@@ -1,0 +1,50 @@
+# IntelliJ IDEA specific files
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Logs
+logs/
+*.log
+
+# Target folder (build output)
+target/
+build/
+
+# Dependency directories
+.mvn/
+.gradle/
+out/
+
+# Compiled class files
+*.class
+
+# Generated files
+*.war
+*.jar
+*.ear
+
+# Spring Boot specific
+application.properties
+application.yml
+application-*.properties
+application-*.yml
+
+# Package managers
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE-specific files
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# Test reports
+test-output/
