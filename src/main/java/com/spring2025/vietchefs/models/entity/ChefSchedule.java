@@ -6,13 +6,11 @@ import lombok.*;
 import java.time.LocalTime;
 
 @Entity
-@Table(name = "schedules")
-@Getter
-@Setter
+@Table(name = "chef_schedules")
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
-public class Schedule {
+public class ChefSchedule {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -21,12 +19,15 @@ public class Schedule {
     @JoinColumn(name = "chef_id", nullable = false)
     private Chef chef;
 
+    @Column(nullable = false)
     private Integer dayOfWeek;
 
+    @Column(nullable = false)
     private LocalTime startTime;
 
+    @Column(nullable = false)
     private LocalTime endTime;
 
     @Column(nullable = false)
-    private boolean isDeleted;
+    private Boolean isDeleted = false;
 }

@@ -3,15 +3,12 @@ package com.spring2025.vietchefs.models.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "booking_details")
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class BookingDetail {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,25 +19,12 @@ public class BookingDetail {
     private Booking booking;
 
     @ManyToOne
-    @JoinColumn(name = "schedule_id", nullable = false)
-    private Schedule schedule;
-
-    @ManyToOne
-    @JoinColumn(name = "package_id")
-    private Package pkg;
-
-    private LocalDateTime startDate;
-
-    private LocalDateTime endDate;
-
-    private String location;
-
-    private LocalDateTime checkInTime;
-
-    private LocalDateTime checkOutTime;
-
-    private boolean isCustom;
+    @JoinColumn(name = "dish_id", nullable = false)
+    private Dish dish;
 
     @Column(nullable = false)
-    private boolean isDeleted;
+    private Integer quantity;
+
+    @Column(nullable = false)
+    private Boolean isDeleted = false;
 }

@@ -8,11 +8,9 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "reviews")
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Review {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -23,21 +21,18 @@ public class Review {
     private User user;
 
     @ManyToOne
-    @JoinColumn(name = "dishes_id")
+    @JoinColumn(name = "dishes_id", nullable = false)
     private Dish dish;
 
-    @ManyToOne
-    @JoinColumn(name = "chef_id")
-    private Chef chef;
-
+    @Column(nullable = false)
     private BigDecimal rating;
 
     private String description;
-
     private String response;
 
+    @Column(nullable = false)
     private LocalDateTime createAt;
 
     @Column(nullable = false)
-    private boolean isDeleted;
+    private Boolean isDeleted = false;
 }

@@ -7,11 +7,9 @@ import java.time.LocalDate;
 
 @Entity
 @Table(name = "reports")
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Report {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -25,10 +23,13 @@ public class Report {
     @JoinColumn(name = "reported_user_id", nullable = false)
     private User reportedUser;
 
+    @Column(nullable = false)
     private String reason;
 
+    @Column(nullable = false)
     private String status;
 
+    @Column(nullable = false)
     private LocalDate createAt;
 
     @ManyToOne
@@ -36,5 +37,5 @@ public class Report {
     private Review review;
 
     @Column(nullable = false)
-    private boolean isDeleted;
+    private Boolean isDeleted = false;
 }
