@@ -8,39 +8,39 @@ import java.time.LocalTime;
 
 @Entity
 @Table(name = "dishes")
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Dish {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne
+    @JoinColumn(name = "chef_id", nullable = false)
+    private Chef chef;
+
     @Column(nullable = false)
     private String name;
-
     private String description;
 
     @Column(nullable = false)
-    private BigDecimal price;
-
     private String cuisineType;
 
+    @Column(nullable = false)
     private String serviceType;
 
     private LocalTime cookTime;
 
-    private Integer servingSize;
+    @Column(nullable = false)
+    private Integer servingSize = 1;
 
     private String imageUrl;
-
     private LocalTime preparationTime;
 
     @Column(nullable = false)
-    private boolean isAvailable;
+    private Boolean isAvailable = true;
 
     @Column(nullable = false)
-    private boolean isDeleted;
+    private Boolean isDeleted = false;
 }
