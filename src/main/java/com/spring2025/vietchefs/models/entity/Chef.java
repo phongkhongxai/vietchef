@@ -7,26 +7,27 @@ import java.math.BigDecimal;
 
 @Entity
 @Table(name = "chefs")
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Chef {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long chefId;
+    private Long id;
 
     @OneToOne
-    @JoinColumn(name = "user_id", unique = true, nullable = false)
+    @JoinColumn(name = "user_id", nullable = false, unique = true)
     private User user;
 
     private String bio;
-
     private String description;
 
-    private BigDecimal rating;
+    @Column(nullable = false)
+    private BigDecimal price;
 
     @Column(nullable = false)
-    private boolean isDeleted;
+    private String status;
+
+    @Column(nullable = false)
+    private Boolean isDeleted = false;
 }

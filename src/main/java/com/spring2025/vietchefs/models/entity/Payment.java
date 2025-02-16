@@ -8,11 +8,9 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "payments")
-@Getter
-@Setter
+@Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Payment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,18 +20,28 @@ public class Payment {
     @JoinColumn(name = "booking_id", nullable = false)
     private Booking booking;
 
-    private LocalDateTime paymentDate;
+    @ManyToOne
+    @JoinColumn(name = "customer_id", nullable = false)
+    private User customer;
 
-    private BigDecimal amount;
-
-    private String method;
-
-    private String status;
-
-    private BigDecimal tipAmount;
-
-    private BigDecimal platformFee;
+    @Column(nullable = false, unique = true)
+    private String transactionId;
 
     @Column(nullable = false)
-    private boolean isDeleted;
+    private String paymentMethod;
+
+    @Column(nullable = false)
+    private BigDecimal amount;
+
+    @Column(nullable = false)
+    private String currency;
+
+    @Column(nullable = false)
+    private String status;
+
+    @Column(nullable = false)
+    private LocalDateTime createAt;
+
+    @Column(nullable = false)
+    private Boolean isDeleted = false;
 }
