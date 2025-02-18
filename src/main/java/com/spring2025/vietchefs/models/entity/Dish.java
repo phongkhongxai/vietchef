@@ -43,4 +43,8 @@ public class Dish {
 
     @Column(nullable = false)
     private Boolean isDeleted = false;
+
+    @ManyToOne
+    @JoinColumn(name = "food_type_id", nullable = false)
+    private FoodType foodType;
 }
