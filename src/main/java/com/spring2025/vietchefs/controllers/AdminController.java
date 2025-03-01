@@ -15,6 +15,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+
 @RestController
 @RequestMapping("/api/v1/admin")
 public class AdminController {
@@ -31,7 +33,7 @@ public class AdminController {
         ChefDto chefDto = new ChefDto();
         chefDto.setUserId(bt.getId());
         chefDto.setBio("Hello world");
-        chefDto.setPrice(5);
+        chefDto.setPrice(BigDecimal.valueOf(20));
         chefDto.setDescription("Bonjour");
         chefDto.setStatus("active");
         ChefDto chefDt = chefService.createChef(chefDto);

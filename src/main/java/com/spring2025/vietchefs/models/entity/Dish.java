@@ -29,11 +29,11 @@ public class Dish {
 
     @Column(nullable = false)
     private String serviceType;
-
-    private LocalTime cookTime;
+    @Column(nullable = false)
+    private BigDecimal cookTime; // Thời gian nấu trung bình
 
     @Column(nullable = false)
-    private Integer servingSize = 1;
+    private BigDecimal basePrice; // Giá cơ bản cho mỗi người
 
     private String imageUrl;
     private LocalTime preparationTime;

@@ -9,5 +9,6 @@ public interface UserService {
     UserDto saveChefUser(SignupDto signupDto);
     String deleteUser(Long id);
     UsersResponse getAllUser(int pageNo, int pageSize, String sortBy, String sortDir);
+    UserDto getProfileUserByUsernameOrEmail(String username, String email);
 
 }
