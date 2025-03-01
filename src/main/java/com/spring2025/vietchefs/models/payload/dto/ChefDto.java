@@ -17,6 +17,7 @@ public class ChefDto {
     private UserDto user;
     private String bio;
     private String description;
-    private double price;
+    private BigDecimal price;
+    private Integer maxServingSize;
     private String status;
 }

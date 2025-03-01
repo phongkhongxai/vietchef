@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalTime;
 
 @Getter
@@ -21,9 +22,8 @@ public class DishDto {
     private String description;
     private String cuisineType;
     private String serviceType;
-    private LocalTime cookTime;
-    private Integer servingSize;
+    private BigDecimal cookTime;
+    private BigDecimal basePrice;
     private String imageUrl;
-    private LocalTime preparationTime;
 
 }

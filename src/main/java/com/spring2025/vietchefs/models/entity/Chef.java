@@ -23,7 +23,9 @@ public class Chef {
     private String description;
 
     @Column(nullable = false)
-    private double price;
+    private BigDecimal price;
+    @Column(nullable = false)
+    private Integer maxServingSize = 10;
 
     @Column(nullable = false)
     private String status;

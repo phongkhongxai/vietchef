@@ -91,4 +91,11 @@ public class UserServiceImpl implements UserService {
 
         return templatesResponse;
     }
+
+    @Override
+    public UserDto getProfileUserByUsernameOrEmail(String username, String email) {
+        User existingUser = userRepository.findByUsernameOrEmail(username, email)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.BAD_REQUEST, "User not found"));
+        return modelMapper.map(existingUser, UserDto.class);
+    }
 }

@@ -76,8 +76,8 @@ public class DishServiceImpl implements DishService {
         dish.setCuisineType(dishRequest.getCuisineType() != null ? dishRequest.getCuisineType() : dish.getCuisineType());
         dish.setServiceType(dishRequest.getServiceType() != null ? dishRequest.getServiceType() : dish.getServiceType());
         dish.setCookTime(dishRequest.getCookTime() != null ? dishRequest.getCookTime() : dish.getCookTime());
-        dish.setServingSize(dishRequest.getServingSize() != null ? dishRequest.getServingSize() : dish.getServingSize());
-        dish.setPreparationTime(dishRequest.getPreparationTime() != null ? dishRequest.getPreparationTime() : dish.getPreparationTime());
+        dish.setBasePrice(dishRequest.getBasePrice() != null ? dishRequest.getBasePrice() : dish.getBasePrice());
+        //dish.setPreparationTime(dishRequest.getPreparationTime() != null ? dishRequest.getPreparationTime() : dish.getPreparationTime());
         Dish updatedDish = dishRepository.save(dish);
         return modelMapper.map(updatedDish, DishDto.class);
     }
