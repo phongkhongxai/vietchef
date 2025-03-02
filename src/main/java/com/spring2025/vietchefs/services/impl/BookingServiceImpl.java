@@ -94,7 +94,6 @@ public class BookingServiceImpl implements BookingService {
                 List<Long> dishIds = new ArrayList<>();
                 Set<Long> uniqueDishIds = new HashSet<>();
 
-                // 🛑 Kiểm tra Menu có phải của Chef không
                 if (detailDto.getMenuId() != null) {
                     Menu menu = menuRepository.findById(detailDto.getMenuId())
                             .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Menu not found"));
@@ -110,7 +109,6 @@ public class BookingServiceImpl implements BookingService {
                     uniqueDishIds.addAll(menuDishIds);
                 }
 
-                // 🛑 Kiểm tra từng Dish có thuộc về Chef không
                 if (detailDto.getExtraDishIds() != null && !detailDto.getExtraDishIds().isEmpty()) {
                     for (Long extraDishId : detailDto.getExtraDishIds()) {
                         Dish dish = dishRepository.findById(extraDishId)
@@ -137,6 +135,7 @@ public class BookingServiceImpl implements BookingService {
             // 🔹 Tính phí dịch vụ đầu bếp (công nấu ăn)
             BigDecimal price1 = calculateService.calculateChefServiceFee(chef.getPrice(), totalCookTime);
             reviewSingleBookingResponse.setChefCookingFee(price1);
+            reviewSingleBookingResponse.setCookTimeMinutes(totalCookTime.multiply(BigDecimal.valueOf(60)));
 
             // 🔹 Tính phí món ăn (menu hoặc món lẻ)
             BigDecimal price2 = calculateService.calculateDishPrice(detailDto);
