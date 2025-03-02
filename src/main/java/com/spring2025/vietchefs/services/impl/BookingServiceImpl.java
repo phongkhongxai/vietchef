@@ -20,7 +20,9 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -87,43 +89,70 @@ public class BookingServiceImpl implements BookingService {
 
         for (BookingDetailPriceRequestDto detailDto : dto.getBookingDetails()) {
             BigDecimal totalCookTime = BigDecimal.ZERO;
+
             if (detailDto.getMenuId() != null || (detailDto.getExtraDishIds() != null && !detailDto.getExtraDishIds().isEmpty())) {
                 List<Long> dishIds = new ArrayList<>();
+                Set<Long> uniqueDishIds = new HashSet<>();
 
                 if (detailDto.getMenuId() != null) {
                     Menu menu = menuRepository.findById(detailDto.getMenuId())
                             .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Menu not found"));
-                    dishIds.addAll(menu.getMenuItems().stream()
+
+                    if (!menu.getChef().getId().equals(chef.getId())) {
+                        throw new VchefApiException(HttpStatus.BAD_REQUEST, "Menu does not belong to the selected Chef");
+                    }
+
+                    List<Long> menuDishIds = menu.getMenuItems().stream()
                             .map(item -> item.getDish().getId())
-                            .collect(Collectors.toList()));
+                            .collect(Collectors.toList());
+
+                    uniqueDishIds.addAll(menuDishIds);
                 }
 
                 if (detailDto.getExtraDishIds() != null && !detailDto.getExtraDishIds().isEmpty()) {
-                    dishIds.addAll(detailDto.getExtraDishIds());
+                    for (Long extraDishId : detailDto.getExtraDishIds()) {
+                        Dish dish = dishRepository.findById(extraDishId)
+                                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Dish not found with ID: " + extraDishId));
+
+                        if (!dish.getChef().getId().equals(chef.getId())) {
+                            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Dish with ID " + extraDishId + " does not belong to the selected Chef");
+                        }
+
+                        if (!uniqueDishIds.contains(extraDishId)) {
+                            uniqueDishIds.add(extraDishId);
+                        }
+                    }
                 }
 
+                dishIds.addAll(uniqueDishIds);
                 if (!dishIds.isEmpty()) {
                     totalCookTime = calculateService.calculateTotalCookTime(dishIds);
                 } else {
                     throw new VchefApiException(HttpStatus.BAD_REQUEST, "At least one dish must be selected.");
                 }
             }
+
             // 🔹 Tính phí dịch vụ đầu bếp (công nấu ăn)
             BigDecimal price1 = calculateService.calculateChefServiceFee(chef.getPrice(), totalCookTime);
+            reviewSingleBookingResponse.setChefCookingFee(price1);
+            reviewSingleBookingResponse.setCookTimeMinutes(totalCookTime.multiply(BigDecimal.valueOf(60)));
 
             // 🔹 Tính phí món ăn (menu hoặc món lẻ)
             BigDecimal price2 = calculateService.calculateDishPrice(detailDto);
+            reviewSingleBookingResponse.setPriceOfDishes(price2);
 
             // 🔹 Tính phí di chuyển
             DistanceFeeResponse price3Of = calculateService.calculateTravelFee(chef.getUser().getAddress(), detailDto.getLocation());
             BigDecimal price3 = price3Of.getTravelFee();
             TimeTravelResponse ttp = calculateService.calculateArrivalTime(detailDto.getStartTime(), totalCookTime, price3Of.getDurationHours());
-
+            reviewSingleBookingResponse.setArrivalFee(price3);
             //  Nếu khách chọn phục vụ, tính thêm phí phục vụ
             BigDecimal servingFee = BigDecimal.ZERO;
             if (dto.getIsServing()) {
                 servingFee = calculateService.calculateServingFee(detailDto.getStartTime(), detailDto.getEndTime(), chef.getPrice());
             }
+            reviewSingleBookingResponse.setChefServingFee(servingFee);
+            reviewSingleBookingResponse.setPlatformFee(price1.multiply(BigDecimal.valueOf(0.12)));
 
             // 🔹 Tính tổng giá của BookingDetail
             BigDecimal price4 = calculateService.calculateFinalPrice(price1, price2, price3).add(servingFee);

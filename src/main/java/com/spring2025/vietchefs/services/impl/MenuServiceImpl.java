@@ -26,6 +26,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -91,8 +92,13 @@ public class MenuServiceImpl implements MenuService {
         // get content for page object
         List<Menu> listOfMenu = menu.getContent();
 
-        List<MenuResponseDto> content = listOfMenu.stream().map(bt -> modelMapper.map(bt, MenuResponseDto.class)).collect(Collectors.toList());
+        List<MenuResponseDto> content = listOfMenu.stream().map(meu -> {
+            MenuResponseDto dto = modelMapper.map(meu, MenuResponseDto.class);
+            dto.setBeforePrice(calculateMenuPrice(meu, false));
+            dto.setAfterPrice(calculateMenuPrice(meu, true));
 
+            return dto;
+        }).collect(Collectors.toList());
         MenuPagingResponse templatesResponse = new MenuPagingResponse();
         templatesResponse.setContent(content);
         templatesResponse.setPageNo(menu.getNumber());
@@ -101,6 +107,17 @@ public class MenuServiceImpl implements MenuService {
         templatesResponse.setTotalPages(menu.getTotalPages());
         templatesResponse.setLast(menu.isLast());
         return templatesResponse;
+    }
+    private BigDecimal calculateMenuPrice(Menu menu, boolean applyDiscount) {
+        BigDecimal totalPrice = menu.getMenuItems().stream()
+                .map(item -> item.getDish().getBasePrice())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (applyDiscount && menu.getHasDiscount() && menu.getDiscountPercentage() != null) {
+            BigDecimal discount = BigDecimal.valueOf(menu.getDiscountPercentage()).divide(BigDecimal.valueOf(100));
+            totalPrice = totalPrice.multiply(BigDecimal.ONE.subtract(discount));
+        }
+        return totalPrice;
     }
 
     @Override
@@ -125,8 +142,13 @@ public class MenuServiceImpl implements MenuService {
         // get content for page object
         List<Menu> listOfMenu = menu.getContent();
 
-        List<MenuResponseDto> content = listOfMenu.stream().map(bt -> modelMapper.map(bt, MenuResponseDto.class)).collect(Collectors.toList());
+        List<MenuResponseDto> content = listOfMenu.stream().map(meu -> {
+            MenuResponseDto dto = modelMapper.map(meu, MenuResponseDto.class);
+            dto.setBeforePrice(calculateMenuPrice(meu, false));
+            dto.setAfterPrice(calculateMenuPrice(meu, true));
 
+            return dto;
+        }).collect(Collectors.toList());
         MenuPagingResponse templatesResponse = new MenuPagingResponse();
         templatesResponse.setContent(content);
         templatesResponse.setPageNo(menu.getNumber());

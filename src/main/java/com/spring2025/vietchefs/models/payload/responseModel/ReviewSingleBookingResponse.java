@@ -9,5 +9,11 @@ import java.time.LocalTime;
 public class ReviewSingleBookingResponse {
     private LocalTime timeBeginTravel;
     private LocalTime timeBeginCook;
+    private BigDecimal cookTimeMinutes;
+    private BigDecimal chefCookingFee;
+    private BigDecimal priceOfDishes;
+    private BigDecimal arrivalFee;
+    private BigDecimal chefServingFee;
+    private BigDecimal platformFee;
     private BigDecimal totalPrice;
 }

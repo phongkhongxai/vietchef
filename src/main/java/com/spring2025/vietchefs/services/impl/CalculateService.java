@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalTime;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -37,17 +38,18 @@ public class CalculateService {
         List<BigDecimal> cookTimes = menuItemIds.stream()
                 .map(item -> dishRepository.findByIdNotDeleted(item)
                         .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Dish not found"))
-                        .getCookTime()) //
+                        .getCookTime()) // Lấy thời gian nấu của món ăn (phút)
+                .sorted(Comparator.reverseOrder())
                 .toList();
 
         if (cookTimes.isEmpty()) {
             return BigDecimal.ZERO;
         }
 
-        BigDecimal maxCookTime = cookTimes.stream().max(BigDecimal::compareTo).orElse(BigDecimal.ZERO);
-        BigDecimal minCookTime = cookTimes.stream().min(BigDecimal::compareTo).orElse(BigDecimal.ZERO);
+        BigDecimal maxCookTime = cookTimes.get(0);
+        BigDecimal secondMaxCookTime = cookTimes.size() > 1 ? cookTimes.get(1) : BigDecimal.ZERO;
 
-        return maxCookTime.add(minCookTime).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+        return maxCookTime.add(secondMaxCookTime).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
     }
 
     public BigDecimal calculateDishPrice(BookingDetailPriceRequestDto detailDto) {
