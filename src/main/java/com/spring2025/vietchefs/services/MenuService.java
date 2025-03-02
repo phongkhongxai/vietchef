@@ -12,7 +12,6 @@ public interface MenuService {
     MenuPagingResponse getMenusByChef(Long chefId, int pageNo, int pageSize, String sortBy, String sortDir);
     MenuResponseDto getMenuById(Long id);
     MenuPagingResponse getAllMenus(int pageNo, int pageSize, String sortBy, String sortDir);
-
     MenuResponseDto updateMenu(Long menuId, MenuUpdateDto menuUpdateDto);
     String deleteMenu(Long menuId);
 }

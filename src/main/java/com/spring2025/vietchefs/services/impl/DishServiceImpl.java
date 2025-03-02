@@ -3,6 +3,7 @@ package com.spring2025.vietchefs.services.impl;
 import com.spring2025.vietchefs.models.entity.Chef;
 import com.spring2025.vietchefs.models.entity.Dish;
 import com.spring2025.vietchefs.models.entity.FoodType;
+import com.spring2025.vietchefs.models.entity.Menu;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.dto.DishDto;
 import com.spring2025.vietchefs.models.payload.requestModel.DishRequest;
@@ -10,6 +11,7 @@ import com.spring2025.vietchefs.models.payload.responseModel.DishesResponse;
 import com.spring2025.vietchefs.repositories.ChefRepository;
 import com.spring2025.vietchefs.repositories.DishRepository;
 import com.spring2025.vietchefs.repositories.FoodTypeRepository;
+import com.spring2025.vietchefs.repositories.MenuRepository;
 import com.spring2025.vietchefs.services.DishService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +32,8 @@ public class DishServiceImpl implements DishService {
     private ModelMapper modelMapper;
     @Autowired
     private DishRepository dishRepository;
+    @Autowired
+    private MenuRepository menuRepository;
     @Autowired
     private ChefRepository chefRepository;
     @Autowired
@@ -130,6 +134,33 @@ public class DishServiceImpl implements DishService {
         Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
 
         Page<Dish> dishes = dishRepository.findByChefAndIsDeletedFalse(chef,pageable);
+
+        // get content for page object
+        List<Dish> listOfDishes = dishes.getContent();
+
+        List<DishDto> content = listOfDishes.stream().map(bt -> modelMapper.map(bt, DishDto.class)).collect(Collectors.toList());
+
+        DishesResponse templatesResponse = new DishesResponse();
+        templatesResponse.setContent(content);
+        templatesResponse.setPageNo(dishes.getNumber());
+        templatesResponse.setPageSize(dishes.getSize());
+        templatesResponse.setTotalElements(dishes.getTotalElements());
+        templatesResponse.setTotalPages(dishes.getTotalPages());
+        templatesResponse.setLast(dishes.isLast());
+        return templatesResponse;
+    }
+
+    @Override
+    public DishesResponse getDishesNotInMenu(Long menuId, int pageNo, int pageSize, String sortBy, String sortDir) {
+        Menu menu = menuRepository.findById(menuId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"Menu not found with id: "+ menuId));
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+
+        // create Pageable instance
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+
+        Page<Dish> dishes = dishRepository.findByNotInMenu(menu.getId(),pageable);
 
         // get content for page object
         List<Dish> listOfDishes = dishes.getContent();
