@@ -89,10 +89,21 @@ public class CalculateService {
 
     public DistanceFeeResponse calculateTravelFee(String chefAddress, String customerLocation) {
         DistanceResponse distanceAndTime = distanceService.calculateDistanceAndTime(chefAddress, customerLocation);
+        if (distanceAndTime.getDistanceKm().compareTo(BigDecimal.ZERO) == 0 &&
+                distanceAndTime.getDurationHours().compareTo(BigDecimal.ZERO) == 0) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Address not found.");
+        }
+        BigDecimal travelFee;
+        if (distanceAndTime.getDistanceKm().compareTo(BigDecimal.valueOf(3)) < 0) {
+            travelFee = BigDecimal.ZERO; // dưới 3km free cost
+        } else {
+            travelFee = distanceAndTime.getDistanceKm().multiply(BigDecimal.valueOf(2.5)); // 2.5 đô/km
+        }
+
         DistanceFeeResponse distanceFee = new DistanceFeeResponse();
         distanceFee.setDistanceKm(distanceAndTime.getDistanceKm());
         distanceFee.setDurationHours(distanceAndTime.getDurationHours());
-        distanceFee.setTravelFee(distanceAndTime.getDistanceKm().multiply(BigDecimal.valueOf(2.5))); //2.5 đô 1km
+        distanceFee.setTravelFee(travelFee);
         return distanceFee;
     }
 

@@ -127,6 +127,8 @@ public class BookingServiceImpl implements BookingService {
                 dishIds.addAll(uniqueDishIds);
                 if (!dishIds.isEmpty()) {
                     totalCookTime = calculateService.calculateTotalCookTime(dishIds);
+                    reviewSingleBookingResponse.setCookTimeMinutes(totalCookTime.multiply(BigDecimal.valueOf(60)));
+
                 } else {
                     throw new VchefApiException(HttpStatus.BAD_REQUEST, "At least one dish must be selected.");
                 }
@@ -135,7 +137,6 @@ public class BookingServiceImpl implements BookingService {
             // 🔹 Tính phí dịch vụ đầu bếp (công nấu ăn)
             BigDecimal price1 = calculateService.calculateChefServiceFee(chef.getPrice(), totalCookTime);
             reviewSingleBookingResponse.setChefCookingFee(price1);
-            reviewSingleBookingResponse.setCookTimeMinutes(totalCookTime.multiply(BigDecimal.valueOf(60)));
 
             // 🔹 Tính phí món ăn (menu hoặc món lẻ)
             BigDecimal price2 = calculateService.calculateDishPrice(detailDto);
