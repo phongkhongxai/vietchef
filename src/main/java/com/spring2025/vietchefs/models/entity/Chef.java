@@ -26,10 +26,24 @@ public class Chef {
     private BigDecimal price;
     @Column(nullable = false)
     private Integer maxServingSize = 10;
-
     @Column(nullable = false)
     private String status;
-
     @Column(nullable = false)
     private Boolean isDeleted = false;
+    @Column(nullable = false)
+    private String specialization = "Vietnamese Cuisine"; // Mặc định là "Ẩm thực Việt Nam"
+
+    @Column(nullable = false)
+    private String country; // Quốc gia hiện tại của đầu bếp (VD: USA, Canada, Germany)
+
+    @Column(nullable = true)
+    private Integer yearsOfExperience; // Số năm kinh nghiệm nấu món Việt
+
+    @Column(nullable = true)
+    private String certification; // Chứng chỉ ẩm thực (nếu có)
+    @Column(nullable = false)
+    private Boolean providesIngredients = false; // Có thể tự mua nguyên liệu không?
+
+    @Column(nullable = true)
+    private String preferredDishes; // Các món Việt Nam sở trường (VD: "Phở, Bún Bò, Cơm Tấm")
 }
