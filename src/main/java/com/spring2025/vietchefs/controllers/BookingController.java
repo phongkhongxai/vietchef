@@ -37,6 +37,14 @@ public class BookingController {
     }
     @SecurityRequirement(name = "Bear Authentication")
     @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_ADMIN')")
+    @PostMapping("/{bookingId}/retry-payment")
+    public ResponseEntity<?> retryPayment(@PathVariable Long bookingId) {
+        BookingResponseDto bookingResponseDto = bookingService.retryPayment(bookingId);
+        return new ResponseEntity<>(bookingResponseDto, HttpStatus.OK);
+
+    }
+    @SecurityRequirement(name = "Bear Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_ADMIN')")
     @PostMapping("/calculate-single-booking")
     public ResponseEntity<?> calculatePriceBookingSingle(@RequestBody BookingPriceRequestDto dto) {
         ReviewSingleBookingResponse reviewSingleBookingResponse = bookingService.calculateFinalPriceForSingleBooking(dto);

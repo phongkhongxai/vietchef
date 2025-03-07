@@ -126,6 +126,7 @@ public class MenuServiceImpl implements MenuService {
         if (menu.isEmpty()){
             throw new VchefApiException(HttpStatus.NOT_FOUND, "Menu not found with id: "+ id);
         }
+        
         return modelMapper.map(menu.get(), MenuResponseDto.class);
     }
 

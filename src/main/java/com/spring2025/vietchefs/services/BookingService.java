@@ -9,5 +9,8 @@ import java.math.BigDecimal;
 
 public interface BookingService {
     BookingResponseDto createSingleBooking(BookingRequestDto dto);
+
     ReviewSingleBookingResponse calculateFinalPriceForSingleBooking(BookingPriceRequestDto dto);
+    void updateBookingStatus(Long bookingId, String newStatus);
+    BookingResponseDto retryPayment(Long bookingId);
 }

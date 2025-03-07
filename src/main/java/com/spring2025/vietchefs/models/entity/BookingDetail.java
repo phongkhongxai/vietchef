@@ -40,7 +40,6 @@ public class BookingDetail {
     private LocalTime endTime;
     @Column(nullable = false)
     private String location;
-
     @Column(nullable = false)
     private BigDecimal totalPrice;
     @OneToMany(mappedBy = "bookingDetail", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
