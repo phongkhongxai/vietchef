@@ -22,4 +22,5 @@ public class BookingResponseDto {
     private String requestDetails;
     private int guestCount;
     private BigDecimal totalPrice;
+    private String paymentLink;
 }

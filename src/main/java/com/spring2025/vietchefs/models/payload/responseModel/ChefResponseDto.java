@@ -1,5 +1,6 @@
 package com.spring2025.vietchefs.models.payload.responseModel;
 
+import com.spring2025.vietchefs.models.payload.dto.UserDto;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -9,10 +10,8 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @Builder
 public class ChefResponseDto {
-    private Long id;                   // ID của Chef
-    private Long userId;                // ID của User liên kết
-    private String fullName;            // Tên đầy đủ của Chef
-    private String email;               // Email của Chef
+    private Long id;
+    private UserDto user;
     private String bio;                 // Giới thiệu ngắn
     private String description;         // Mô tả chi tiết
     private BigDecimal price;           // Giá theo giờ

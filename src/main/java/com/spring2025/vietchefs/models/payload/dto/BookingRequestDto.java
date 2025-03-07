@@ -17,7 +17,6 @@ import java.util.List;
 public class BookingRequestDto {
     private Long customerId;
     private Long chefId;
-    private String bookingType; // "single" hoặc "recurring"
     private String requestDetails;
     private int guestCount;
     private BigDecimal totalPrice;

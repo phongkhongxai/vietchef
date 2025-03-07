@@ -19,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -31,7 +32,8 @@ public class BookingServiceImpl implements BookingService {
     private BookingDetailRepository bookingDetailRepository;
     @Autowired
     private BookingRepository bookingRepository;
-
+    @Autowired
+    private PaypalService paypalService;
     @Autowired
     private BookingDetailItemRepository bookingDetailItemRepository;
     @Autowired
@@ -76,7 +78,36 @@ public class BookingServiceImpl implements BookingService {
         booking.setTotalPrice(totalPrice);
         Booking booking1 = bookingRepository.save(booking);
 
-        return modelMapper.map(booking1, BookingResponseDto.class);
+        // Tích hợp thanh toán PayPal
+        try {
+            String returnUrl = "http://localhost:8080/api/v1/paypal/success"; // Thay bằng URL thực tế
+            String cancelUrl = "http://localhost:8080/api/v1/paypal/cancel";  // Thay bằng URL thực tế
+            String currency = "USD";
+
+            String paymentLink = paypalService.createPayment(
+                    booking1.getTotalPrice(),
+                    currency,
+                    booking1.getId(),
+                    returnUrl,
+                    cancelUrl
+            ).block(); // Chuyển Mono thành kết quả blocking
+
+            if (paymentLink != null) {
+                // Thanh toán đã được khởi tạo, giữ trạng thái PENDING
+                // Trạng thái sẽ được cập nhật sau khi capture thành công
+                BookingResponseDto responseDto = modelMapper.map(booking1, BookingResponseDto.class);
+                responseDto.setPaymentLink(paymentLink);
+                return responseDto;
+            } else {
+                throw new VchefApiException(HttpStatus.INTERNAL_SERVER_ERROR,"Failed to generate payment link");
+            }
+        } catch (Exception e) {
+            // Nếu tạo thanh toán thất bại, cập nhật trạng thái booking thành FAILED
+            booking.setStatus("FAILED");
+            bookingRepository.save(booking);
+            throw new VchefApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Payment initiation failed: " + e.getMessage());
+        }
+
     }
 
     @Override
@@ -166,5 +197,49 @@ public class BookingServiceImpl implements BookingService {
         }
 
         return reviewSingleBookingResponse;
+    }
+
+    @Override
+    public void updateBookingStatus(Long bookingId, String newStatus) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Booking not found with ID: " + bookingId));
+        booking.setStatus(newStatus);
+        booking.setUpdatedAt(LocalDateTime.now());
+        bookingRepository.save(booking);
+    }
+
+    @Override
+    public BookingResponseDto retryPayment(Long bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Booking not found with ID: " + bookingId));
+
+        if (!"PENDING".equals(booking.getStatus())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Booking must be in PENDING status to retry payment");
+        }
+
+        try {
+            String returnUrl = "http://localhost:8080/api/v1/paypal/success";
+            String cancelUrl = "http://localhost:8080/api/v1/paypal/cancel";
+            String currency = "USD";
+
+            String paymentLink = paypalService.createPayment(
+                    booking.getTotalPrice(),
+                    currency,
+                    booking.getId(),
+                    returnUrl,
+                    cancelUrl
+            ).block();
+
+            if (paymentLink != null) {
+                BookingResponseDto responseDto = modelMapper.map(booking, BookingResponseDto.class);
+                responseDto.setPaymentLink(paymentLink);
+                return responseDto;
+            } else {
+                throw new VchefApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to generate payment link");
+            }
+        } catch (Exception e) {
+            throw new VchefApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Retry payment failed: " + e.getMessage());
+        }
+
     }
 }
