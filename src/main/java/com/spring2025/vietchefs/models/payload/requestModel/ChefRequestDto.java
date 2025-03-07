@@ -1,5 +1,6 @@
 package com.spring2025.vietchefs.models.payload.requestModel;
 
+import jakarta.persistence.Column;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -12,6 +13,7 @@ import java.math.BigDecimal;
 public class ChefRequestDto {
     private String bio;
     private String description;
+    private String address;
     private BigDecimal price;
     private Integer maxServingSize;
     private String specialization; // Chuyên môn (Món Bắc, Món Nam, Món Trung, Hải sản...)

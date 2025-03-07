@@ -35,6 +35,7 @@ public class AdminController {
         chefDto.setBio("Hello world");
         chefDto.setPrice(BigDecimal.valueOf(20));
         chefDto.setDescription("Bonjour");
+        chefDto.setAddress("S302 Vinhomes Grand Park Quan 9 Ho Chi Minh");
         chefDto.setStatus("active");
         ChefDto chefDt = chefService.createChef(chefDto);
         return new ResponseEntity<>(chefDt, HttpStatus.CREATED);

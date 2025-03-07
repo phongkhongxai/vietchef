@@ -36,9 +36,6 @@ public class User {
     private LocalDate dob;
 
     @Column(nullable = false)
-    private String address;
-
-    @Column(nullable = false)
     private String gender;
 
     @Column(nullable = false)
@@ -79,6 +76,7 @@ public class User {
     @OneToMany(mappedBy = "user")
     private List<AccessToken> accessToken;
 
-
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Address> addresses;
 
 }

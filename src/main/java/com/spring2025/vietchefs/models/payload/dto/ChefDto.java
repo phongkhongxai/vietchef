@@ -1,5 +1,6 @@
 package com.spring2025.vietchefs.models.payload.dto;
 
+import jakarta.persistence.Column;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,6 +18,7 @@ public class ChefDto {
     private UserDto user;
     private String bio;
     private String description;
+    private String address;
     private BigDecimal price;
     private Integer maxServingSize;
     private String status;

@@ -15,6 +15,8 @@ public class ChefResponseDto {
     private String email;               // Email của Chef
     private String bio;                 // Giới thiệu ngắn
     private String description;         // Mô tả chi tiết
+
+    private String address;
     private BigDecimal price;           // Giá theo giờ
     private Integer maxServingSize;     // Số lượng khách tối đa
     private String specialization;      // Chuyên môn

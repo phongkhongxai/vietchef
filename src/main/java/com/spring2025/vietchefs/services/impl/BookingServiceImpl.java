@@ -143,7 +143,7 @@ public class BookingServiceImpl implements BookingService {
             reviewSingleBookingResponse.setPriceOfDishes(price2);
 
             // 🔹 Tính phí di chuyển
-            DistanceFeeResponse price3Of = calculateService.calculateTravelFee(chef.getUser().getAddress(), detailDto.getLocation());
+            DistanceFeeResponse price3Of = calculateService.calculateTravelFee(chef.getAddress(), detailDto.getLocation());
             BigDecimal price3 = price3Of.getTravelFee();
             TimeTravelResponse ttp = calculateService.calculateArrivalTime(detailDto.getStartTime(), totalCookTime, price3Of.getDurationHours());
             reviewSingleBookingResponse.setArrivalFee(price3);

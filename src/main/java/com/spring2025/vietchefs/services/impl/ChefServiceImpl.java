@@ -60,6 +60,7 @@ public class ChefServiceImpl implements ChefService {
         chef.setUser(user);
         chef.setBio(chefDto.getBio());
         chef.setDescription(chefDto.getDescription());
+        chef.setAddress(chefDto.getAddress());
         chef.setPrice(chefDto.getPrice());
         chef.setStatus(chefDto.getStatus() != null ? chefDto.getStatus() : "active");
         chef = chefRepository.save(chef);
@@ -92,6 +93,7 @@ public class ChefServiceImpl implements ChefService {
         chef.setUser(user);
         chef.setBio(requestDto.getBio());
         chef.setDescription(requestDto.getDescription());
+        chef.setAddress(requestDto.getAddress());
         chef.setPrice(requestDto.getPrice() != null ? requestDto.getPrice() : BigDecimal.valueOf(10));
         chef.setMaxServingSize(requestDto.getMaxServingSize() != null ? requestDto.getMaxServingSize() : 10);
         chef.setStatus("PENDING");
@@ -156,6 +158,7 @@ public class ChefServiceImpl implements ChefService {
 
         chef.setBio(requestDto.getBio() != null ? requestDto.getBio() : chef.getBio());
         chef.setDescription(requestDto.getDescription() != null ? requestDto.getDescription() : chef.getDescription());
+        chef.setAddress(requestDto.getAddress() != null ? requestDto.getAddress() : chef.getAddress());
         chef.setPrice(requestDto.getPrice() != null ? requestDto.getPrice() : chef.getPrice());
         chef.setMaxServingSize(requestDto.getMaxServingSize() != null ? requestDto.getMaxServingSize() : chef.getMaxServingSize());
 
