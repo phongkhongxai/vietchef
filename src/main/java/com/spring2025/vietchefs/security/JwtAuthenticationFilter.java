@@ -5,6 +5,7 @@ package com.spring2025.vietchefs.security;
 import com.spring2025.vietchefs.models.entity.AccessToken;
 import com.spring2025.vietchefs.repositories.AccessTokenRepository;
 import com.spring2025.vietchefs.repositories.RefreshTokenRepository;
+import com.spring2025.vietchefs.utils.CustomUserDetails;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -43,39 +44,73 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 //        this.refreshTokenRepository = refreshTokenRepository;
 //    }
 
+//    @Override
+//    public void doFilterInternal(HttpServletRequest request,
+//                                 HttpServletResponse response,
+//                                 FilterChain filterChain) throws ServletException, IOException {
+//        // get jwt from request header
+//        String jwt = getJwtFromRequest(request);
+//
+//        if (StringUtils.hasText(jwt) && jwtTokenProvider.validateToken(jwt)) {
+//            // get username from jwt
+//            String username = jwtTokenProvider.getUsernameFromJwt(jwt);
+//            //String userId = jwtTokenProvider.getUserIdFromJwt(jwt);
+//
+//            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+//                // load the user associated with the username from token
+//                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+//
+//                AccessToken accessToken = accessTokenRepository.findByToken(jwt);
+//
+//                if (jwtTokenProvider.isTokenValid(jwt, userDetails.getUsername())
+//                        && accessToken != null
+//                        && !accessToken.isRevoked()
+//                        && !accessToken.isExpired()
+//                ) {
+//                    UsernamePasswordAuthenticationToken authToken =
+//                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+//                    authToken.setDetails(
+//                            new WebAuthenticationDetailsSource().buildDetails(request)
+//                    );
+//                    SecurityContextHolder.getContext().setAuthentication(authToken);
+//                }
+//            }
+//        }
+//
+//        filterChain.doFilter(request, response);
+//    }
+
     @Override
-    public void doFilterInternal(HttpServletRequest request,
-                                 HttpServletResponse response,
-                                 FilterChain filterChain) throws ServletException, IOException {
-        // get jwt from request header
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
         String jwt = getJwtFromRequest(request);
 
         if (StringUtils.hasText(jwt) && jwtTokenProvider.validateToken(jwt)) {
-            // get username from jwt
             String username = jwtTokenProvider.getUsernameFromJwt(jwt);
-            //String userId = jwtTokenProvider.getUserIdFromJwt(jwt);
+            // Giả sử JwtTokenProvider hoặc một cơ chế khác cung cấp userId từ token
+            String userIdStr = jwtTokenProvider.getUserIdFromJwt(jwt);
+            Long userId = Long.parseLong(userIdStr);
 
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                // load the user associated with the username from token
+                // Tải UserDetails từ service (bạn có thể chuyển đổi sang CustomUserDetails nếu cần)
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                // Giả sử bạn có thể xây dựng CustomUserDetails từ userDetails và userId:
+                CustomUserDetails customUserDetails = new CustomUserDetails(
+                        userId,
+                        userDetails.getUsername(),
+                        userDetails.getPassword(),
+                        userDetails.getAuthorities()
+                );
 
-                AccessToken accessToken = accessTokenRepository.findByToken(jwt);
-
-                if (jwtTokenProvider.isTokenValid(jwt, userDetails.getUsername())
-                        && accessToken != null
-                        && !accessToken.isRevoked()
-                        && !accessToken.isExpired()
-                ) {
-                    UsernamePasswordAuthenticationToken authToken =
-                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                    authToken.setDetails(
-                            new WebAuthenticationDetailsSource().buildDetails(request)
-                    );
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
-                }
+                UsernamePasswordAuthenticationToken authToken =
+                        new UsernamePasswordAuthenticationToken(customUserDetails, null, customUserDetails.getAuthorities());
+                // Sử dụng WebAuthenticationDetailsSource nếu cần để lưu các thông tin về request
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                // Lưu Authentication vào SecurityContextHolder
+                SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         }
-
         filterChain.doFilter(request, response);
     }
 

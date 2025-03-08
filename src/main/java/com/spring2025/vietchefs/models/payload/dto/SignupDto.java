@@ -33,9 +33,6 @@ public class SignupDto {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate dob;
 
-    @NotEmpty(message = "Address should not be empty!")
-    private String address;
-
     @NotEmpty(message = "Gender should not be empty!")
     private String gender;
 
