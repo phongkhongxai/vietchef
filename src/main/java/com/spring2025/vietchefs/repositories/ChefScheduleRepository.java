@@ -10,4 +10,5 @@ import java.util.List;
 @Repository
 public interface ChefScheduleRepository extends JpaRepository<ChefSchedule, Long> {
     List<ChefSchedule> findByChefAndIsDeletedFalse(Chef chef);
+    List<ChefSchedule> findByChefAndDayOfWeekAndIsDeletedFalse(Chef chef, Integer dayOfWeek);
 }
