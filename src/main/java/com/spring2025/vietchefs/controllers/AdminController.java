@@ -25,7 +25,7 @@ public class AdminController {
     @Autowired
     private UserService userService;
 
-    @SecurityRequirement(name = "Bear Authentication")
+    @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PostMapping("/chefs")
     public ResponseEntity<?> createChefUserEX(@Valid @RequestBody SignupDto signupDto) {
@@ -50,7 +50,7 @@ public class AdminController {
         return userService.getAllUser(pageNo, pageSize, sortBy, sortDir);
     }
 
-    @SecurityRequirement(name = "Bear Authentication")
+    @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     @DeleteMapping("/users/{id}")
     public ResponseEntity<?> deleteUser(@PathVariable("id") Long id) {

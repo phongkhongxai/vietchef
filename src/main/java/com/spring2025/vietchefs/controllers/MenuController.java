@@ -22,13 +22,13 @@ public class MenuController {
     private MenuService menuService;
 
 
-    @SecurityRequirement(name = "Bear Authentication")
+    @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CHEF') or hasRole('ROLE_ADMIN')")
     @PostMapping
     public ResponseEntity<MenuResponseDto> createMenu(@RequestBody MenuRequestDto requestDto) {
         return ResponseEntity.ok(menuService.createMenu(requestDto));
     }
-    @SecurityRequirement(name = "Bear Authentication")
+    @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CHEF') or hasRole('ROLE_ADMIN')")
     @PutMapping("/{menuId}")
     public ResponseEntity<MenuResponseDto> updateMenu(@PathVariable Long menuId, @RequestBody MenuUpdateDto dto) {
@@ -53,7 +53,7 @@ public class MenuController {
         MenuResponseDto menuResponseDto = menuService.getMenuById(id);
         return new ResponseEntity<>(menuResponseDto, HttpStatus.OK);
     }
-    @SecurityRequirement(name = "Bear Authentication")
+    @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CHEF') or hasRole('ROLE_ADMIN')")
     @DeleteMapping("/{menuId}")
     public ResponseEntity<?> deleteMenu(@PathVariable Long menuId) {

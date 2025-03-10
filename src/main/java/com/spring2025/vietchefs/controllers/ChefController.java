@@ -19,20 +19,20 @@ import org.springframework.web.bind.annotation.*;
 public class ChefController {
     @Autowired
     private ChefService chefService;
-    @SecurityRequirement(name = "Bear Authentication")
+    @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_ADMIN')")
     @PostMapping("/register/{userId}")
     public ResponseEntity<ChefResponseDto> registerChef(@PathVariable Long userId, @RequestBody ChefRequestDto requestDto) {
         return ResponseEntity.ok(chefService.registerChefRequest(userId, requestDto));
     }
-    @SecurityRequirement(name = "Bear Authentication")
+    @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PutMapping("/approve/{chefId}")
     public ResponseEntity<ChefResponseDto> approveChef(@PathVariable Long chefId) {
         return ResponseEntity.ok(chefService.approveChef(chefId));
     }
 
-    @SecurityRequirement(name = "Bear Authentication")
+    @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CHEF')")
     @PutMapping("/{chefId}")
     public ResponseEntity<ChefResponseDto> updateChef(@PathVariable Long chefId, @RequestBody ChefRequestDto chefRequestDto) {

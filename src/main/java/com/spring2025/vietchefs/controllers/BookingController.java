@@ -27,7 +27,7 @@ public class BookingController {
     @Autowired
     private BookingDetailService bookingDetailService;
 
-    @SecurityRequirement(name = "Bear Authentication")
+    @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_ADMIN')")
     @PostMapping
     public ResponseEntity<?> createBookingSingle(@RequestBody BookingRequestDto dto) {
@@ -35,7 +35,7 @@ public class BookingController {
         return new ResponseEntity<>(bookingResponseDto, HttpStatus.CREATED);
 
     }
-    @SecurityRequirement(name = "Bear Authentication")
+    @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_ADMIN')")
     @PostMapping("/{bookingId}/retry-payment")
     public ResponseEntity<?> retryPayment(@PathVariable Long bookingId) {
