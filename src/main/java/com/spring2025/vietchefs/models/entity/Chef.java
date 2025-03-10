@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Entity
 @Table(name = "chefs")
@@ -49,4 +50,7 @@ public class Chef {
 
     @Column(nullable = true)
     private String preferredDishes; // Các món Việt Nam sở trường (VD: "Phở, Bún Bò, Cơm Tấm")
+
+    @OneToMany(mappedBy = "chef", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ChefSchedule> schedules;
 }

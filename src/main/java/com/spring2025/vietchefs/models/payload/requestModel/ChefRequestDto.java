@@ -14,6 +14,7 @@ public class ChefRequestDto {
     private String bio;
     private String description;
     private String address;
+    private String country;
     private BigDecimal price;
     private Integer maxServingSize;
     private String specialization; // Chuyên môn (Món Bắc, Món Nam, Món Trung, Hải sản...)

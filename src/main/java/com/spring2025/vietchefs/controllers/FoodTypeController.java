@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 public class FoodTypeController {
     @Autowired
     private FoodTypeService foodTypeService;
-    @SecurityRequirement(name = "Bear Authentication")
+    @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PostMapping
     public ResponseEntity<?> createFoodType(@Valid @RequestBody FoodTypeDto foodTypeDto) {
@@ -38,7 +38,7 @@ public class FoodTypeController {
         return new ResponseEntity<>(foodTypeDto, HttpStatus.OK);
     }
 
-    @SecurityRequirement(name = "Bear Authentication")
+    @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<?> updateType(@PathVariable("id") Long id, @Valid @RequestBody FoodTypeDto foodTypeDto) {
@@ -46,7 +46,7 @@ public class FoodTypeController {
         return new ResponseEntity<>(bt1, HttpStatus.OK);
     }
 
-    @SecurityRequirement(name = "Bear Authentication")
+    @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteType(@PathVariable("id") Long id) {

@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 public class DishController {
     @Autowired
     private DishService dishService;
-    @SecurityRequirement(name = "Bear Authentication")
+    @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CHEF') or hasRole('ROLE_ADMIN')")
     @PostMapping
     public ResponseEntity<?> createDish(@Valid @RequestBody DishDto dishDto) {
@@ -57,7 +57,7 @@ public class DishController {
         return new ResponseEntity<>(dishDto, HttpStatus.OK);
     }
 
-    @SecurityRequirement(name = "Bear Authentication")
+    @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CHEF') or hasRole('ROLE_ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<?> updateDish(@PathVariable("id") Long id, @Valid @RequestBody DishRequest dishRequest) {
@@ -65,7 +65,7 @@ public class DishController {
         return new ResponseEntity<>(bt1, HttpStatus.OK);
     }
 
-    @SecurityRequirement(name = "Bear Authentication")
+    @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CHEF') or hasRole('ROLE_ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteDish(@PathVariable("id") Long id) {

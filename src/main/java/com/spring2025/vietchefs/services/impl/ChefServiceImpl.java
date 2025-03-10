@@ -61,6 +61,7 @@ public class ChefServiceImpl implements ChefService {
         chef.setBio(chefDto.getBio());
         chef.setDescription(chefDto.getDescription());
         chef.setAddress(chefDto.getAddress());
+        chef.setCountry(chefDto.getCountry());
         chef.setPrice(chefDto.getPrice());
         chef.setStatus(chefDto.getStatus() != null ? chefDto.getStatus() : "active");
         chef = chefRepository.save(chef);
@@ -94,6 +95,7 @@ public class ChefServiceImpl implements ChefService {
         chef.setBio(requestDto.getBio());
         chef.setDescription(requestDto.getDescription());
         chef.setAddress(requestDto.getAddress());
+        chef.setCountry(requestDto.getCountry());
         chef.setPrice(requestDto.getPrice() != null ? requestDto.getPrice() : BigDecimal.valueOf(10));
         chef.setMaxServingSize(requestDto.getMaxServingSize() != null ? requestDto.getMaxServingSize() : 10);
         chef.setStatus("PENDING");
@@ -117,7 +119,7 @@ public class ChefServiceImpl implements ChefService {
 
         // Gán quyền ROLE_CHEF cho User
         Role chefRole = roleRepository.findByRoleName("ROLE_CHEF")
-                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Role ROLE_CHEF not found"));
+                                  .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Role ROLE_CHEF not found"));
         User user = chef.getUser();
         user.setRole(chefRole);
         userRepository.save(user);

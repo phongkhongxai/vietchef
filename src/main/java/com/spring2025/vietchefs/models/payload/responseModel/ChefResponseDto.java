@@ -17,6 +17,7 @@ public class ChefResponseDto {
     private String description;         // Mô tả chi tiết
 
     private String address;
+    private String country;
     private BigDecimal price;           // Giá theo giờ
     private Integer maxServingSize;     // Số lượng khách tối đa
     private String specialization;      // Chuyên môn
