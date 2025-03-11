@@ -20,6 +20,7 @@ public class BookingDetailRequestDto {
     private LocalTime endTime;
     private String location;
     private BigDecimal totalPrice;
+    private BigDecimal allChefFeePrice;
     private LocalTime timeBeginCook;
     private LocalTime timeBeginTravel;
     private Boolean isServing;

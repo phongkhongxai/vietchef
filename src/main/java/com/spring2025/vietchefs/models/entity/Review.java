@@ -21,8 +21,8 @@ public class Review {
     private User user;
 
     @ManyToOne
-    @JoinColumn(name = "dishes_id", nullable = false)
-    private Dish dish;
+    @JoinColumn(name = "chef_id", nullable = false)
+    private Chef chef;
 
     @Column(nullable = false)
     private BigDecimal rating;

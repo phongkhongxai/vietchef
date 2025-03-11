@@ -50,6 +50,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         detail.setEndTime(dto.getEndTime());
         detail.setLocation(dto.getLocation());
         detail.setIsServing(dto.getIsServing());
+        detail.setAllChefFeePrice(dto.getAllChefFeePrice());
         detail.setIsDeleted(false);
         detail.setTimeBeginCook(dto.getTimeBeginCook());
         detail.setTimeBeginTravel(dto.getTimeBeginTravel());

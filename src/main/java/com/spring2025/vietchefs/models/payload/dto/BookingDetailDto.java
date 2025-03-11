@@ -16,10 +16,12 @@ import java.util.List;
 public class BookingDetailDto {
     private Long id;
     private LocalDate sessionDate;
+    private String status;
     private LocalTime startTime;
     private LocalTime endTime;
     private String location;
     private BigDecimal totalPrice;
+    private BigDecimal allChefFeePrice;
     private LocalTime timeBeginCook;
     private LocalTime timeBeginTravel;
     private Boolean isServing;
