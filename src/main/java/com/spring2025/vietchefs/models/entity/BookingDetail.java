@@ -26,7 +26,8 @@ public class BookingDetail {
 
     @Column(nullable = false)
     private LocalDate sessionDate; // Ngày diễn ra buổi ăn
-
+    @Column(nullable = false)
+    private String status = "scheduled";
     @Column(nullable = false)
     private LocalTime startTime;
 
@@ -41,9 +42,13 @@ public class BookingDetail {
     @Column(nullable = false)
     private String location;
     @Column(nullable = false)
+    private BigDecimal allChefFeePrice;
+    @Column(nullable = false)
     private BigDecimal totalPrice;
     @OneToMany(mappedBy = "bookingDetail", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<BookingDetailItem> dishes;
+    @OneToMany(mappedBy = "bookingDetail", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<BookingPrice> prices;
 
     @Column(nullable = false)
     private Boolean isDeleted = false;

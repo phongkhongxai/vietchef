@@ -103,7 +103,6 @@ public class BookingServiceImpl implements BookingService {
             }
         } catch (Exception e) {
             // Nếu tạo thanh toán thất bại, cập nhật trạng thái booking thành FAILED
-            booking.setStatus("FAILED");
             bookingRepository.save(booking);
             throw new VchefApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Payment initiation failed: " + e.getMessage());
         }
@@ -190,6 +189,7 @@ public class BookingServiceImpl implements BookingService {
             BigDecimal price4 = calculateService.calculateFinalPrice(price1, price2, price3).add(servingFee);
 
             totalBookingPrice = totalBookingPrice.add(price4);
+            reviewSingleBookingResponse.setTotalChefFeePrice(price1.add(price2).add(price3).add(servingFee));
             reviewSingleBookingResponse.setTotalPrice(totalBookingPrice);
             reviewSingleBookingResponse.setTimeBeginTravel(ttp.getTimeBeginTravel());
             reviewSingleBookingResponse.setTimeBeginCook(ttp.getTimeBeginCook());

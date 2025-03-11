@@ -43,10 +43,13 @@ public class Booking {
     private BigDecimal totalPrice;
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<BookingDetail> bookingDetails; // Danh sách các buổi đặt trong booking
-
     @Column(nullable = false)
     private Boolean isDeleted = false;
-
+    @Column(nullable = false)
+    private Boolean isEdit = false;
+    @ManyToOne
+    @JoinColumn(name = "package_id")
+    private Package bookingPackage;
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
