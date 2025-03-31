@@ -118,4 +118,20 @@ public class PackageServiceImpl implements PackageService {
                 .map(pkg -> modelMapper.map(pkg, PackageResponseDto.class))
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public List<PackageResponseDto> getPackagesByChefId(Long chefId) {
+        Chef chef = chefRepository.findById(chefId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found with id: " + chefId));
+
+        Set<Long> registeredPackageIds = chef.getPackages().stream().map(Package::getId).collect(Collectors.toSet());
+
+        List<Package> registeredPackages = packageRepository.findAll().stream()
+                .filter(pkg -> registeredPackageIds.contains(pkg.getId()))
+                .toList();
+
+        return registeredPackages.stream()
+                .map(pkg -> modelMapper.map(pkg, PackageResponseDto.class))
+                .collect(Collectors.toList());
+    }
 }

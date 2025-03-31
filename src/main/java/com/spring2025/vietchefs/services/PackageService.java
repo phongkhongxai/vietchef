@@ -15,5 +15,7 @@ public interface PackageService {
     void registerChefToPackages(ChefPackageRequestDto request);
     void unregisterChefFromPackages(ChefPackageRequestDto request);
     List<PackageResponseDto> getUnregisteredPackages(Long chefId);
+    List<PackageResponseDto> getPackagesByChefId(Long chefId);
+
 
 }

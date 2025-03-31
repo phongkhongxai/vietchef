@@ -67,4 +67,9 @@ public class PackageController {
     public ResponseEntity<List<PackageResponseDto>> getUnregisteredPackages(@PathVariable Long chefId) {
         return ResponseEntity.ok(packageService.getUnregisteredPackages(chefId));
     }
+
+    @GetMapping("/chefs/{chefId}")
+    public ResponseEntity<List<PackageResponseDto>> getRegisteredPackagesByChef(@PathVariable Long chefId) {
+        return ResponseEntity.ok(packageService.getPackagesByChefId(chefId));
+    }
 }
