@@ -30,7 +30,7 @@ public class Dish {
     @Column(nullable = false)
     private String serviceType;
     @Column(nullable = false)
-    private BigDecimal cookTime; // Thời gian nấu trung bình
+    private BigDecimal cookTime; // Thời gian nấu trung bình phut
 
     @Column(nullable = false)
     private BigDecimal basePrice; // Giá cơ bản cho mỗi người

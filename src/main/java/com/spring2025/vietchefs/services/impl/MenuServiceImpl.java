@@ -126,8 +126,11 @@ public class MenuServiceImpl implements MenuService {
         if (menu.isEmpty()){
             throw new VchefApiException(HttpStatus.NOT_FOUND, "Menu not found with id: "+ id);
         }
+        MenuResponseDto dto = modelMapper.map(menu.get(), MenuResponseDto.class);
+        dto.setBeforePrice(calculateMenuPrice(menu.get(), false));
+        dto.setAfterPrice(calculateMenuPrice(menu.get(), true));
         
-        return modelMapper.map(menu.get(), MenuResponseDto.class);
+        return dto;
     }
 
     @Override

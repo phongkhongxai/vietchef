@@ -12,33 +12,43 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "booking_prices")
+@Table(name = "customer_transactions")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class BookingPrice {
+public class CustomerTransaction {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Liên kết với một BookingDetail
+    // Liên kết đến ví của khách hàng
     @ManyToOne
-    @JoinColumn(name = "booking_detail_id", nullable = false)
-    private BookingDetail bookingDetail;
+    @JoinColumn(name = "wallet_id", nullable = false)
+    private Wallet wallet;
 
-    // Loại chi phí, ví dụ: "chef_fee", "serving_fee", "travel_fee"
+    // Liên kết đến booking (chỉ khi liên quan đến thanh toán hoặc hoàn tiền)
+    @ManyToOne
+    @JoinColumn(name = "booking_id", nullable = true)
+    private Booking booking;
+
+    // Loại giao dịch: DEPOSIT, PAYMENT, REFUND
     @Column(nullable = false)
-    private String costType;
+    private String transactionType;
 
-    // Số tiền của khoản chi phí này
+    // Số tiền giao dịch
     @Column(nullable = false)
     private BigDecimal amount;
 
+    @Column(columnDefinition = "TEXT")
+    private String description;
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
-
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+    @Column(nullable = false)
+    private String status;
+    @Column(nullable = false)
+    private Boolean isDeleted = false;
 }

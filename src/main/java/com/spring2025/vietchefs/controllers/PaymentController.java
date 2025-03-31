@@ -1,8 +1,5 @@
 package com.spring2025.vietchefs.controllers;
 
-import com.spring2025.vietchefs.models.entity.Booking;
-import com.spring2025.vietchefs.models.entity.Payment;
-import com.spring2025.vietchefs.services.BookingService;
 import com.spring2025.vietchefs.services.impl.PaypalService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,8 +11,8 @@ import reactor.core.publisher.Mono;
 import java.math.BigDecimal;
 
 @RestController
-@RequestMapping("/api/v1/paypal")
-public class PaypalController {
+@RequestMapping("/api/v1/payment")
+public class PaymentController {
 
     @Autowired
     private PaypalService paypalService;
@@ -27,17 +24,27 @@ public class PaypalController {
             @RequestParam String currency,
             @RequestParam Long bookingId) {
 
-        String returnUrl = "http://localhost:8080/api/v1/paypal/success";
-        String cancelUrl = "http://localhost:8080/api/v1/paypal/cancel";
+        String returnUrl = "http://localhost:8080/api/v1/payment/success";
+        String cancelUrl = "http://localhost:8080/api/v1/payment/cancel";
         return paypalService.createPayment(amount, currency, bookingId, returnUrl, cancelUrl)
                 .map(orderId -> ResponseEntity.ok(orderId))
                 .onErrorResume(e -> Mono.just(ResponseEntity.status(500).body("Error: " + e.getMessage())));
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @PostMapping("/deposit")
+    public Mono<String> depositToWallet(@RequestParam Long walletId,
+                                        @RequestParam BigDecimal amount) {
+        String returnUrl = "http://localhost:8080/api/v1/payment/success";
+        String cancelUrl = "http://localhost:8080/api/v1/payment/cancel";
+        String currency = "USD";
+        return paypalService.depositToWallet(walletId, amount, currency, returnUrl, cancelUrl);
     }
 
     // Hoàn tất thanh toán
     @GetMapping("/success")
     public Mono<ResponseEntity<String>> capturePayment(@RequestParam("token") String orderId) {
-        return paypalService.capturePayment(orderId)
+        return paypalService.completeDeposit(orderId)
                 .then(Mono.just(ResponseEntity.ok("Thanh toán thành công")))
                 .onErrorResume(e -> Mono.just(ResponseEntity.status(500).body("Error: " + e.getMessage())));
     }
@@ -45,7 +52,7 @@ public class PaypalController {
     @GetMapping("/cancel")
     public Mono<ResponseEntity<String>> cancelPayment(@RequestParam("token") String orderId) {
         return paypalService.cancelPayment(orderId)
-                .map(message -> ResponseEntity.ok(message))
+                .map(ResponseEntity::ok)
                 .onErrorResume(e -> Mono.just(ResponseEntity.badRequest().body(e.getMessage())));
     }
 

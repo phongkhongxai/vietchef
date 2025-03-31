@@ -13,7 +13,8 @@ import java.util.List;
 
 @Entity
 @Table(name = "bookings")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class Booking {
@@ -53,8 +54,9 @@ public class Booking {
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
-
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+    @Column
+    private BigDecimal depositPaid;
 
 }

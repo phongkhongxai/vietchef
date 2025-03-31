@@ -1,29 +1,34 @@
 package com.spring2025.vietchefs.controllers;
 
+import com.spring2025.vietchefs.models.payload.dto.BookingDetailDto;
 import com.spring2025.vietchefs.models.payload.dto.BookingRequestDto;
 import com.spring2025.vietchefs.models.payload.dto.BookingResponseDto;
-import com.spring2025.vietchefs.models.payload.requestModel.BookingPriceRequestDto;
-import com.spring2025.vietchefs.models.payload.requestModel.MenuRequestDto;
-import com.spring2025.vietchefs.models.payload.responseModel.BookingDetailsResponse;
-import com.spring2025.vietchefs.models.payload.responseModel.ChefResponseDto;
-import com.spring2025.vietchefs.models.payload.responseModel.MenuResponseDto;
-import com.spring2025.vietchefs.models.payload.responseModel.ReviewSingleBookingResponse;
+import com.spring2025.vietchefs.models.payload.dto.UserDto;
+import com.spring2025.vietchefs.models.payload.requestModel.*;
+import com.spring2025.vietchefs.models.payload.responseModel.*;
 import com.spring2025.vietchefs.services.BookingDetailService;
 import com.spring2025.vietchefs.services.BookingService;
 import com.spring2025.vietchefs.services.MenuService;
+import com.spring2025.vietchefs.services.UserService;
 import com.spring2025.vietchefs.utils.AppConstants;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/bookings")
 public class BookingController {
     @Autowired
     private BookingService bookingService;
+    @Autowired
+    private UserService userService;
     @Autowired
     private BookingDetailService bookingDetailService;
 
@@ -33,17 +38,45 @@ public class BookingController {
     public ResponseEntity<?> createBookingSingle(@RequestBody BookingRequestDto dto) {
         BookingResponseDto bookingResponseDto = bookingService.createSingleBooking(dto);
         return new ResponseEntity<>(bookingResponseDto, HttpStatus.CREATED);
-
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_ADMIN')")
-    @PostMapping("/{bookingId}/retry-payment")
-    public ResponseEntity<?> retryPayment(@PathVariable Long bookingId) {
-        BookingResponseDto bookingResponseDto = bookingService.retryPayment(bookingId);
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PostMapping("/{bookingId}/payment")
+    public ResponseEntity<?> paySingleBooking(@AuthenticationPrincipal UserDetails userDetails, @PathVariable Long bookingId) {
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        BookingResponseDto bookingResponseDto = bookingService.paymentBooking(bookingId, bto.getId());
         return new ResponseEntity<>(bookingResponseDto, HttpStatus.OK);
 
     }
-    @SecurityRequirement(name = "Bear Authentication")
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PostMapping("/{bookingId}/deposit")
+    public ResponseEntity<?> depositBooking(@AuthenticationPrincipal UserDetails userDetails, @PathVariable Long bookingId) {
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        BookingResponseDto bookingResponseDto = bookingService.depositBooking(bookingId, bto.getId());
+        return new ResponseEntity<>(bookingResponseDto, HttpStatus.OK);
+
+    }
+
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PutMapping("/{bookingId}/confirm")
+    public ResponseEntity<?> confirmBooking(@AuthenticationPrincipal UserDetails userDetails, @PathVariable Long bookingId) {
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        BookingResponseDto bookingResponseDto = bookingService.updateBookingStatusConfirm(bookingId, bto.getId(),true);
+        return new ResponseEntity<>(bookingResponseDto, HttpStatus.OK);
+
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PutMapping("/{bookingId}/reject")
+    public ResponseEntity<?> rejectBooking(@AuthenticationPrincipal UserDetails userDetails, @PathVariable Long bookingId) {
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        BookingResponseDto bookingResponseDto = bookingService.updateBookingStatusConfirm(bookingId, bto.getId(),false);
+        return new ResponseEntity<>(bookingResponseDto, HttpStatus.OK);
+
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_ADMIN')")
     @PostMapping("/calculate-single-booking")
     public ResponseEntity<?> calculatePriceBookingSingle(@RequestBody BookingPriceRequestDto dto) {
@@ -62,6 +95,76 @@ public class BookingController {
         return bookingDetailService.getBookingDetailByBooking(bookingId,pageNo, pageSize, sortBy, sortDir);
 
     }
+
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PostMapping("/calculate-long-term-booking")
+    public ResponseEntity<?> calculatePriceLongTermBooking(@RequestBody BookingLTPriceRequestDto dto) {
+        ReviewLongTermBookingResponse reviewResponse = bookingService.calculateFinalPriceForLongTermBooking(dto);
+        return new ResponseEntity<>(reviewResponse, HttpStatus.OK);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PostMapping("/booking-details/{bookingDetailId}/calculate")
+    public ResponseEntity<?> calculateUpdateBookingDetail(@PathVariable Long bookingDetailId,@RequestBody BookingDetailUpdateDto dto) {
+        ReviewBookingDetailResponse reviewResponse = bookingDetailService.calculateUpdatedBookingDetail(bookingDetailId, dto);
+        return new ResponseEntity<>(reviewResponse, HttpStatus.OK);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PostMapping("/long-term")
+    public ResponseEntity<?> createLongTermBooking(@RequestBody BookingRequestDto dto) {
+        BookingResponseDto bookingResponseDto = bookingService.createLongtermBooking(dto);
+        return new ResponseEntity<>(bookingResponseDto, HttpStatus.CREATED);
+    }
+
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PutMapping("/booking-details/{bookingDetailId}")
+    public ResponseEntity<?> updateBookingDetail(@PathVariable Long bookingDetailId,
+                                                 @RequestBody BookingDetailUpdateRequest updateRequest) {
+        BookingDetailDto bookingDetailDto = bookingDetailService.updateBookingDetail(bookingDetailId, updateRequest);
+        return new ResponseEntity<>(bookingDetailDto, HttpStatus.OK);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_ADMIN')")
+    @GetMapping("/{bookingId}/payment-cycles")
+    public ResponseEntity<?> getPaymentCyclesWithDetails(@PathVariable Long bookingId) {
+        List<PaymentCycleResponse> paymentCycles = bookingService.getPaymentCyclesWithDetails(bookingId);
+        return new ResponseEntity<>(paymentCycles, HttpStatus.OK);
+    }
+
+    @GetMapping("/booking-details/{bookingDetailId}")
+    public ResponseEntity<?> getBookingDetailByid(@PathVariable Long bookingDetailId) {
+        BookingDetailDto bl = bookingDetailService.getBookingDetailById(bookingDetailId);
+        return new ResponseEntity<>(bl, HttpStatus.OK);
+    }
+
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PostMapping("/payment-cycles/{paymentCycleId}/pay")
+    public ResponseEntity<?> payForPaymentCycle(@AuthenticationPrincipal UserDetails userDetails,
+                                                @PathVariable Long paymentCycleId) {
+        UserDto userDto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(), userDetails.getUsername());
+        PaymentCycleResponse paymentResponse = bookingService.payForPaymentCycle(paymentCycleId, userDto.getId());
+        return new ResponseEntity<>(paymentResponse, HttpStatus.OK);
+    }
+
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PutMapping("/single/cancel/{bookingid}")
+    public ResponseEntity<?> cancelSingleBooking(@PathVariable Long bookingid) {
+        BookingResponseDto bookingResponseDto = bookingService.cancelSingleBooking(bookingid);
+        return new ResponseEntity<>(bookingResponseDto, HttpStatus.OK);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PutMapping("/long-term/cancel/{bookingid}")
+    public ResponseEntity<?> cancelLongTermBooking(@PathVariable Long bookingid) {
+        BookingResponseDto bookingResponseDto = bookingService.cancelLongTermBooking(bookingid);
+        return new ResponseEntity<>(bookingResponseDto, HttpStatus.OK);
+    }
+
 
 
 }

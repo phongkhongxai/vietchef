@@ -1,5 +1,7 @@
 package com.spring2025.vietchefs.models.payload.dto;
 
+import jakarta.validation.constraints.Future;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -15,14 +17,22 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class BookingDetailRequestDto {
+    @Future(message = "sessionDate phải là một ngày trong tương lai")
+    @NotNull(message = "sessionDate không được để trống")
     private LocalDate sessionDate;
     private LocalTime startTime;
     private LocalTime endTime;
     private String location;
     private BigDecimal totalPrice;
-    private BigDecimal allChefFeePrice;
+    private BigDecimal chefCookingFee; // Công nấu ăn của đầu bếp
+    private BigDecimal priceOfDishes;  // Giá của các món ăn
+    private BigDecimal arrivalFee;      // Phí di chuyển
+    private BigDecimal chefServingFee;  // Phí phục vụ nếu có
     private LocalTime timeBeginCook;
     private LocalTime timeBeginTravel;
+    private BigDecimal platformFee;
+    private BigDecimal totalChefFeePrice;
     private Boolean isServing;
+    private Boolean isUpdated;
     private List<BookingDetailItemRequestDto> dishes;
 }

@@ -76,7 +76,8 @@ public class SecurityConfig {
                                 .requestMatchers("/swagger-ui/**").permitAll()
                                 .requestMatchers("/v3/api-docs/**").permitAll()
                                 .requestMatchers("/swagger-ui.html").permitAll()
-                                .requestMatchers("/api/v1/paypal/**").permitAll()
+                                .requestMatchers("/api/v1/payment/**").permitAll()
+
 
 
                                 .anyRequest().authenticated()
@@ -117,11 +118,13 @@ public class SecurityConfig {
                         .addSecuritySchemes("Bearer Authentication",
                                 new SecurityScheme()
                                         .type(SecurityScheme.Type.HTTP)
-                                        .scheme("bearer")
+                                        .scheme("Bearer")
                                         .bearerFormat("JWT")
                         )
                 )
                 .addSecurityItem(new SecurityRequirement().addList("Bearer Authentication"));
     }
+
+
 
 }

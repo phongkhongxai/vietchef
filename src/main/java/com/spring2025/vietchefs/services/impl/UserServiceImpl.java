@@ -5,6 +5,8 @@ import com.spring2025.vietchefs.models.entity.User;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.dto.SignupDto;
 import com.spring2025.vietchefs.models.payload.dto.UserDto;
+import com.spring2025.vietchefs.models.payload.requestModel.ChangePasswordRequest;
+import com.spring2025.vietchefs.models.payload.requestModel.UserRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.UsersResponse;
 import com.spring2025.vietchefs.repositories.RoleRepository;
 import com.spring2025.vietchefs.repositories.UserRepository;
@@ -21,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.ui.ModelMap;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -97,5 +100,42 @@ public class UserServiceImpl implements UserService {
         User existingUser = userRepository.findByUsernameOrEmail(username, email)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.BAD_REQUEST, "User not found"));
         return modelMapper.map(existingUser, UserDto.class);
+    }
+
+    @Override
+    public UserDto updateProfile(Long userId, UserRequest userRequest) {
+        Optional<User> userOptional = userRepository.findById(userId);
+        if (userOptional.isEmpty()) {
+            throw new VchefApiException(HttpStatus.NOT_FOUND, "User not found with id: " + userId);
+        }
+        User user = userOptional.get();
+
+        // Cập nhật thông tin từ UserDTO nếu có
+        user.setFullName(userRequest.getFullName() != null ? userRequest.getFullName() : user.getFullName());
+        user.setDob(userRequest.getDob() != null ? userRequest.getDob() : user.getDob());
+        user.setGender(userRequest.getGender() != null ? userRequest.getGender() : user.getGender());
+        user.setPhone(userRequest.getPhone() != null ? userRequest.getPhone() : user.getPhone());
+        user.setAvatarUrl(userRequest.getAvatarUrl() != null ? userRequest.getAvatarUrl() : user.getAvatarUrl());
+
+        User updatedUser = userRepository.save(user);
+
+        return modelMapper.map(updatedUser, UserDto.class);
+    }
+
+    @Override
+    public void changePassword(Long userId, ChangePasswordRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User not found with id: " + userId));
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Current password is incorrect");
+        }
+
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "New password and confirm password do not match");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
     }
 }

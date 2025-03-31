@@ -19,5 +19,6 @@ public class BookingRequestDto {
     private Long chefId;
     private String requestDetails;
     private int guestCount;
+    private Long packageId;
     private List<BookingDetailRequestDto> bookingDetails;
 }

@@ -17,6 +17,7 @@ import com.spring2025.vietchefs.repositories.RoleRepository;
 import com.spring2025.vietchefs.repositories.UserRepository;
 import com.spring2025.vietchefs.security.JwtTokenProvider;
 import com.spring2025.vietchefs.services.AuthService;
+import com.spring2025.vietchefs.services.WalletService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.modelmapper.ModelMapper;
@@ -48,11 +49,12 @@ public class AuthServiceImpl implements AuthService {
     private PasswordEncoder passwordEncoder;
     private JwtTokenProvider jwtTokenProvider;
     private ModelMapper modelMapper;
+    private WalletService walletService;
 
     @Autowired
     public AuthServiceImpl(AuthenticationManager authenticationManager, UserRepository userRepository,
                            RoleRepository roleRepository, AccessTokenRepository accessTokenRepository, RefreshTokenRepository refreshTokenRepository, UserDetailsService userDetailsService, PasswordEncoder passwordEncoder,
-                           JwtTokenProvider jwtTokenProvider, ModelMapper modelMapper, EmailVerificationService emailVerificationService) {
+                           JwtTokenProvider jwtTokenProvider, ModelMapper modelMapper, EmailVerificationService emailVerificationService,WalletService walletService) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
@@ -63,6 +65,7 @@ public class AuthServiceImpl implements AuthService {
         this.jwtTokenProvider = jwtTokenProvider;
         this.modelMapper = modelMapper;
         this.emailVerificationService = emailVerificationService;
+        this.walletService = walletService;
     }
 
     @Override
@@ -161,35 +164,7 @@ public class AuthServiceImpl implements AuthService {
         emailVerificationService.sendVerificationCode(user);
 
         User user1 = userRepository.save(user);
-
-        return "User registered successfully! Please check your email for the verification code.";
-    }
-    @Override
-    @Transactional
-    public String signupOwner(SignupDto signupDto) {
-
-        // add check if username already exists
-        if (userRepository.existsByUsername(signupDto.getUsername())) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Username is already exist!");
-        }
-
-        // add check if email already exists
-        if (userRepository.existsByEmail(signupDto.getEmail())) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Email is already exist!");
-        }
-
-        User user = modelMapper.map(signupDto, User.class);
-
-        user.setPassword(passwordEncoder.encode(signupDto.getPassword()));
-
-        Role userRole = roleRepository.findByRoleName("ROLE_OWNER")
-                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User Role not found."));
-        user.setRole(userRole);
-        user.setEmailVerified(false);
-        user.setAvatarUrl("default");
-        emailVerificationService.sendVerificationCode(user);
-
-        User user1 = userRepository.save(user);
+        walletService.createWallet(user1.getId(), "CUSTOMER");
 
         return "User registered successfully! Please check your email for the verification code.";
     }
