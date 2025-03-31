@@ -17,4 +17,5 @@ public class ReviewSingleBookingResponse {
     private BigDecimal platformFee;
     private BigDecimal totalPrice;
     private BigDecimal totalChefFeePrice;
+
 }

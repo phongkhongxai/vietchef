@@ -15,6 +15,7 @@ import com.spring2025.vietchefs.repositories.ChefRepository;
 import com.spring2025.vietchefs.repositories.RoleRepository;
 import com.spring2025.vietchefs.repositories.UserRepository;
 import com.spring2025.vietchefs.services.ChefService;
+import com.spring2025.vietchefs.services.WalletService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -39,6 +40,8 @@ public class ChefServiceImpl implements ChefService {
     private UserRepository userRepository;
     @Autowired
     private RoleRepository roleRepository;
+    @Autowired
+    private WalletService walletService;
 
     @Override
     public ChefDto createChef(ChefDto chefDto) {
@@ -123,6 +126,8 @@ public class ChefServiceImpl implements ChefService {
         User user = chef.getUser();
         user.setRole(chefRole);
         userRepository.save(user);
+
+        walletService.updateWalletType(user.getId(), "CHEF");
 
         chefRepository.save(chef);
         return modelMapper.map(chef, ChefResponseDto.class);

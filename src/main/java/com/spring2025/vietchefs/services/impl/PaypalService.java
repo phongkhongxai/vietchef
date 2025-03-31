@@ -2,11 +2,9 @@ package com.spring2025.vietchefs.services.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.spring2025.vietchefs.models.entity.Booking;
-import com.spring2025.vietchefs.models.entity.Payment;
+import com.spring2025.vietchefs.models.entity.*;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
-import com.spring2025.vietchefs.repositories.BookingRepository;
-import com.spring2025.vietchefs.repositories.PaymentRepository;
+import com.spring2025.vietchefs.repositories.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -41,6 +39,12 @@ public class PaypalService{
 
     @Autowired
     private ObjectMapper objectMapper; // Inject Jackson ObjectMapper
+    @Autowired
+    private WalletRepository walletRepository;
+    @Autowired
+    private CustomerTransactionRepository customerTransactionRepository;
+    @Autowired
+    private ChefTransactionRepository chefTransactionRepository;
 
     private final String BASE_URL = "https://api-m.sandbox.paypal.com";
     private final String PAYPAL_CHECKOUT_URL = "https://www.sandbox.paypal.com/checkoutnow?token="; // URL redirect
@@ -110,7 +114,6 @@ public class PaypalService{
 
                                     // Lưu vào DB
                                     Payment paymentEntity = new Payment();
-                                    paymentEntity.setBooking(booking);
                                     paymentEntity.setTransactionId(orderId);
                                     paymentEntity.setPaymentMethod("PayPal");
                                     paymentEntity.setAmount(amount);
@@ -159,11 +162,11 @@ public class PaypalService{
                                     payment.setStatus("COMPLETED");
                                     paymentRepository.save(payment);
 
-                                    Booking booking = payment.getBooking();
+                                   /* Booking booking = payment.getBooking();
                                     if (booking != null) {
                                         booking.setStatus("PAID");
                                         bookingRepository.save(booking);
-                                    }
+                                    }*/
                                 }
                                 return Mono.empty();
                             } catch (Exception e) {
@@ -173,6 +176,122 @@ public class PaypalService{
                 ).then();
     }
 
+
+    public Mono<String> depositToWallet(Long walletId, BigDecimal amount, String currency, String returnUrl, String cancelUrl) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return Mono.error(new IllegalArgumentException("Amount must be greater than zero"));
+        }
+
+        // Lấy ví theo ID
+        Wallet wallet = walletRepository.findById(walletId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found with id: " + walletId));
+
+        return getAccessToken()
+                .flatMap(token -> {
+                    String jsonBody = "{"
+                            + "\"intent\":\"CAPTURE\","
+                            + "\"purchase_units\":[{"
+                            + "\"amount\":{\"currency_code\":\"" + currency + "\",\"value\":\"" + amount.setScale(2, RoundingMode.HALF_UP) + "\"},"
+                            + "\"description\":\"Nạp tiền vào ví VietChefs - Wallet ID: " + walletId + "\""
+                            + "}],"
+                            + "\"application_context\":{"
+                            + "\"return_url\":\"" + returnUrl + "\","
+                            + "\"cancel_url\":\"" + cancelUrl + "\""
+                            + "}"
+                            + "}";
+                    System.out.println("Request body gửi đến PayPal: " + jsonBody);
+                    return webClient.post()
+                            .uri(BASE_URL + "/v2/checkout/orders")
+                            .header(HttpHeaders.AUTHORIZATION, token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(jsonBody)
+                            .retrieve()
+                            .bodyToMono(String.class)
+                            .map(response -> {
+                                try {
+                                    JsonNode jsonNode = objectMapper.readTree(response);
+                                    String orderId = jsonNode.get("id").asText();
+
+                                    // Lưu thông tin Payment vào DB
+                                    Payment payment = new Payment();
+                                    payment.setTransactionId(orderId);
+                                    payment.setPaymentMethod("PayPal");
+                                    payment.setAmount(amount);
+                                    payment.setCurrency(currency);
+                                    payment.setStatus("PENDING");
+                                    payment.setWallet(wallet);
+                                    payment.setPaymentType("DEPOSIT");
+                                    paymentRepository.save(payment);
+
+                                    return PAYPAL_CHECKOUT_URL + orderId;
+                                } catch (Exception e) {
+                                    throw new VchefApiException(HttpStatus.BAD_REQUEST, "Failed to create PayPal order: " + e.getMessage());
+                                }
+                            });
+                });
+    }
+
+    /**
+     * Xử lý hoàn tất thanh toán
+     */
+    public Mono<Void> completeDeposit(String orderId) {
+        return getAccessToken()
+                .flatMap(token -> webClient.post()
+                        .uri(BASE_URL + "/v2/checkout/orders/" + orderId + "/capture")
+                        .header(HttpHeaders.AUTHORIZATION, token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue("{}")
+                        .retrieve()
+                        .bodyToMono(String.class)
+                        .map(response -> {
+                            try {
+                                JsonNode jsonNode = objectMapper.readTree(response);
+                                String captureId = jsonNode.get("purchase_units").get(0)
+                                        .get("payments").get("captures").get(0).get("id").asText();
+                                BigDecimal amount = new BigDecimal(jsonNode.get("purchase_units").get(0)
+                                        .get("payments").get("captures").get(0).get("amount").get("value").asText());
+
+
+
+                                // Lưu Payment đã hoàn thành
+                                Payment payment = paymentRepository.findByTransactionId(orderId)
+                                        .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Payment not found"));
+                                // Cập nhật ví
+                                Wallet wallet = walletRepository.findById(payment.getWallet().getId())
+                                        .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found"));
+                                payment.setTransactionId(captureId);
+                                payment.setStatus("COMPLETED");
+                                paymentRepository.save(payment);
+                                wallet.setBalance(wallet.getBalance().add(amount));
+                                walletRepository.save(wallet);
+
+                                // Lưu Transaction
+                                if (wallet.getWalletType().equalsIgnoreCase("CUSTOMER")) {
+                                    customerTransactionRepository.save(CustomerTransaction.builder()
+                                            .wallet(wallet)
+                                            .transactionType("DEPOSIT")
+                                            .amount(amount)
+                                            .description("Nạp tiền thành công qua PayPal")
+                                            .status("COMPLETED")
+                                            .isDeleted(false)
+                                            .build());
+                                } else {
+                                    chefTransactionRepository.save(ChefTransaction.builder()
+                                            .wallet(wallet)
+                                            .transactionType("DEPOSIT")
+                                            .amount(amount)
+                                            .description("Nạp tiền thành công qua PayPal")
+                                            .status("COMPLETED")
+                                            .isDeleted(false)
+                                            .build());
+                                }
+                                return Mono.empty();
+                            } catch (Exception e) {
+                                throw new VchefApiException(HttpStatus.BAD_REQUEST, "Lỗi khi xử lý thanh toán: " + e.getMessage());
+                            }
+                        })
+                ).then();
+    }
     public Mono<String> cancelPayment(String orderId) {
         return Mono.fromCallable(() -> {
             Optional<Payment> paymentEntity = paymentRepository.findByTransactionId(orderId);
@@ -180,11 +299,7 @@ public class PaypalService{
                 Payment payment = paymentEntity.get();
                 payment.setStatus("FAILED");
                 paymentRepository.save(payment);
-                Booking booking = payment.getBooking();
-                if (booking != null) {
-                    booking.setStatus("PENDING"); // Quay lại PENDING
-                    bookingRepository.save(booking);
-                }
+
                 return "Thanh toán đã bị hủy";
             } else {
                 throw new VchefApiException(HttpStatus.NOT_FOUND,"Payment not found for orderId: " + orderId);
@@ -216,7 +331,7 @@ public class PaypalService{
                                     Optional<Payment> paymentEntity = paymentRepository.findByTransactionId(transactionId);
                                     if (paymentEntity.isPresent()){
                                         Payment refundEntity = new Payment();
-                                        refundEntity.setBooking(paymentEntity.get().getBooking());
+
                                         refundEntity.setTransactionId(refundId);
                                         refundEntity.setPaymentMethod("PayPal");
                                         refundEntity.setAmount(amount);

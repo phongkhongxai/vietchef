@@ -4,12 +4,14 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 @Entity
 @Table(name = "chefs")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class Chef {
@@ -54,6 +56,9 @@ public class Chef {
 
     @OneToMany(mappedBy = "chef", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ChefSchedule> schedules;
-    @ManyToMany(mappedBy = "chefs")
+    @ManyToMany
+    @JoinTable(name = "chef_package",
+            joinColumns = @JoinColumn(name = "chef_id"),
+            inverseJoinColumns = @JoinColumn(name = "package_id"))
     private Set<Package> packages;
 }

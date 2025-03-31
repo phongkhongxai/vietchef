@@ -7,11 +7,21 @@ import com.spring2025.vietchefs.models.entity.Dish;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import java.math.BigDecimal;
+import java.util.List;
 
 @Repository
 @EnableJpaRepositories
 public interface BookingDetailRepository extends JpaRepository<BookingDetail, Long> {
     Page<BookingDetail> findByBookingAndIsDeletedFalse(Booking booking, Pageable pageable);
+    List<BookingDetail> findByBooking(Booking booking);
+    @Query("SELECT bd FROM BookingDetail bd WHERE bd.booking.id = :bookingId")
+    List<BookingDetail> findByBookingId(@Param("bookingId") Long bookingId);
+    @Query("SELECT COALESCE(SUM(bd.totalPrice), 0) FROM BookingDetail bd WHERE bd.booking.id = :bookingId")
+    BigDecimal calculateTotalPriceByBooking(@Param("bookingId") Long bookingId);
 }

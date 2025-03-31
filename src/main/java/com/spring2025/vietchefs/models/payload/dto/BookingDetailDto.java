@@ -21,9 +21,13 @@ public class BookingDetailDto {
     private LocalTime endTime;
     private String location;
     private BigDecimal totalPrice;
-    private BigDecimal allChefFeePrice;
+    private BigDecimal chefCookingFee; // Công nấu ăn của đầu bếp
+    private BigDecimal priceOfDishes;  // Giá của các món ăn
+    private BigDecimal arrivalFee;      // Phí di chuyển
+    private BigDecimal chefServingFee;  // Phí phục vụ nếu có
     private LocalTime timeBeginCook;
     private LocalTime timeBeginTravel;
     private Boolean isServing;
+    private Boolean isUpdated;
     private List<BookingDetailItemDto> dishes;
 }

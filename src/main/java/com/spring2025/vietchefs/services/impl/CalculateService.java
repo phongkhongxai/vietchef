@@ -52,17 +52,17 @@ public class CalculateService {
         return maxCookTime.add(secondMaxCookTime).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
     }
 
-    public BigDecimal calculateDishPrice(BookingDetailPriceRequestDto detailDto) {
+    public BigDecimal calculateDishPrice(Long menuId, int guestCount, List<Long> extraDishIds) {
         BigDecimal totalDishPrice = BigDecimal.ZERO;
 
         // Nếu khách hàng đặt theo menu
-        if (detailDto.getMenuId() != null) {
-            Menu menu = menuRepository.findById(detailDto.getMenuId())
+        if (menuId != null) {
+            Menu menu = menuRepository.findById(menuId)
                     .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Menu not found"));
 
             // Tính tổng giá các món trong menu
             BigDecimal menuTotalPrice = menu.getMenuItems().stream()
-                    .map(item -> item.getDish().getBasePrice().multiply(BigDecimal.valueOf(detailDto.getGuestCount())))
+                    .map(item -> item.getDish().getBasePrice().multiply(BigDecimal.valueOf(guestCount)))
                     .reduce(BigDecimal.ZERO, BigDecimal::add); // Cộng tổng giá
 
             // Áp dụng giảm giá nếu có
@@ -73,16 +73,18 @@ public class CalculateService {
 
             totalDishPrice = totalDishPrice.add(menuTotalPrice);
         }
+    if(extraDishIds!=null && !extraDishIds.isEmpty()){
+    for (Long dishId : extraDishIds) {
+        Dish dish = dishRepository.findById(dishId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Dish not found"));
 
-        for (Long dishId : detailDto.getExtraDishIds()) {
-            Dish dish = dishRepository.findById(dishId)
-                    .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Dish not found"));
+        BigDecimal dishPrice = dish.getBasePrice()
+                .multiply(BigDecimal.valueOf(guestCount));
 
-            BigDecimal dishPrice = dish.getBasePrice()
-                    .multiply(BigDecimal.valueOf(detailDto.getGuestCount()));
+        totalDishPrice = totalDishPrice.add(dishPrice);
+    }
+}
 
-            totalDishPrice = totalDishPrice.add(dishPrice);
-        }
 
         return totalDishPrice;
     }
@@ -97,7 +99,7 @@ public class CalculateService {
         if (distanceAndTime.getDistanceKm().compareTo(BigDecimal.valueOf(3)) < 0) {
             travelFee = BigDecimal.ZERO; // dưới 3km free cost
         } else {
-            travelFee = distanceAndTime.getDistanceKm().multiply(BigDecimal.valueOf(2.5)); // 2.5 đô/km
+            travelFee = distanceAndTime.getDistanceKm().multiply(BigDecimal.valueOf(0.7)); // 0.7 đô/km
         }
 
         DistanceFeeResponse distanceFee = new DistanceFeeResponse();
@@ -139,9 +141,8 @@ public class CalculateService {
         BigDecimal servingHours = BigDecimal.valueOf(servingMinutes).divide(BigDecimal.valueOf(60), RoundingMode.CEILING);
 
         // Tính giá phục vụ (70% của giá theo giờ)
-        BigDecimal servingFee = servingHours.multiply(pricePerHour.multiply(BigDecimal.valueOf(0.7)));
 
-        return servingFee;
+        return servingHours.multiply(pricePerHour.multiply(BigDecimal.valueOf(0.6)));
     }
 
 

@@ -88,14 +88,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (StringUtils.hasText(jwt) && jwtTokenProvider.validateToken(jwt)) {
             String username = jwtTokenProvider.getUsernameFromJwt(jwt);
-            // Giả sử JwtTokenProvider hoặc một cơ chế khác cung cấp userId từ token
             String userIdStr = jwtTokenProvider.getUserIdFromJwt(jwt);
             Long userId = Long.parseLong(userIdStr);
 
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                // Tải UserDetails từ service (bạn có thể chuyển đổi sang CustomUserDetails nếu cần)
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                // Giả sử bạn có thể xây dựng CustomUserDetails từ userDetails và userId:
                 CustomUserDetails customUserDetails = new CustomUserDetails(
                         userId,
                         userDetails.getUsername(),

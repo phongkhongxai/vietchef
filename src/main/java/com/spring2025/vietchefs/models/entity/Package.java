@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.Set;
 
 @Entity
@@ -35,12 +36,7 @@ public class Package {
     @Column(nullable = false)
     private Boolean isDeleted = false;
 
-    @ManyToMany
-    @JoinTable(
-            name = "chef_packages",
-            joinColumns = @JoinColumn(name = "package_id"),
-            inverseJoinColumns = @JoinColumn(name = "chef_id")
-    )
+    @ManyToMany(mappedBy = "packages")
     private Set<Chef> chefs;
 }
 

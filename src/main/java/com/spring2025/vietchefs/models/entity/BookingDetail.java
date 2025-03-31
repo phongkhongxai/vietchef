@@ -7,12 +7,14 @@ import net.minidev.json.annotate.JsonIgnore;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 
 
 @Entity
 @Table(name = "booking_details")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class BookingDetail {
@@ -27,10 +29,9 @@ public class BookingDetail {
     @Column(nullable = false)
     private LocalDate sessionDate; // Ngày diễn ra buổi ăn
     @Column(nullable = false)
-    private String status = "scheduled";
+    private String status = "scheduled"; // scheduled, confirmed, locked
     @Column(nullable = false)
     private LocalTime startTime;
-
     @Column(nullable = false)
     private Boolean isServing;
     @Column(nullable = false)
@@ -41,15 +42,24 @@ public class BookingDetail {
     private LocalTime endTime;
     @Column(nullable = false)
     private String location;
+    @Column
+    private BigDecimal chefCookingFee; // Công nấu ăn của đầu bếp
+    @Column
+    private BigDecimal priceOfDishes;  // Giá của các món ăn
+    @Column
+    private BigDecimal arrivalFee;      // Phí di chuyển
+    @Column
+    private BigDecimal chefServingFee;  // Phí phục vụ nếu có
     @Column(nullable = false)
-    private BigDecimal allChefFeePrice;
+    private BigDecimal platformFee;
+    @Column(nullable = false)
+    private BigDecimal totalChefFeePrice;
     @Column(nullable = false)
     private BigDecimal totalPrice;
     @OneToMany(mappedBy = "bookingDetail", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<BookingDetailItem> dishes;
-    @OneToMany(mappedBy = "bookingDetail", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<BookingPrice> prices;
-
+    private List<BookingDetailItem> dishes = new ArrayList<>();
     @Column(nullable = false)
     private Boolean isDeleted = false;
+    @Column(nullable = false)
+    private Boolean isUpdated = false;
 }
