@@ -13,6 +13,7 @@ import com.spring2025.vietchefs.repositories.DishRepository;
 import com.spring2025.vietchefs.repositories.FoodTypeRepository;
 import com.spring2025.vietchefs.repositories.MenuRepository;
 import com.spring2025.vietchefs.services.DishService;
+import jakarta.transaction.Transactional;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -21,7 +22,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -38,14 +41,26 @@ public class DishServiceImpl implements DishService {
     private ChefRepository chefRepository;
     @Autowired
     private FoodTypeRepository foodTypeRepository;
+    @Autowired
+    private ImageService imageService;
     @Override
-    public DishDto createDish(DishDto dishDto) {
+    @Transactional
+    public DishDto createDish(DishDto dishDto, MultipartFile imageFile) {
         Chef chef = chefRepository.findById(dishDto.getChefId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"Chef not found."));
         FoodType foodType = foodTypeRepository.findById(dishDto.getFoodTypeId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"FoodType not found."));
         Dish dish = modelMapper.map(dishDto, Dish.class);
-        return modelMapper.map(dishRepository.save(dish), DishDto.class);
+        dish = dishRepository.save(dish);
+        if (imageFile != null) {
+            try {
+                String imageUrl = imageService.uploadImage(imageFile,dish.getId(), "DISH");
+                dish.setImageUrl(imageUrl);
+            } catch (IOException e) {
+                throw new VchefApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to upload image.");
+            }
+        }
+        return modelMapper.map(dish, DishDto.class);
     }
 
     @Override
@@ -83,6 +98,14 @@ public class DishServiceImpl implements DishService {
         dish.setBasePrice(dishRequest.getBasePrice() != null ? dishRequest.getBasePrice() : dish.getBasePrice());
         //dish.setPreparationTime(dishRequest.getPreparationTime() != null ? dishRequest.getPreparationTime() : dish.getPreparationTime());
         Dish updatedDish = dishRepository.save(dish);
+        if (dishRequest.getFile() != null && !dishRequest.getFile().isEmpty()) {
+            try{
+                String imageUrl = imageService.uploadImage(dishRequest.getFile(), id, "DISH");
+                updatedDish.setImageUrl(imageUrl);
+            } catch (IOException e) {
+                throw new VchefApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to upload image.");
+            }
+        }
         return modelMapper.map(updatedDish, DishDto.class);
     }
 

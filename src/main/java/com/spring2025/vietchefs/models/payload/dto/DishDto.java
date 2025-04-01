@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalTime;
@@ -25,5 +26,6 @@ public class DishDto {
     private BigDecimal cookTime;
     private BigDecimal basePrice;
     private String imageUrl;
+    private MultipartFile file;
 
 }

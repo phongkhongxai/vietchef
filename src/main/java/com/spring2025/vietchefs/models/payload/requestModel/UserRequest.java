@@ -1,6 +1,7 @@
 package com.spring2025.vietchefs.models.payload.requestModel;
 
 import lombok.Data;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 
@@ -10,5 +11,5 @@ public class UserRequest {
     private LocalDate dob;
     private String gender;
     private String phone;
-    private String avatarUrl;
+    private MultipartFile file;
 }

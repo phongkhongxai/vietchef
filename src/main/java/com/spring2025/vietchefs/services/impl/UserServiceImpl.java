@@ -11,6 +11,7 @@ import com.spring2025.vietchefs.models.payload.responseModel.UsersResponse;
 import com.spring2025.vietchefs.repositories.RoleRepository;
 import com.spring2025.vietchefs.repositories.UserRepository;
 import com.spring2025.vietchefs.services.UserService;
+import jakarta.transaction.Transactional;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -22,6 +23,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.ui.ModelMap;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -36,6 +38,8 @@ public class UserServiceImpl implements UserService {
     private ModelMapper modelMapper;
     @Autowired
     private PasswordEncoder passwordEncoder;
+    @Autowired
+    private ImageService imageService;
 
 
 
@@ -103,6 +107,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public UserDto updateProfile(Long userId, UserRequest userRequest) {
         Optional<User> userOptional = userRepository.findById(userId);
         if (userOptional.isEmpty()) {
@@ -115,10 +120,15 @@ public class UserServiceImpl implements UserService {
         user.setDob(userRequest.getDob() != null ? userRequest.getDob() : user.getDob());
         user.setGender(userRequest.getGender() != null ? userRequest.getGender() : user.getGender());
         user.setPhone(userRequest.getPhone() != null ? userRequest.getPhone() : user.getPhone());
-        user.setAvatarUrl(userRequest.getAvatarUrl() != null ? userRequest.getAvatarUrl() : user.getAvatarUrl());
-
         User updatedUser = userRepository.save(user);
-
+        if (userRequest.getFile() != null && !userRequest.getFile().isEmpty()) {
+            try{
+                String avatarUrl = imageService.uploadImage(userRequest.getFile(), userId, "USER");
+                updatedUser.setAvatarUrl(avatarUrl);
+            } catch (IOException e) {
+                throw new VchefApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to upload image.");
+            }
+        }
         return modelMapper.map(updatedUser, UserDto.class);
     }
 
