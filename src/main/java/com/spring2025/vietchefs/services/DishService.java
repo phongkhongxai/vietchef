@@ -3,9 +3,10 @@ package com.spring2025.vietchefs.services;
 import com.spring2025.vietchefs.models.payload.dto.DishDto;
 import com.spring2025.vietchefs.models.payload.requestModel.DishRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.DishesResponse;
+import org.springframework.web.multipart.MultipartFile;
 
 public interface DishService {
-    DishDto createDish (DishDto dishDto);
+    DishDto createDish (DishDto dishDto, MultipartFile imageFile);
     DishDto getDishById(Long id);
     DishDto updateDish (Long id, DishRequest dishRequest);
     String deleteDish(Long id);

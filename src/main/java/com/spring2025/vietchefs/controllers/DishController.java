@@ -5,13 +5,18 @@ import com.spring2025.vietchefs.models.payload.requestModel.DishRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.DishesResponse;
 import com.spring2025.vietchefs.services.DishService;
 import com.spring2025.vietchefs.utils.AppConstants;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/dishes")
@@ -20,9 +25,14 @@ public class DishController {
     private DishService dishService;
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CHEF') or hasRole('ROLE_ADMIN')")
+    @Operation(
+            summary = "Tạo món ăn mới với ảnh",
+            description = "Chấp nhận yêu cầu multipart chứa thông tin món ăn và ảnh"
+    )
     @PostMapping
-    public ResponseEntity<?> createDish(@Valid @RequestBody DishDto dishDto) {
-        DishDto pt = dishService.createDish(dishDto);
+    public ResponseEntity<?> createDish(@Valid @ModelAttribute DishDto dishDto
+                                         ) {
+        DishDto pt = dishService.createDish(dishDto, dishDto.getFile());
         return new ResponseEntity<>(pt, HttpStatus.CREATED);
     }
     @GetMapping
@@ -60,7 +70,7 @@ public class DishController {
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CHEF') or hasRole('ROLE_ADMIN')")
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateDish(@PathVariable("id") Long id, @Valid @RequestBody DishRequest dishRequest) {
+    public ResponseEntity<?> updateDish(@PathVariable("id") Long id, @Valid @ModelAttribute DishRequest dishRequest) {
         DishDto bt1 = dishService.updateDish(id, dishRequest);
         return new ResponseEntity<>(bt1, HttpStatus.OK);
     }

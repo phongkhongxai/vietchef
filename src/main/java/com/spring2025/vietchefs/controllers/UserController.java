@@ -6,6 +6,7 @@ import com.spring2025.vietchefs.models.payload.requestModel.ChangePasswordReques
 import com.spring2025.vietchefs.models.payload.requestModel.UserRequest;
 import com.spring2025.vietchefs.services.UserService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -29,7 +30,7 @@ public class UserController {
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
     @PutMapping("/profile")
-    public ResponseEntity<UserDto> updateMyProfile(@AuthenticationPrincipal UserDetails userDetails, @RequestBody UserRequest userDTO) {
+    public ResponseEntity<UserDto> updateMyProfile(@AuthenticationPrincipal UserDetails userDetails, @ModelAttribute @Valid UserRequest userDTO) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
         return ResponseEntity.ok(userService.updateProfile(bto.getId(), userDTO));
     }

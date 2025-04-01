@@ -4,7 +4,10 @@ import com.spring2025.vietchefs.models.payload.requestModel.ChefPackageRequestDt
 import com.spring2025.vietchefs.models.payload.requestModel.PackageRequestDto;
 import com.spring2025.vietchefs.models.payload.responseModel.PackageResponseDto;
 import com.spring2025.vietchefs.services.PackageService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import org.apache.commons.lang3.builder.ToStringSummary;
+import org.modelmapper.internal.bytebuddy.build.Plugin;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -67,7 +70,8 @@ public class PackageController {
     public ResponseEntity<List<PackageResponseDto>> getUnregisteredPackages(@PathVariable Long chefId) {
         return ResponseEntity.ok(packageService.getUnregisteredPackages(chefId));
     }
-
+    @Operation(summary = "Lấy danh sách gói dịch vụ của đầu bếp",
+            description = "Trả về danh sách các gói dịch vụ mà đầu bếp đã đăng ký.")
     @GetMapping("/chefs/{chefId}")
     public ResponseEntity<List<PackageResponseDto>> getRegisteredPackagesByChef(@PathVariable Long chefId) {
         return ResponseEntity.ok(packageService.getPackagesByChefId(chefId));
