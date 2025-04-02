@@ -1,0 +1,94 @@
+package com.spring2025.vietchefs.services.impl;
+
+import com.spring2025.vietchefs.models.entity.Booking;
+import com.spring2025.vietchefs.models.entity.BookingDetail;
+import com.spring2025.vietchefs.models.entity.Chef;
+import com.spring2025.vietchefs.repositories.BookingDetailRepository;
+import com.spring2025.vietchefs.repositories.BookingRepository;
+import com.spring2025.vietchefs.services.BookingConflictService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+public class BookingConflictServiceImpl implements BookingConflictService {
+
+    private static final List<String> ACTIVE_BOOKING_STATUSES = List.of("PENDING", "CONFIRMED", "IN_PROGRESS");
+    private static final List<String> ACTIVE_DETAIL_STATUSES = List.of("PENDING", "CONFIRMED", "IN_PROGRESS");
+    
+    @Autowired
+    private BookingRepository bookingRepository;
+    
+    @Autowired
+    private BookingDetailRepository bookingDetailRepository;
+
+    @Override
+    public boolean hasBookingConflict(Chef chef, LocalDate date, LocalTime startTime, LocalTime endTime) {
+        // Lấy tất cả booking detail của chef vào ngày cụ thể
+        List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking_ChefAndSessionDateAndIsDeletedFalse(chef, date);
+        
+        // Lọc ra những booking còn active
+        bookingDetails = filterActiveBookingDetails(bookingDetails);
+        
+        // Kiểm tra xem có booking detail nào trùng giờ không
+        return bookingDetails.stream()
+                .anyMatch(detail -> 
+                    timeRangesOverlap(startTime, endTime, detail.getTimeBeginTravel(), detail.getEndTime()));
+    }
+
+    @Override
+    public boolean hasBookingConflictOnDayOfWeek(Chef chef, Integer dayOfWeek, LocalTime startTime, LocalTime endTime, Integer daysToCheck) {
+        LocalDate today = LocalDate.now();
+        LocalDate endDate = today.plusDays(daysToCheck);
+        
+        // Lọc ra tất cả các ngày trong khoảng thời gian có cùng thứ trong tuần
+        List<LocalDate> datesToCheck = today.datesUntil(endDate.plusDays(1))
+                .filter(date -> {
+                    // Điều chỉnh dayOfWeek để phù hợp với DayOfWeek.getValue() (1-7 với 1 là Thứ 2)
+                    int adjustedDayOfWeek = (dayOfWeek % 7) + 1;
+                    if (adjustedDayOfWeek == 8) adjustedDayOfWeek = 1; // Chủ nhật
+                    
+                    return date.getDayOfWeek().getValue() == adjustedDayOfWeek;
+                })
+                .collect(Collectors.toList());
+        
+        // Kiểm tra từng ngày
+        for (LocalDate date : datesToCheck) {
+            if (hasBookingConflict(chef, date, startTime, endTime)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Lọc danh sách booking detail để lấy ra các booking còn active
+     */
+    private List<BookingDetail> filterActiveBookingDetails(List<BookingDetail> bookingDetails) {
+        return bookingDetails.stream()
+                .filter(detail -> {
+                    // Booking vẫn còn active
+                    Booking booking = detail.getBooking();
+                    if (booking.getIsDeleted() || !ACTIVE_BOOKING_STATUSES.contains(booking.getStatus())) {
+                        return false;
+                    }
+                    
+                    // BookingDetail vẫn còn active
+                    return !detail.getIsDeleted() && ACTIVE_DETAIL_STATUSES.contains(detail.getStatus());
+                })
+                .collect(Collectors.toList());
+    }
+    
+    /**
+     * Kiểm tra xem hai khoảng thời gian có chồng lấn không
+     */
+    private boolean timeRangesOverlap(LocalTime start1, LocalTime end1, LocalTime start2, LocalTime end2) {
+        return start1.isBefore(end2) && end1.isAfter(start2);
+    }
+} 
