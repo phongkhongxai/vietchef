@@ -13,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
@@ -24,4 +25,10 @@ public interface BookingDetailRepository extends JpaRepository<BookingDetail, Lo
     List<BookingDetail> findByBookingId(@Param("bookingId") Long bookingId);
     @Query("SELECT COALESCE(SUM(bd.totalPrice), 0) FROM BookingDetail bd WHERE bd.booking.id = :bookingId")
     BigDecimal calculateTotalPriceByBooking(@Param("bookingId") Long bookingId);
+    
+    /**
+     * Tìm tất cả booking detail của một chef vào một ngày cụ thể
+     */
+    @Query("SELECT bd FROM BookingDetail bd WHERE bd.booking.chef = :chef AND bd.sessionDate = :sessionDate AND bd.isDeleted = false")
+    List<BookingDetail> findByBooking_ChefAndSessionDateAndIsDeletedFalse(@Param("chef") Chef chef, @Param("sessionDate") LocalDate sessionDate);
 }

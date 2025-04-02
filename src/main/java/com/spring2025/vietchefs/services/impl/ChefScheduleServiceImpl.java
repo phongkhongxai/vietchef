@@ -1,15 +1,18 @@
 package com.spring2025.vietchefs.services.impl;
 
 import com.spring2025.vietchefs.models.entity.Chef;
+import com.spring2025.vietchefs.models.entity.ChefBlockedDate;
 import com.spring2025.vietchefs.models.entity.ChefSchedule;
 import com.spring2025.vietchefs.models.entity.User;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefScheduleRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefScheduleUpdateRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.ChefScheduleResponse;
+import com.spring2025.vietchefs.repositories.ChefBlockedDateRepository;
 import com.spring2025.vietchefs.repositories.ChefRepository;
 import com.spring2025.vietchefs.repositories.ChefScheduleRepository;
 import com.spring2025.vietchefs.repositories.UserRepository;
+import com.spring2025.vietchefs.services.BookingConflictService;
 import com.spring2025.vietchefs.services.ChefScheduleService;
 import com.spring2025.vietchefs.utils.SecurityUtils;
 import org.modelmapper.ModelMapper;
@@ -17,12 +20,24 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 public class ChefScheduleServiceImpl implements ChefScheduleService {
+
+    // Các hằng số cho việc validation
+    private static final LocalTime MIN_WORK_HOUR = LocalTime.of(8, 0);
+    private static final LocalTime MAX_WORK_HOUR = LocalTime.of(22, 0);
+    private static final int MIN_SLOT_DURATION_MINUTES = 120; // 2 giờ
+    private static final int MIN_SLOT_GAP_MINUTES = 60; // 1 giờ
+    private static final int MAX_SESSIONS_PER_DAY = 3;
+    private static final int DAYS_TO_CHECK_FOR_BLOCKED_DATES = 60; // Kiểm tra 60 ngày tới
+    private static final int DAYS_TO_CHECK_FOR_BOOKINGS = 60; // Kiểm tra 60 ngày tới cho đơn hàng
 
     @Autowired
     private ChefScheduleRepository chefScheduleRepository;
@@ -32,6 +47,12 @@ public class ChefScheduleServiceImpl implements ChefScheduleService {
 
     @Autowired
     private UserRepository userRepository;
+    
+    @Autowired
+    private ChefBlockedDateRepository chefBlockedDateRepository;
+    
+    @Autowired
+    private BookingConflictService bookingConflictService;
 
     @Autowired
     private ModelMapper modelMapper;
@@ -59,13 +80,27 @@ public class ChefScheduleServiceImpl implements ChefScheduleService {
             schedule.setEndTime(request.getEndTime());
         }
 
+        // Validate các ràng buộc thời gian
+        validateScheduleTimeConstraints(schedule.getStartTime(), schedule.getEndTime());
+
+        // Kiểm tra số buổi tối đa trong ngày
+        validateMaxSessionsPerDay(schedule.getChef(), schedule.getDayOfWeek(), schedule.getId());
+
+        // Kiểm tra khoảng cách giữa các khung giờ
+        validateTimeSlotGaps(schedule.getChef(), schedule.getDayOfWeek(), schedule.getStartTime(), schedule.getEndTime(), schedule.getId());
+
         // Kiểm tra conflict với các lịch khác của chef, loại trừ lịch hiện tại
         checkScheduleConflict(schedule.getChef(), schedule.getDayOfWeek(), schedule.getStartTime(), schedule.getEndTime(), schedule.getId());
+        
+        // Kiểm tra xung đột với các ngày bị chặn
+        validateNoBlockedDateConflict(schedule.getChef(), schedule.getDayOfWeek(), schedule.getStartTime(), schedule.getEndTime());
+        
+        // Kiểm tra xung đột với các đơn đặt hàng hiện có
+        validateNoBookingConflict(schedule.getChef(), schedule.getDayOfWeek(), schedule.getStartTime(), schedule.getEndTime());
 
         ChefSchedule updatedSchedule = chefScheduleRepository.save(schedule);
         return modelMapper.map(updatedSchedule, ChefScheduleResponse.class);
     }
-
 
     @Override
     public void deleteSchedule(Long scheduleId) {
@@ -83,15 +118,29 @@ public class ChefScheduleServiceImpl implements ChefScheduleService {
         Chef chef = chefRepository.findByUser(user)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef profile not found for user id: " + userId));
 
+        // Validate các ràng buộc thời gian
+        validateScheduleTimeConstraints(request.getStartTime(), request.getEndTime());
+
+        // Kiểm tra số buổi tối đa trong ngày
+        validateMaxSessionsPerDay(chef, request.getDayOfWeek(), null);
+
+        // Kiểm tra khoảng cách giữa các khung giờ
+        validateTimeSlotGaps(chef, request.getDayOfWeek(), request.getStartTime(), request.getEndTime(), null);
+
         // Kiểm tra conflict trước khi tạo lịch
         checkScheduleConflict(chef, request.getDayOfWeek(), request.getStartTime(), request.getEndTime(), null);
+        
+        // Kiểm tra xung đột với các ngày bị chặn
+        validateNoBlockedDateConflict(chef, request.getDayOfWeek(), request.getStartTime(), request.getEndTime());
+        
+        // Kiểm tra xung đột với các đơn đặt hàng hiện có
+        validateNoBookingConflict(chef, request.getDayOfWeek(), request.getStartTime(), request.getEndTime());
 
         ChefSchedule schedule = modelMapper.map(request, ChefSchedule.class);
         schedule.setChef(chef);
         ChefSchedule savedSchedule = chefScheduleRepository.save(schedule);
         return modelMapper.map(savedSchedule, ChefScheduleResponse.class);
     }
-
 
     @Override
     public List<ChefScheduleResponse> getSchedulesForCurrentChef() {
@@ -106,6 +155,9 @@ public class ChefScheduleServiceImpl implements ChefScheduleService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Kiểm tra xung đột giữa khung giờ mới và các khung giờ hiện có
+     */
     private void checkScheduleConflict(Chef chef, Integer dayOfWeek, LocalTime newStart, LocalTime newEnd, Long excludeScheduleId) {
         List<ChefSchedule> schedules = chefScheduleRepository.findByChefAndDayOfWeekAndIsDeletedFalse(chef, dayOfWeek);
         for (ChefSchedule existing : schedules) {
@@ -114,6 +166,110 @@ public class ChefScheduleServiceImpl implements ChefScheduleService {
                     throw new VchefApiException(HttpStatus.BAD_REQUEST, "Schedule time conflicts with an existing schedule");
                 }
             }
+        }
+    }
+
+    /**
+     * Kiểm tra các ràng buộc về thời gian: 
+     * - Thời gian bắt đầu và kết thúc phải nằm trong khoảng 8:00-22:00
+     * - Độ dài khung giờ phải ít nhất 2 giờ
+     */
+    private void validateScheduleTimeConstraints(LocalTime startTime, LocalTime endTime) {
+        // Kiểm tra thời gian bắt đầu và kết thúc nằm trong khoảng cho phép
+        if (startTime.isBefore(MIN_WORK_HOUR) || endTime.isAfter(MAX_WORK_HOUR)) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, 
+                "Schedule time must be between " + MIN_WORK_HOUR + " and " + MAX_WORK_HOUR);
+        }
+
+        // Kiểm tra độ dài khung giờ tối thiểu (2 giờ)
+        long durationMinutes = Duration.between(startTime, endTime).toMinutes();
+        if (durationMinutes < MIN_SLOT_DURATION_MINUTES) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, 
+                "Schedule duration must be at least " + MIN_SLOT_DURATION_MINUTES + " minutes");
+        }
+    }
+
+    /**
+     * Kiểm tra số lượng buổi tối đa trong một ngày
+     */
+    private void validateMaxSessionsPerDay(Chef chef, Integer dayOfWeek, Long excludeScheduleId) {
+        List<ChefSchedule> schedules = chefScheduleRepository.findByChefAndDayOfWeekAndIsDeletedFalse(chef, dayOfWeek);
+        
+        // Nếu đang cập nhật, loại trừ lịch hiện tại
+        if (excludeScheduleId != null) {
+            schedules = schedules.stream()
+                .filter(schedule -> !schedule.getId().equals(excludeScheduleId))
+                .collect(Collectors.toList());
+        }
+        
+        if (schedules.size() >= MAX_SESSIONS_PER_DAY) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, 
+                "Maximum number of sessions per day (" + MAX_SESSIONS_PER_DAY + ") exceeded");
+        }
+    }
+
+    /**
+     * Kiểm tra khoảng cách giữa các khung giờ (ít nhất 1 giờ)
+     */
+    private void validateTimeSlotGaps(Chef chef, Integer dayOfWeek, LocalTime newStart, LocalTime newEnd, Long excludeScheduleId) {
+        List<ChefSchedule> schedules = chefScheduleRepository.findByChefAndDayOfWeekAndIsDeletedFalse(chef, dayOfWeek);
+        
+        for (ChefSchedule existing : schedules) {
+            if (excludeScheduleId == null || !existing.getId().equals(excludeScheduleId)) {
+                // Kiểm tra khoảng cách giữa khung giờ mới và khung giờ hiện có
+                if (!newStart.isBefore(existing.getEndTime()) && 
+                    Duration.between(existing.getEndTime(), newStart).toMinutes() < MIN_SLOT_GAP_MINUTES) {
+                    throw new VchefApiException(HttpStatus.BAD_REQUEST, 
+                        "Schedule must have at least " + MIN_SLOT_GAP_MINUTES + " minutes gap from previous schedule");
+                }
+                
+                if (!existing.getStartTime().isBefore(newEnd) && 
+                    Duration.between(newEnd, existing.getStartTime()).toMinutes() < MIN_SLOT_GAP_MINUTES) {
+                    throw new VchefApiException(HttpStatus.BAD_REQUEST, 
+                        "Schedule must have at least " + MIN_SLOT_GAP_MINUTES + " minutes gap from next schedule");
+                }
+            }
+        }
+    }
+    
+    /**
+     * Kiểm tra xung đột với các ngày bị chặn
+     */
+    private void validateNoBlockedDateConflict(Chef chef, Integer dayOfWeek, LocalTime startTime, LocalTime endTime) {
+        LocalDate today = LocalDate.now();
+        LocalDate endDate = today.plusDays(DAYS_TO_CHECK_FOR_BLOCKED_DATES);
+        
+        // Lấy tất cả blocked dates trong khoảng ngày kiểm tra
+        List<ChefBlockedDate> blockedDates = chefBlockedDateRepository.findByChefAndBlockedDateBetweenAndIsDeletedFalse(
+                chef, today, endDate);
+                
+        // Lọc ra những blocked dates có cùng thứ trong tuần với lịch đang tạo/cập nhật
+        for (ChefBlockedDate blockedDate : blockedDates) {
+            // Kiểm tra xem ngày bị chặn có cùng thứ trong tuần không
+            if (blockedDate.getBlockedDate().getDayOfWeek().getValue() % 7 == dayOfWeek % 7) {
+                // Kiểm tra xung đột thời gian
+                if (startTime.isBefore(blockedDate.getEndTime()) && 
+                    endTime.isAfter(blockedDate.getStartTime())) {
+                    throw new VchefApiException(HttpStatus.BAD_REQUEST,
+                        "Schedule conflicts with a blocked date: " + blockedDate.getBlockedDate() + 
+                        " (" + blockedDate.getStartTime() + " - " + blockedDate.getEndTime() + ")" +
+                        (blockedDate.getReason() != null ? ". Reason: " + blockedDate.getReason() : ""));
+                }
+            }
+        }
+    }
+    
+    /**
+     * Kiểm tra xung đột với các đơn đặt hàng
+     */
+    private void validateNoBookingConflict(Chef chef, Integer dayOfWeek, LocalTime startTime, LocalTime endTime) {
+        // Sử dụng BookingConflictService để kiểm tra xung đột
+        boolean hasConflict = bookingConflictService.hasBookingConflictOnDayOfWeek(
+                chef, dayOfWeek, startTime, endTime, DAYS_TO_CHECK_FOR_BOOKINGS);
+        
+        if (hasConflict) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST,
+                "Schedule conflicts with existing bookings. Please check your booking calendar and choose a different time slot.");
         }
     }
 }
