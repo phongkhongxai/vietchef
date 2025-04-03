@@ -76,6 +76,7 @@ Thumbs.db
 *.swo
 *.bak
 *.tmp
+.cursorrules
 
 # Test reports
 test-output/
