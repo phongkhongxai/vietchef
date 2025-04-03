@@ -28,11 +28,13 @@ public class BookingDetailRequestDto {
     private BigDecimal priceOfDishes;  // Giá của các món ăn
     private BigDecimal arrivalFee;      // Phí di chuyển
     private BigDecimal chefServingFee;  // Phí phục vụ nếu có
+    private BigDecimal discountAmout;
     private LocalTime timeBeginCook;
     private LocalTime timeBeginTravel;
     private BigDecimal platformFee;
     private BigDecimal totalChefFeePrice;
     private Boolean isServing;
     private Boolean isUpdated;
+    private Long menuId;
     private List<BookingDetailItemRequestDto> dishes;
 }

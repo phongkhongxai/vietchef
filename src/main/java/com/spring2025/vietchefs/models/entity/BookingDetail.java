@@ -54,6 +54,10 @@ public class BookingDetail {
     private BigDecimal platformFee;
     @Column(nullable = false)
     private BigDecimal totalChefFeePrice;
+    @Column(nullable = true)
+    private BigDecimal discountAmout;
+    @Column
+    private Long menuId;
     @Column(nullable = false)
     private BigDecimal totalPrice;
     @OneToMany(mappedBy = "bookingDetail", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)

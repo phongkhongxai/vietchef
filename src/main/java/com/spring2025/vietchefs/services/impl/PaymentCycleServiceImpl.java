@@ -3,21 +3,34 @@ package com.spring2025.vietchefs.services.impl;
 import com.spring2025.vietchefs.models.entity.Booking;
 import com.spring2025.vietchefs.models.entity.BookingDetail;
 import com.spring2025.vietchefs.models.entity.PaymentCycle;
+import com.spring2025.vietchefs.models.exception.VchefApiException;
+import com.spring2025.vietchefs.models.payload.responseModel.PaymentCycleResponseDto;
 import com.spring2025.vietchefs.repositories.BookingDetailRepository;
+import com.spring2025.vietchefs.repositories.BookingRepository;
 import com.spring2025.vietchefs.repositories.PaymentCycleRepository;
 import com.spring2025.vietchefs.services.PaymentCycleService;
+import jakarta.transaction.Transactional;
+import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
+
 @Service
 public class PaymentCycleServiceImpl implements PaymentCycleService {
     @Autowired
     private PaymentCycleRepository paymentCycleRepository;
     @Autowired
     private BookingDetailRepository bookingDetailRepository;
+    @Autowired
+    private BookingRepository bookingRepository;
+    @Autowired
+    private ModelMapper modelMapper;
 
     @Override
     public void createPaymentCycles(Booking booking) {
@@ -84,6 +97,72 @@ public class PaymentCycleServiceImpl implements PaymentCycleService {
                 paymentCycleRepository.save(paymentCycle);
             }
         }
+    }
+
+    @Override
+    @Transactional
+    public PaymentCycleResponseDto cancelPaymentCycle(Long paymentCycleId) {
+        PaymentCycle cycle = paymentCycleRepository.findById(paymentCycleId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Payment cycle not found"));
+
+        if ("PAID".equalsIgnoreCase(cycle.getStatus())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel a payment cycle that has already been PAID.");
+        }
+
+        if (!cycle.getDueDate().isAfter(LocalDate.now())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel a payment cycle that has already started.");
+        }
+        if(cycle.getCycleOrder()==1){
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel the first payment cycle.");
+        }
+
+        cycle.setStatus("CANCELED");
+        paymentCycleRepository.save(cycle);
+
+        Booking booking = cycle.getBooking();
+        BigDecimal refundAmount = cycle.getAmountDue();
+
+        // Cập nhật totalPrice của booking (giảm đi số tiền bị hủy)
+        booking.setTotalPrice(booking.getTotalPrice().subtract(refundAmount));
+
+        List<PaymentCycle> futureCycles = paymentCycleRepository.findByBookingId(booking.getId())
+                .stream()
+                .filter(c -> c.getDueDate().isAfter(cycle.getDueDate())) // Chỉ lấy các kỳ sau kỳ hiện tại
+                .toList();
+        // Nếu có futureCycles, lấy ngày kết thúc của cycle cuối cùng
+        LocalDate endDateLastCycle = futureCycles.isEmpty() ? cycle.getEndDate() :
+                futureCycles.stream().max(Comparator.comparing(PaymentCycle::getEndDate)).get().getEndDate();
+
+        // Tính tổng số tiền bị hủy từ các kỳ thanh toán trong tương lai
+        BigDecimal totalFutureRefund = futureCycles.stream()
+                .map(PaymentCycle::getAmountDue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Cập nhật status và giảm totalPrice một lần duy nhất
+        for (PaymentCycle futureCycle : futureCycles) {
+            futureCycle.setStatus("CANCELED");
+            paymentCycleRepository.save(futureCycle);
+        }
+        booking.setTotalPrice(booking.getTotalPrice().subtract(totalFutureRefund));
+        booking.setStatus("CONFIRM_PAID");
+        bookingRepository.save(booking);
+
+        // Lọc danh sách BookingDetail có sessionDate nằm trong khoảng từ startDate đến endDate
+        List<BookingDetail> bookingDetails = bookingDetailRepository.findByBookingId(booking.getId())
+                .stream()
+                .filter(detail -> !detail.getSessionDate().isBefore(cycle.getStartDate())
+                        && !detail.getSessionDate().isAfter(endDateLastCycle))
+                .toList();
+
+        if (!bookingDetails.isEmpty()) {
+            for (BookingDetail detail : bookingDetails) {
+                detail.setTotalPrice(BigDecimal.ZERO);
+                detail.setStatus("CANCELED");
+                bookingDetailRepository.save(detail);
+            }
+        }
+
+        return modelMapper.map(cycle, PaymentCycleResponseDto.class);
     }
 
     private int getNumOfCycles(Booking booking) {

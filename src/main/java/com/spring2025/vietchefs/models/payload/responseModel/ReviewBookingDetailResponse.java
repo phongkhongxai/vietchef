@@ -24,11 +24,12 @@ public class ReviewBookingDetailResponse {
     private BigDecimal platformFee; // Phí nền tảng (12% phí dịch vụ)
 
     private BigDecimal totalChefFeePrice; // Tổng phí dịch vụ đầu bếp (cooking + dish + travel + serving)
+    private BigDecimal discountAmout;
 
     private BigDecimal totalPrice; // Tổng giá trị cập nhật của `BookingDetail`
 
     private LocalTime timeBeginTravel; // Giờ bắt đầu di chuyển của đầu bếp
-
+    private Long menuId;
     private LocalTime timeBeginCook; // Giờ đầu bếp bắt đầu nấu ăn
     private Boolean isServing;
     List<BookingDetailItemRequestDto> dishes;
