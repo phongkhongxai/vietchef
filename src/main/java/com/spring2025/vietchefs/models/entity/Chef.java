@@ -61,4 +61,9 @@ public class Chef {
             joinColumns = @JoinColumn(name = "chef_id"),
             inverseJoinColumns = @JoinColumn(name = "package_id"))
     private Set<Package> packages;
+    @Column(nullable = true)
+    private Double latitude;
+
+    @Column(nullable = true)
+    private Double longitude;
 }

@@ -13,10 +13,7 @@ import java.util.List;
 @AllArgsConstructor
 public class BookingDetailUpdateDto {
     private Long menuId; // ID của Menu (nếu chọn cả Menu)
-
     private List<Long> extraDishIds; // ID các món ăn bổ sung
-
-    private Boolean isServing; // Khách có chọn phục vụ không?
     List<BookingDetailItemRequestDto> dishes;
 
 }

@@ -14,7 +14,6 @@ public class ChefResponseDto {
     private UserDto user;
     private String bio;                 // Giới thiệu ngắn
     private String description;         // Mô tả chi tiết
-
     private String address;
     private String country;
     private BigDecimal price;           // Giá theo giờ

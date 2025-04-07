@@ -14,23 +14,16 @@ import java.util.List;
 @AllArgsConstructor
 public class ReviewBookingDetailResponse {
     private BigDecimal chefCookingFee; // Phí nấu ăn của đầu bếp
-
     private BigDecimal priceOfDishes; // Tổng tiền món ăn
-
     private BigDecimal arrivalFee; // Phí di chuyển của đầu bếp
-
-    private BigDecimal chefServingFee; // Phí phục vụ (nếu có)
-
-    private BigDecimal platformFee; // Phí nền tảng (12% phí dịch vụ)
-
-    private BigDecimal totalChefFeePrice; // Tổng phí dịch vụ đầu bếp (cooking + dish + travel + serving)
-
+    private BigDecimal platformFee; // Phí nền tảng (25% phí dịch vụ)
+    private BigDecimal totalCookTime;
+    private BigDecimal totalChefFeePrice; // Tổng phí dịch vụ đầu bếp (cooking + dish + travel)
+    private BigDecimal discountAmout;
     private BigDecimal totalPrice; // Tổng giá trị cập nhật của `BookingDetail`
-
     private LocalTime timeBeginTravel; // Giờ bắt đầu di chuyển của đầu bếp
-
+    private Long menuId;
     private LocalTime timeBeginCook; // Giờ đầu bếp bắt đầu nấu ăn
-    private Boolean isServing;
     List<BookingDetailItemRequestDto> dishes;
 
 }

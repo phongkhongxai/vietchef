@@ -1,5 +1,6 @@
 package com.spring2025.vietchefs.models.payload.dto;
 
+import jakarta.persistence.Column;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -25,9 +26,13 @@ public class BookingDetailDto {
     private BigDecimal priceOfDishes;  // Giá của các món ăn
     private BigDecimal arrivalFee;      // Phí di chuyển
     private BigDecimal chefServingFee;  // Phí phục vụ nếu có
+    private BigDecimal platformFee;
+    private BigDecimal totalChefFeePrice;
+    private BigDecimal discountAmout;
     private LocalTime timeBeginCook;
     private LocalTime timeBeginTravel;
     private Boolean isServing;
     private Boolean isUpdated;
+    private Long menuId;
     private List<BookingDetailItemDto> dishes;
 }

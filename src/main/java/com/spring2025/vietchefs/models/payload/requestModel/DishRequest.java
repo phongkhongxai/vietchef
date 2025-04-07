@@ -20,6 +20,7 @@ public class DishRequest {
     private String description;
     private String cuisineType;
     private String serviceType;
+    private Integer estimatedCookGroup;
     private BigDecimal cookTime;
     private BigDecimal basePrice;
     private MultipartFile file;

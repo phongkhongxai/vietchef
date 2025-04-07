@@ -8,7 +8,8 @@ import java.time.LocalTime;
 
 @Entity
 @Table(name = "dishes")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class Dish {
@@ -37,7 +38,8 @@ public class Dish {
 
     private String imageUrl;
     private LocalTime preparationTime;
-
+    @Column(nullable = false)
+    private Integer estimatedCookGroup=1;
     @Column(nullable = false)
     private Boolean isAvailable = true;
 

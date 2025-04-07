@@ -96,7 +96,7 @@ public class DishServiceImpl implements DishService {
         dish.setServiceType(dishRequest.getServiceType() != null ? dishRequest.getServiceType() : dish.getServiceType());
         dish.setCookTime(dishRequest.getCookTime() != null ? dishRequest.getCookTime() : dish.getCookTime());
         dish.setBasePrice(dishRequest.getBasePrice() != null ? dishRequest.getBasePrice() : dish.getBasePrice());
-        //dish.setPreparationTime(dishRequest.getPreparationTime() != null ? dishRequest.getPreparationTime() : dish.getPreparationTime());
+        dish.setEstimatedCookGroup(dishRequest.getEstimatedCookGroup()!=null ? dishRequest.getEstimatedCookGroup() : dish.getEstimatedCookGroup());
         Dish updatedDish = dishRepository.save(dish);
         if (dishRequest.getFile() != null && !dishRequest.getFile().isEmpty()) {
             try{

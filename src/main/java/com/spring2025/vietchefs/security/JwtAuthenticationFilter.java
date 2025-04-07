@@ -87,6 +87,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String jwt = getJwtFromRequest(request);
 
         if (StringUtils.hasText(jwt) && jwtTokenProvider.validateToken(jwt)) {
+            AccessToken accessToken = accessTokenRepository.findByToken(jwt);
+            if (accessToken == null || accessToken.isRevoked() || accessToken.isExpired()) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("Token has been revoked or expired");
+                return;
+            }
+
+
             String username = jwtTokenProvider.getUsernameFromJwt(jwt);
             String userIdStr = jwtTokenProvider.getUserIdFromJwt(jwt);
             Long userId = Long.parseLong(userIdStr);

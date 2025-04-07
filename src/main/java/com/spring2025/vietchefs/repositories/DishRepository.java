@@ -25,6 +25,8 @@ public interface DishRepository extends JpaRepository<Dish, Long> {
     Optional<Dish> findByIdNotDeleted(Long id);
 
     Page<Dish> findByChefAndIsDeletedFalse(Chef chef, Pageable pageable);
+    List<Dish> findByChefAndIsDeletedFalse(Chef chef);
+
 
     Page<Dish> findByFoodTypeAndIsDeletedFalse(FoodType foodType, Pageable pageable);
     @Query("SELECT d FROM Dish d WHERE d.isDeleted = false AND d.id NOT IN " +

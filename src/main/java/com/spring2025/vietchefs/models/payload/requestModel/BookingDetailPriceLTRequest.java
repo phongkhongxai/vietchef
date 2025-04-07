@@ -12,9 +12,7 @@ import java.util.List;
 public class BookingDetailPriceLTRequest {
     @Future(message = "sessionDate phải là một ngày trong tương lai")
     private LocalDate sessionDate;
-    private Boolean isServing;
     private LocalTime startTime;
-    private LocalTime endTime;
     private Long menuId;
     private List<Long> extraDishIds;
     private Boolean isDishSelected;

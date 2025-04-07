@@ -4,14 +4,14 @@ import com.spring2025.vietchefs.models.payload.dto.BookingRequestDto;
 import com.spring2025.vietchefs.models.payload.dto.BookingResponseDto;
 import com.spring2025.vietchefs.models.payload.requestModel.BookingLTPriceRequestDto;
 import com.spring2025.vietchefs.models.payload.requestModel.BookingPriceRequestDto;
-import com.spring2025.vietchefs.models.payload.responseModel.PaymentCycleResponse;
-import com.spring2025.vietchefs.models.payload.responseModel.ReviewLongTermBookingResponse;
-import com.spring2025.vietchefs.models.payload.responseModel.ReviewSingleBookingResponse;
+import com.spring2025.vietchefs.models.payload.responseModel.*;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 public interface BookingService {
+    BookingsResponse getBookingsByCustomerId(Long customerId, int pageNo, int pageSize, String sortBy, String sortDir);
+    BookingResponseDto getBookingById(Long id);
     BookingResponseDto createSingleBooking(BookingRequestDto dto);
     BookingResponseDto createLongtermBooking(BookingRequestDto dto);
     ReviewSingleBookingResponse calculateFinalPriceForSingleBooking(BookingPriceRequestDto dto);

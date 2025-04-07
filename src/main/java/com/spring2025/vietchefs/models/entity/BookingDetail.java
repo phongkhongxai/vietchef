@@ -25,35 +25,36 @@ public class BookingDetail {
     @ManyToOne
     @JoinColumn(name = "booking_id", nullable = false)
     private Booking booking;
-
     @Column(nullable = false)
     private LocalDate sessionDate; // Ngày diễn ra buổi ăn
     @Column(nullable = false)
-    private String status = "scheduled"; // scheduled, confirmed, locked
+    private String status = "SCHEDULED"; // scheduled, confirmed, locked
     @Column(nullable = false)
     private LocalTime startTime;
     @Column(nullable = false)
-    private Boolean isServing;
+    private Boolean isServing=false;
     @Column(nullable = false)
     private LocalTime timeBeginCook;
     @Column(nullable = false)
     private LocalTime timeBeginTravel;
-    @Column
-    private LocalTime endTime;
     @Column(nullable = false)
     private String location;
+    @Column
+    private BigDecimal totalCookTime;
     @Column
     private BigDecimal chefCookingFee; // Công nấu ăn của đầu bếp
     @Column
     private BigDecimal priceOfDishes;  // Giá của các món ăn
     @Column
     private BigDecimal arrivalFee;      // Phí di chuyển
-    @Column
-    private BigDecimal chefServingFee;  // Phí phục vụ nếu có
     @Column(nullable = false)
     private BigDecimal platformFee;
     @Column(nullable = false)
     private BigDecimal totalChefFeePrice;
+    @Column(nullable = true)
+    private BigDecimal discountAmout;
+    @Column
+    private Long menuId;
     @Column(nullable = false)
     private BigDecimal totalPrice;
     @OneToMany(mappedBy = "bookingDetail", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)

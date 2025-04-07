@@ -6,10 +6,7 @@ import com.spring2025.vietchefs.models.payload.dto.BookingResponseDto;
 import com.spring2025.vietchefs.models.payload.dto.UserDto;
 import com.spring2025.vietchefs.models.payload.requestModel.*;
 import com.spring2025.vietchefs.models.payload.responseModel.*;
-import com.spring2025.vietchefs.services.BookingDetailService;
-import com.spring2025.vietchefs.services.BookingService;
-import com.spring2025.vietchefs.services.MenuService;
-import com.spring2025.vietchefs.services.UserService;
+import com.spring2025.vietchefs.services.*;
 import com.spring2025.vietchefs.utils.AppConstants;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,7 +27,29 @@ public class BookingController {
     @Autowired
     private UserService userService;
     @Autowired
+    private PaymentCycleService paymentCycleService;
+    @Autowired
     private BookingDetailService bookingDetailService;
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_ADMIN') or hasRole('ROLE_CHEF')")
+    @GetMapping("/users/my-bookings")
+    public BookingsResponse getBookingsMySelf(
+           // @RequestParam(value = "customerId", required = false) Long customerId,
+           @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
+            @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
+            @RequestParam(value = "sortBy", defaultValue = AppConstants.DEFAULT_SORT_BY, required = false) String sortBy,
+            @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir){
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        return bookingService.getBookingsByCustomerId(bto.getId(),pageNo, pageSize, sortBy, sortDir);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_ADMIN') or hasRole('ROLE_CHEF')")
+    @GetMapping("/{bookingId}")
+    public ResponseEntity<?> getBookingById(@PathVariable Long bookingId){
+        BookingResponseDto dto = bookingService.getBookingById(bookingId);
+        return new ResponseEntity<>(dto, HttpStatus.OK);
+    }
 
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_ADMIN')")
@@ -163,6 +182,14 @@ public class BookingController {
     public ResponseEntity<?> cancelLongTermBooking(@PathVariable Long bookingid) {
         BookingResponseDto bookingResponseDto = bookingService.cancelLongTermBooking(bookingid);
         return new ResponseEntity<>(bookingResponseDto, HttpStatus.OK);
+    }
+
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PutMapping("/payment-cycles/cancel/{cycleId}")
+    public ResponseEntity<?> cancelLongTermBookingByPayCycle(@PathVariable Long cycleId) {
+        PaymentCycleResponseDto cancelPaymentCycle = paymentCycleService.cancelPaymentCycle(cycleId);
+        return new ResponseEntity<>(cancelPaymentCycle, HttpStatus.OK);
     }
 
 
