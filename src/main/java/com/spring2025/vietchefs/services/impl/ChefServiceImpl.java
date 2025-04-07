@@ -42,6 +42,10 @@ public class ChefServiceImpl implements ChefService {
     private RoleRepository roleRepository;
     @Autowired
     private WalletService walletService;
+    @Autowired
+    private DistanceService distanceService;
+    @Autowired
+    private CalculateService calculateService;
 
     @Override
     public ChefDto createChef(ChefDto chefDto) {
@@ -67,6 +71,9 @@ public class ChefServiceImpl implements ChefService {
         chef.setCountry(chefDto.getCountry());
         chef.setPrice(chefDto.getPrice());
         chef.setStatus(chefDto.getStatus() != null ? chefDto.getStatus() : "active");
+        double[] latLng = distanceService.getLatLngFromAddress(chefDto.getAddress());
+        chef.setLatitude(latLng[0]);
+        chef.setLongitude(latLng[1]);
         chef = chefRepository.save(chef);
 
         return modelMapper.map(chefRepository.save(chef), ChefDto.class);
@@ -101,6 +108,9 @@ public class ChefServiceImpl implements ChefService {
         chef.setCountry(requestDto.getCountry());
         chef.setPrice(requestDto.getPrice() != null ? requestDto.getPrice() : BigDecimal.valueOf(10));
         chef.setMaxServingSize(requestDto.getMaxServingSize() != null ? requestDto.getMaxServingSize() : 10);
+        double[] latLng = distanceService.getLatLngFromAddress(requestDto.getAddress());
+        chef.setLatitude(latLng[0]);
+        chef.setLongitude(latLng[1]);
         chef.setStatus("PENDING");
         chef.setIsDeleted(false);
 
@@ -159,6 +169,45 @@ public class ChefServiceImpl implements ChefService {
     }
 
     @Override
+    public ChefsResponse getAllChefsNearBy( double customerLat, double customerLng, double distance,int pageNo, int pageSize, String sortBy, String sortDir) {
+        // Tạo đối tượng Sort
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+
+        Page<Chef> chefs = chefRepository.findByStatusAndIsDeletedFalse("ACTIVE", pageable);
+
+        // Lấy danh sách các đầu bếp từ kết quả
+        List<Chef> listOfChefs = chefs.getContent();
+
+        // Lọc các đầu bếp có khoảng cách gần khách hàng trong bán kính mong muốn
+        List<Chef> filteredChefs = listOfChefs.stream()
+                .filter(chef -> {
+                    double chefLat = chef.getLatitude(); // Giả sử có latitude và longitude trong chef entity
+                    double chefLng = chef.getLongitude();
+                    double distanceToCustomer = calculateService.calculateDistance(customerLat, customerLng, chefLat, chefLng);
+                    return distanceToCustomer <= distance; // Lọc các đầu bếp trong bán kính mong muốn
+                })
+                .toList();
+
+        // Chuyển đổi thành DTO để trả về
+        List<ChefResponseDto> content = filteredChefs.stream()
+                .map(chef -> modelMapper.map(chef, ChefResponseDto.class))
+                .collect(Collectors.toList());
+
+        // Tạo đối tượng response
+        ChefsResponse chefsResponse = new ChefsResponse();
+        chefsResponse.setContent(content);
+        chefsResponse.setPageNo(chefs.getNumber());
+        chefsResponse.setPageSize(chefs.getSize());
+        chefsResponse.setTotalElements(filteredChefs.size());
+        chefsResponse.setTotalPages((int) Math.ceil((double) filteredChefs.size() / pageSize));
+        chefsResponse.setLast(filteredChefs.size() <= pageNo * pageSize);
+
+        return chefsResponse;
+    }
+
+    @Override
     public ChefResponseDto updateChef(Long chefId, ChefRequestDto requestDto) {
         Chef chef = chefRepository.findById(chefId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found with id: " + chefId));
@@ -178,6 +227,7 @@ public class ChefServiceImpl implements ChefService {
         Chef chef = chefRepository.findById(chefId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found with id: " + chefId));
 
+        chef.setStatus("BLOCKED");
         chef.setIsDeleted(true);
         chefRepository.save(chef);
     }

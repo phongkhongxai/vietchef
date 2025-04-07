@@ -25,6 +25,7 @@ public class DishDto {
     private String serviceType;
     private BigDecimal cookTime;
     private BigDecimal basePrice;
+    private Integer estimatedCookGroup;
     private String imageUrl;
     private MultipartFile file;
 

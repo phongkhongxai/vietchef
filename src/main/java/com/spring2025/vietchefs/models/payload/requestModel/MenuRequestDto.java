@@ -15,6 +15,7 @@ public class MenuRequestDto {
     private String description;
     private Boolean hasDiscount;
     private Double discountPercentage;
+    private BigDecimal totalCookTime;
     private List<MenuItemRequestDto> menuItems;
 }
 

@@ -1,8 +1,10 @@
 package com.spring2025.vietchefs.services.impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.spring2025.vietchefs.models.payload.responseModel.DistanceResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.GoogleDistanceResponse;
+import net.minidev.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -88,4 +90,40 @@ public class DistanceService {
 
         return new DistanceResponse(BigDecimal.ZERO, BigDecimal.ZERO);
     }
+    public double[] getLatLngFromAddress(String address) {
+        try {
+            String encodedAddress = URLEncoder.encode(address, StandardCharsets.UTF_8);
+            String url = "https://maps.googleapis.com/maps/api/geocode/json?address=" + encodedAddress + "&key=" + googleApiKey;
+
+            // Sử dụng WebClient đã cấu hình
+            String response = webClient
+                    .get()
+                    .uri(url)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();  // Chú ý là chúng ta sử dụng block() để đợi kết quả đồng bộ
+
+            // Parse JSON với ObjectMapper
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode jsonNode = mapper.readTree(response);
+
+            // Kiểm tra status
+            if (!jsonNode.get("status").asText().equals("OK")) {
+                throw new RuntimeException("Địa chỉ không hợp lệ hoặc không tìm được.");
+            }
+
+            // Lấy tọa độ từ JSON response
+            JsonNode locationNode = jsonNode.get("results").get(0).get("geometry").get("location");
+
+            // Trả về latitude và longitude
+            double lat = locationNode.get("lat").asDouble();
+            double lng = locationNode.get("lng").asDouble();
+
+            return new double[] { lat, lng };
+        } catch (Exception e) {
+            throw new RuntimeException("Không thể lấy tọa độ: " + e.getMessage(), e);
+        }
+    }
+
+
 }

@@ -43,6 +43,8 @@ public class MenuServiceImpl implements MenuService {
     @Autowired
     private DishRepository dishRepository;
     @Autowired
+    private CalculateService calculateService;
+    @Autowired
     private ModelMapper modelMapper;
     @Override
     public MenuResponseDto createMenu(MenuRequestDto menuRequestDto) {
@@ -60,6 +62,18 @@ public class MenuServiceImpl implements MenuService {
         menu.setDescription(menuRequestDto.getDescription());
         menu.setHasDiscount(menuRequestDto.getHasDiscount());
         menu.setDiscountPercentage(menuRequestDto.getDiscountPercentage());
+        if (menuRequestDto.getTotalCookTime() == null) {
+            // Chuyển danh sách Dish thành danh sách ID món ăn (Long)
+            List<Long> dishIds = dishes.stream()
+                    .map(Dish::getId)
+                    .collect(Collectors.toList());
+
+            // Tính tổng thời gian nấu cho các món
+            BigDecimal calculatedTotalCookTime = calculateService.calculateTotalCookTime(dishIds, 4);
+            menu.setTotalCookTime(calculatedTotalCookTime);
+        } else {
+            menu.setTotalCookTime(menuRequestDto.getTotalCookTime());
+        }
 
         // Tạo danh sách MenuItem
         List<MenuItem> menuItems = new ArrayList<>();
@@ -167,27 +181,42 @@ public class MenuServiceImpl implements MenuService {
     public MenuResponseDto updateMenu(Long menuId, MenuUpdateDto menuUpdateDto) {
         Menu menu = menuRepository.findById(menuId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Menu not found with id: " + menuId));
+        List<Dish> dishes = menuUpdateDto.getMenuItems().stream()
+                .map(itemDto -> dishRepository.findById(itemDto.getDishId())
+                        .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Dish not found")))
+                .toList();
 
         menu.setName(menuUpdateDto.getName() != null ? menuUpdateDto.getName() : menu.getName());
         menu.setDescription(menuUpdateDto.getDescription() != null ? menuUpdateDto.getDescription() : menu.getDescription());
         menu.setHasDiscount(menuUpdateDto.getHasDiscount() != null ? menuUpdateDto.getHasDiscount() : menu.getHasDiscount());
         menu.setDiscountPercentage(menuUpdateDto.getDiscountPercentage() != null ? menuUpdateDto.getDiscountPercentage() : menu.getDiscountPercentage());
 
+        if (menuUpdateDto.getTotalCookTime() == null) {
+            List<Long> dishIds = dishes.stream()
+                    .map(Dish::getId)
+                    .collect(Collectors.toList());
+
+            BigDecimal calculatedTotalCookTime = calculateService.calculateTotalCookTime(dishIds, 4);
+            menu.setTotalCookTime(calculatedTotalCookTime);
+        } else {
+            menu.setTotalCookTime(menuUpdateDto.getTotalCookTime());
+        }
         if (menuUpdateDto.getMenuItems() != null && !menuUpdateDto.getMenuItems().isEmpty()) {
+            List<MenuItem> menuItemList = menuItemRepository.findByMenu(menu);
+            menuItemRepository.deleteAll(menuItemList);
+
             List<MenuItem> newMenuItems = menuUpdateDto.getMenuItems().stream()
                     .map(itemDto -> {
-                        Dish dish = dishRepository.findById(itemDto.getDishId())
-                                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Dish not found with id: " + itemDto.getDishId()));
-
-
+                        Dish dish = dishes.stream()
+                                .filter(d -> d.getId().equals(itemDto.getDishId()))
+                                .findFirst()
+                                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Dish not found for menu item"));
                         MenuItem newItem = new MenuItem();
                         newItem.setMenu(menu);
                         newItem.setDish(dish);
                         return newItem;
-                    }).collect(Collectors.toList());
-            List<MenuItem> menuItemList = menuItemRepository.findByMenu(menu);
-            menuItemRepository.deleteAll(menuItemList); // Xóa món cũ trước khi thêm mới
-
+                    })
+                    .collect(Collectors.toList());
 
             menuItemRepository.saveAll(newMenuItems);
         }

@@ -13,9 +13,9 @@ import java.util.List;
 public class BookingDetailPriceRequestDto {
     @Future(message = "sessionDate phải là một ngày trong tương lai")
     private LocalDate sessionDate;
-    private Boolean isServing;
+    //private Boolean isServing;
     private LocalTime startTime;
-    private LocalTime endTime;
+    //private LocalTime endTime;
     private String location;
     private Long menuId;
     private List<Long> extraDishIds;

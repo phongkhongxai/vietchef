@@ -13,7 +13,6 @@ public class ReviewSingleBookingResponse {
     private BigDecimal chefCookingFee;
     private BigDecimal priceOfDishes;
     private BigDecimal arrivalFee;
-    private BigDecimal chefServingFee;
     private BigDecimal platformFee;
     private BigDecimal totalPrice;
     private Long menuId;

@@ -38,7 +38,7 @@ public class BookingConflictServiceImpl implements BookingConflictService {
         // Kiểm tra xem có booking detail nào trùng giờ không
         return bookingDetails.stream()
                 .anyMatch(detail -> 
-                    timeRangesOverlap(startTime, endTime, detail.getTimeBeginTravel(), detail.getEndTime()));
+                    timeRangesOverlap(startTime, endTime, detail.getTimeBeginTravel(), detail.getStartTime()));
     }
 
     @Override

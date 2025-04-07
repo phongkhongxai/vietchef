@@ -19,10 +19,13 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 @Service
@@ -50,23 +53,22 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         detail.setBooking(booking);
         detail.setSessionDate(dto.getSessionDate());
         detail.setStartTime(dto.getStartTime());
-        detail.setEndTime(dto.getEndTime());
         detail.setLocation(dto.getLocation());
-        detail.setIsServing(dto.getIsServing());
         detail.setArrivalFee(dto.getArrivalFee());
         detail.setChefCookingFee(dto.getChefCookingFee());
-        detail.setChefServingFee(dto.getChefServingFee());
         detail.setPriceOfDishes(dto.getPriceOfDishes());
         detail.setIsDeleted(false);
+        detail.setTotalCookTime(dto.getTotalCookTime().divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP));
         detail.setIsUpdated(dto.getIsUpdated());
         detail.setTimeBeginCook(dto.getTimeBeginCook());
         detail.setTimeBeginTravel(dto.getTimeBeginTravel());
         detail.setTotalChefFeePrice(dto.getTotalChefFeePrice());
         detail.setPlatformFee(dto.getPlatformFee());
+        detail.setTotalCookTime(dto.getTotalCookTime());
         detail.setDiscountAmout(dto.getDiscountAmout() != null ? dto.getDiscountAmout() : BigDecimal.ZERO);
         detail.setMenuId(dto.getMenuId() != null ? dto.getMenuId() : null);
         List<BookingDetailItem> dishes = Optional.ofNullable(dto.getDishes())
-                .orElse(Collections.emptyList()) // Nếu null thì thay bằng danh sách rỗng
+                .orElse(Collections.emptyList())
                 .stream()
                 .map(itemDto -> {
                     Dish dish = dishRepository.findById(itemDto.getDishId())
@@ -162,44 +164,49 @@ public class BookingDetailServiceImpl implements BookingDetailService {
 
             List<Long> dishIds = new ArrayList<>(uniqueDishIds);
             if (!dishIds.isEmpty()) {
-                totalCookTime = calculateService.calculateTotalCookTime(dishIds);
+                if (dto.getMenuId() != null) {
+                    // Nếu có menuId, gọi hàm tính tổng thời gian từ menu và món ngoài menu
+                    totalCookTime = calculateService.calculateTotalCookTimeFromMenu(dto.getMenuId(), dishIds, bookingDetail.getBooking().getGuestCount());
+                } else {
+                    // Nếu không có menuId, chỉ tính tổng thời gian cho các món trong dishIds
+                    totalCookTime = calculateService.calculateTotalCookTime(dishIds, bookingDetail.getBooking().getGuestCount());
+                }
             } else {
                 throw new VchefApiException(HttpStatus.BAD_REQUEST, "At least one dish must be selected.");
             }
         }
 
         BigDecimal cookingFee = calculateService.calculateChefServiceFee(chef.getPrice(), totalCookTime);
+
         BigDecimal dishPrice = calculateService.calculateDishPrice(dto.getMenuId(), bookingDetail.getBooking().getGuestCount(), dto.getExtraDishIds());
+        BigDecimal platformFee = cookingFee.multiply(BigDecimal.valueOf(0.25))  // 25% của cookingFee
+                .add(dishPrice.multiply(BigDecimal.valueOf(0.20))); // 20% của dishPrice
+
         DistanceFeeResponse travelFeeResponse = calculateService.calculateTravelFee(chef.getAddress(), bookingDetail.getLocation());
         BigDecimal travelFee = travelFeeResponse.getTravelFee();
         TimeTravelResponse timeTravelResponse = calculateService.calculateArrivalTime(bookingDetail.getStartTime(), totalCookTime, travelFeeResponse.getDurationHours());
-        BigDecimal servingFee = BigDecimal.ZERO;
-        if (dto.getIsServing()) {
-            servingFee = calculateService.calculateServingFee(bookingDetail.getStartTime(), bookingDetail.getEndTime(), chef.getPrice());
-        }
+
 
         BigDecimal discountAmountDetail = BigDecimal.ZERO;
-        BigDecimal totalChefFeePrice = cookingFee.add(dishPrice).add(travelFee).add(servingFee);
-        BigDecimal totalPrice = calculateService.calculateFinalPrice(cookingFee, dishPrice, travelFee).add(servingFee);
+        BigDecimal totalChefFeePrice = cookingFee.add(dishPrice.multiply(BigDecimal.valueOf(0.8))).add(travelFee) ;
+        BigDecimal totalPrice = calculateService.calculateFinalPrice(cookingFee, dishPrice, travelFee);
         if(bookingDetail.getBooking().getBookingPackage().getDiscount()!=null){
-            discountAmountDetail = totalPrice.multiply(bookingDetail.getBooking().getBookingPackage().getDiscount());
+            discountAmountDetail = platformFee.multiply(bookingDetail.getBooking().getBookingPackage().getDiscount());
             totalPrice = totalPrice.subtract(discountAmountDetail);
         }
 
         reviewResponse.setChefCookingFee(cookingFee);
+        reviewResponse.setTotalCookTime(totalCookTime);
         reviewResponse.setPriceOfDishes(dishPrice);
         reviewResponse.setArrivalFee(travelFee);
-        reviewResponse.setChefServingFee(servingFee);
-        reviewResponse.setPlatformFee(cookingFee.multiply(BigDecimal.valueOf(0.12))); // Phí nền tảng 12%
+        reviewResponse.setPlatformFee(platformFee);
         reviewResponse.setTotalChefFeePrice(totalChefFeePrice);
         reviewResponse.setDiscountAmout(discountAmountDetail);
         reviewResponse.setTotalPrice(totalPrice);
         reviewResponse.setMenuId(dto.getMenuId());
         reviewResponse.setTimeBeginTravel(timeTravelResponse.getTimeBeginTravel());
         reviewResponse.setTimeBeginCook(timeTravelResponse.getTimeBeginCook());
-        reviewResponse.setPlatformFee(cookingFee.multiply(BigDecimal.valueOf(0.12)));
-        reviewResponse.setTotalChefFeePrice(cookingFee.multiply(BigDecimal.valueOf(0.88)).add(dishPrice).add(travelFee).add(servingFee));
-        reviewResponse.setIsServing(dto.getIsServing());
+
         reviewResponse.setDishes(dto.getDishes());
 
         return reviewResponse;
@@ -235,12 +242,10 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         bookingDetail.setMenuId(bookingDetailUpdateRequest.getMenuId());
         bookingDetail.setArrivalFee(bookingDetailUpdateRequest.getArrivalFee());
         bookingDetail.setChefCookingFee(bookingDetailUpdateRequest.getChefCookingFee());
-        bookingDetail.setChefServingFee(bookingDetailUpdateRequest.getChefServingFee());
         bookingDetail.setPriceOfDishes(bookingDetailUpdateRequest.getPriceOfDishes());
         bookingDetail.setTimeBeginTravel(bookingDetailUpdateRequest.getTimeBeginTravel());
         bookingDetail.setTimeBeginCook(bookingDetailUpdateRequest.getTimeBeginCook());
         bookingDetail.setTotalPrice(bookingDetailUpdateRequest.getTotalPrice());
-        bookingDetail.setIsServing(bookingDetailUpdateRequest.getIsServing());
         bookingDetail.setPlatformFee(bookingDetailUpdateRequest.getPlatformFee());
         bookingDetail.setTotalChefFeePrice(bookingDetailUpdateRequest.getTotalChefFeePrice());
         bookingDetail.setIsUpdated(true);
@@ -256,5 +261,16 @@ public class BookingDetailServiceImpl implements BookingDetailService {
 
 
         return modelMapper.map(ba, BookingDetailDto.class);
+    }
+
+    @Scheduled(cron = "0 0 0 * * ?") // Mỗi ngày vào lúc nửa đêm
+    public void updateBookingDetailsStatus() {
+        LocalDate currentDate = LocalDate.now();
+        List<BookingDetail> bookingDetails = bookingDetailRepository.findBySessionDateAndStatus(currentDate, "LOCKED");
+
+        for (BookingDetail bookingDetail : bookingDetails) {
+                bookingDetail.setStatus("IN_PROGRESS");
+                bookingDetailRepository.save(bookingDetail);  // Lưu lại các thay đổi
+        }
     }
 }

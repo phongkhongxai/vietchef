@@ -21,19 +21,17 @@ public class BookingDetailRequestDto {
     @NotNull(message = "sessionDate không được để trống")
     private LocalDate sessionDate;
     private LocalTime startTime;
-    private LocalTime endTime;
     private String location;
     private BigDecimal totalPrice;
     private BigDecimal chefCookingFee; // Công nấu ăn của đầu bếp
     private BigDecimal priceOfDishes;  // Giá của các món ăn
     private BigDecimal arrivalFee;      // Phí di chuyển
-    private BigDecimal chefServingFee;  // Phí phục vụ nếu có
     private BigDecimal discountAmout;
     private LocalTime timeBeginCook;
     private LocalTime timeBeginTravel;
     private BigDecimal platformFee;
     private BigDecimal totalChefFeePrice;
-    private Boolean isServing;
+    private BigDecimal totalCookTime;
     private Boolean isUpdated;
     private Long menuId;
     private List<BookingDetailItemRequestDto> dishes;

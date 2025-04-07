@@ -18,17 +18,15 @@ public class BookingDetailPriceResponse {
     private BigDecimal totalPrice; // Tổng tiền buổi ăn
     private BigDecimal chefCookingFee; // Công nấu ăn của đầu bếp
     private BigDecimal priceOfDishes;  // Giá của các món ăn
-    private BigDecimal arrivalFee;      // Phí di chuyển
-    private BigDecimal chefServingFee;  // Phí phục vụ nếu có
+    private BigDecimal arrivalFee;
     private LocalTime timeBeginTravel; // Giờ đầu bếp bắt đầu di chuyển
     private LocalTime timeBeginCook;   // Giờ đầu bếp bắt đầu nấu ăn
     private BigDecimal platformFee; // Phí nền tảng (12% phí dịch vụ)
     private BigDecimal totalChefFeePrice; // Tổng phí dịch vụ đầu bếp (cooking + dish + travel + serving)
     private BigDecimal discountAmout;
+    private BigDecimal totalCookTime;
     private LocalTime startTime;
-    private LocalTime endTime;
     private String location;
-    private Boolean isServing;
     private Boolean isUpdated;
     private Long menuId;
     private List<BookingDetailItemRequestDto> dishes;
