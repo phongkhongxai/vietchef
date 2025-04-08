@@ -1,17 +1,16 @@
 package com.spring2025.vietchefs.services;
 
-import com.spring2025.vietchefs.models.entity.Review;
-import com.spring2025.vietchefs.models.entity.ReviewReaction;
-import com.spring2025.vietchefs.models.entity.User;
+import com.spring2025.vietchefs.models.payload.requestModel.ReviewReactionRequest;
+import com.spring2025.vietchefs.models.payload.responseModel.ReviewReactionResponse;
 
 import java.util.List;
 import java.util.Map;
 
 public interface ReviewReactionService {
-    ReviewReaction addReaction(Review review, User user, String reactionType);
-    ReviewReaction updateReaction(Long reactionId, String reactionType);
+    ReviewReactionResponse addReaction(Long reviewId, Long userId, ReviewReactionRequest request);
+    ReviewReactionResponse updateReaction(Long reactionId, ReviewReactionRequest request);
     void removeReaction(Long reactionId);
-    List<ReviewReaction> getReactionsByReview(Review review);
-    boolean hasUserReacted(Review review, User user);
-    Map<String, Long> getReactionCountsByReview(Review review);
+    List<ReviewReactionResponse> getReactionsByReview(Long reviewId);
+    boolean hasUserReacted(Long reviewId, Long userId);
+    Map<String, Long> getReactionCountsByReview(Long reviewId);
 } 

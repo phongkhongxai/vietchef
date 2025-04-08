@@ -1,9 +1,8 @@
 package com.spring2025.vietchefs.services;
 
-import com.spring2025.vietchefs.models.entity.Booking;
-import com.spring2025.vietchefs.models.entity.Chef;
-import com.spring2025.vietchefs.models.entity.Review;
-import com.spring2025.vietchefs.models.entity.User;
+import com.spring2025.vietchefs.models.payload.requestModel.ReviewCreateRequest;
+import com.spring2025.vietchefs.models.payload.requestModel.ReviewUpdateRequest;
+import com.spring2025.vietchefs.models.payload.responseModel.ReviewResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -12,23 +11,23 @@ import java.util.List;
 import java.util.Map;
 
 public interface ReviewService {
-    Review getReviewById(Long id);
-    List<Review> getReviewsByChef(Chef chef);
-    Page<Review> getReviewsByChef(Chef chef, Pageable pageable);
-    List<Review> getReviewsByUser(User user);
-    Review getReviewByBooking(Booking booking);
+    ReviewResponse getReviewById(Long id);
+    List<ReviewResponse> getReviewsByChef(Long chefId);
+    Page<ReviewResponse> getReviewsByChef(Long chefId, Pageable pageable);
+    List<ReviewResponse> getReviewsByUser(Long userId);
+    ReviewResponse getReviewByBooking(Long bookingId);
     
-    Review createReview(Review review, Map<Long, BigDecimal> criteriaRatings, Map<Long, String> criteriaComments);
-    Review updateReview(Long id, Review updatedReview, Map<Long, BigDecimal> criteriaRatings, Map<Long, String> criteriaComments);
+    ReviewResponse createReview(ReviewCreateRequest request, Long userId);
+    ReviewResponse updateReview(Long id, ReviewUpdateRequest request, Long userId);
     void deleteReview(Long id);
     
-    Review addChefResponse(Long reviewId, String response, User chef);
+    ReviewResponse addChefResponse(Long reviewId, String response, Long chefId);
     
     BigDecimal calculateWeightedRating(Map<Long, BigDecimal> criteriaRatings);
-    BigDecimal getAverageRatingForChef(Chef chef);
-    long getReviewCountForChef(Chef chef);
-    Map<String, Long> getRatingDistributionForChef(Chef chef);
+    BigDecimal getAverageRatingForChef(Long chefId);
+    long getReviewCountForChef(Long chefId);
+    Map<String, Long> getRatingDistributionForChef(Long chefId);
     
-    boolean isVerifiedReview(Review review);
+    boolean isVerifiedReview(Long reviewId);
     void markReviewAsVerified(Long reviewId);
 } 

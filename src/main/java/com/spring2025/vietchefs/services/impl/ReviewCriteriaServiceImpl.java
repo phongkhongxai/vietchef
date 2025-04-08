@@ -2,6 +2,8 @@ package com.spring2025.vietchefs.services.impl;
 
 import com.spring2025.vietchefs.models.entity.ReviewCriteria;
 import com.spring2025.vietchefs.models.exception.ResourceNotFoundException;
+import com.spring2025.vietchefs.models.payload.requestModel.ReviewCriteriaRequest;
+import com.spring2025.vietchefs.models.payload.responseModel.ReviewCriteriaResponse;
 import com.spring2025.vietchefs.repositories.ReviewCriteriaRepository;
 import com.spring2025.vietchefs.services.ReviewCriteriaService;
 import jakarta.annotation.PostConstruct;
@@ -11,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class ReviewCriteriaServiceImpl implements ReviewCriteriaService {
@@ -28,42 +31,46 @@ public class ReviewCriteriaServiceImpl implements ReviewCriteriaService {
     }
 
     @Override
-    public List<ReviewCriteria> getAllCriteria() {
-        return reviewCriteriaRepository.findAll();
+    public List<ReviewCriteriaResponse> getAllCriteria() {
+        return reviewCriteriaRepository.findAll().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
     @Override
-    public List<ReviewCriteria> getActiveCriteria() {
-        return reviewCriteriaRepository.findByIsActiveTrueOrderByDisplayOrderAsc();
+    public List<ReviewCriteriaResponse> getActiveCriteria() {
+        return reviewCriteriaRepository.findByIsActiveTrueOrderByDisplayOrderAsc().stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
     }
 
     @Override
-    public ReviewCriteria getCriteriaById(Long id) {
-        return reviewCriteriaRepository.findById(id)
+    public ReviewCriteriaResponse getCriteriaById(Long id) {
+        ReviewCriteria criteria = reviewCriteriaRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Review criteria not found with id: " + id));
+        return mapToResponse(criteria);
     }
 
     @Override
-    public ReviewCriteria createCriteria(ReviewCriteria criteria) {
-        return reviewCriteriaRepository.save(criteria);
+    public ReviewCriteriaResponse createCriteria(ReviewCriteriaRequest request) {
+        ReviewCriteria criteria = new ReviewCriteria();
+        mapToEntity(request, criteria);
+        return mapToResponse(reviewCriteriaRepository.save(criteria));
     }
 
     @Override
-    public ReviewCriteria updateCriteria(Long id, ReviewCriteria criteria) {
-        ReviewCriteria existingCriteria = getCriteriaById(id);
+    public ReviewCriteriaResponse updateCriteria(Long id, ReviewCriteriaRequest request) {
+        ReviewCriteria existingCriteria = reviewCriteriaRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Review criteria not found with id: " + id));
         
-        existingCriteria.setName(criteria.getName());
-        existingCriteria.setDescription(criteria.getDescription());
-        existingCriteria.setWeight(criteria.getWeight());
-        existingCriteria.setIsActive(criteria.getIsActive());
-        existingCriteria.setDisplayOrder(criteria.getDisplayOrder());
-        
-        return reviewCriteriaRepository.save(existingCriteria);
+        mapToEntity(request, existingCriteria);
+        return mapToResponse(reviewCriteriaRepository.save(existingCriteria));
     }
 
     @Override
     public void deleteCriteria(Long id) {
-        ReviewCriteria criteria = getCriteriaById(id);
+        ReviewCriteria criteria = reviewCriteriaRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Review criteria not found with id: " + id));
         criteria.setIsActive(false);
         reviewCriteriaRepository.save(criteria);
     }
@@ -94,5 +101,24 @@ public class ReviewCriteriaServiceImpl implements ReviewCriteriaService {
             
             reviewCriteriaRepository.save(criteria);
         }
+    }
+    
+    private ReviewCriteriaResponse mapToResponse(ReviewCriteria criteria) {
+        return new ReviewCriteriaResponse(
+                criteria.getCriteriaId(),
+                criteria.getName(),
+                criteria.getDescription(),
+                criteria.getWeight(),
+                criteria.getIsActive(),
+                criteria.getDisplayOrder()
+        );
+    }
+    
+    private void mapToEntity(ReviewCriteriaRequest request, ReviewCriteria criteria) {
+        criteria.setName(request.getName());
+        criteria.setDescription(request.getDescription());
+        criteria.setWeight(request.getWeight());
+        criteria.setIsActive(request.getIsActive());
+        criteria.setDisplayOrder(request.getDisplayOrder());
     }
 } 

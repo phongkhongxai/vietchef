@@ -1,15 +1,14 @@
 package com.spring2025.vietchefs.services;
 
-import com.spring2025.vietchefs.models.entity.Review;
-import com.spring2025.vietchefs.models.entity.ReviewReply;
-import com.spring2025.vietchefs.models.entity.User;
+import com.spring2025.vietchefs.models.payload.requestModel.ReviewReplyRequest;
+import com.spring2025.vietchefs.models.payload.responseModel.ReviewReplyResponse;
 
 import java.util.List;
 
 public interface ReviewReplyService {
-    ReviewReply addReply(Review review, User user, String content);
-    ReviewReply updateReply(Long replyId, String content);
+    ReviewReplyResponse addReply(Long reviewId, Long userId, ReviewReplyRequest request);
+    ReviewReplyResponse updateReply(Long replyId, ReviewReplyRequest request);
     void deleteReply(Long replyId);
-    List<ReviewReply> getRepliesByReview(Review review);
-    List<ReviewReply> getRepliesByUser(User user);
+    List<ReviewReplyResponse> getRepliesByReview(Long reviewId);
+    List<ReviewReplyResponse> getRepliesByUser(Long userId);
 } 

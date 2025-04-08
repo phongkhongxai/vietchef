@@ -1,19 +1,31 @@
 package com.spring2025.vietchefs.controllers;
 
 import com.spring2025.vietchefs.models.entity.*;
+import com.spring2025.vietchefs.models.payload.dto.ChefDto;
+import com.spring2025.vietchefs.models.payload.dto.UserDto;
 import com.spring2025.vietchefs.models.payload.requestModel.ReviewCreateRequest;
+import com.spring2025.vietchefs.models.payload.requestModel.ReviewCriteriaRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ReviewReactionRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ReviewReplyRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ReviewUpdateRequest;
+import com.spring2025.vietchefs.models.payload.responseModel.ChefResponseDto;
+import com.spring2025.vietchefs.models.payload.responseModel.ReviewCriteriaResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.ReviewDetailResponse;
+import com.spring2025.vietchefs.models.payload.responseModel.ReviewReactionResponse;
+import com.spring2025.vietchefs.models.payload.responseModel.ReviewReplyResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.ReviewResponse;
 import com.spring2025.vietchefs.repositories.BookingRepository;
 import com.spring2025.vietchefs.repositories.ChefRepository;
 import com.spring2025.vietchefs.repositories.UserRepository;
+import com.spring2025.vietchefs.services.BookingService;
+import com.spring2025.vietchefs.services.ChefService;
 import com.spring2025.vietchefs.services.ReviewCriteriaService;
 import com.spring2025.vietchefs.services.ReviewReactionService;
 import com.spring2025.vietchefs.services.ReviewReplyService;
 import com.spring2025.vietchefs.services.ReviewService;
+import com.spring2025.vietchefs.services.RoleService;
+import com.spring2025.vietchefs.services.UserService;
+
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -40,10 +52,9 @@ public class ReviewController {
     private final ReviewCriteriaService reviewCriteriaService;
     private final ReviewReplyService reviewReplyService;
     private final ReviewReactionService reviewReactionService;
-    private final UserRepository userRepository;
-    private final ChefRepository chefRepository;
-    private final BookingRepository bookingRepository;
-    private final ModelMapper modelMapper;
+    private final UserService userService;
+    private final ChefService chefService;
+    private final RoleService roleService;
 
     @Autowired
     public ReviewController(
@@ -51,46 +62,43 @@ public class ReviewController {
             ReviewCriteriaService reviewCriteriaService,
             ReviewReplyService reviewReplyService,
             ReviewReactionService reviewReactionService,
-            UserRepository userRepository,
-            ChefRepository chefRepository,
-            BookingRepository bookingRepository,
-            ModelMapper modelMapper) {
+            UserService userService,
+            ChefService chefService,
+            RoleService roleService) {
         this.reviewService = reviewService;
         this.reviewCriteriaService = reviewCriteriaService;
         this.reviewReplyService = reviewReplyService;
         this.reviewReactionService = reviewReactionService;
-        this.userRepository = userRepository;
-        this.chefRepository = chefRepository;
-        this.bookingRepository = bookingRepository;
-        this.modelMapper = modelMapper;
+        this.userService = userService;
+        this.chefService = chefService;
+        this.roleService = roleService;
     }
 
     // Get current authenticated user
-    private User getCurrentUser() {
+    private UserDto getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String currentUsername = authentication.getName();
-        return userRepository.findByUsername(currentUsername)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        return userService.getProfileUserByUsernameOrEmail(currentUsername, currentUsername);
     }
 
     // Get all review criteria
     @GetMapping("/review-criteria")
-    public ResponseEntity<List<ReviewCriteria>> getAllCriteria() {
+    public ResponseEntity<List<ReviewCriteriaResponse>> getAllCriteria() {
         return ResponseEntity.ok(reviewCriteriaService.getActiveCriteria());
     }
 
     // Admin: Create review criteria
     @PostMapping("/review-criteria")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ReviewCriteria> createCriteria(@RequestBody ReviewCriteria criteria) {
-        return new ResponseEntity<>(reviewCriteriaService.createCriteria(criteria), HttpStatus.CREATED);
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<ReviewCriteriaResponse> createCriteria(@RequestBody ReviewCriteriaRequest request) {
+        return new ResponseEntity<>(reviewCriteriaService.createCriteria(request), HttpStatus.CREATED);
     }
 
     // Admin: Update review criteria
     @PutMapping("/review-criteria/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ReviewCriteria> updateCriteria(@PathVariable Long id, @RequestBody ReviewCriteria criteria) {
-        return ResponseEntity.ok(reviewCriteriaService.updateCriteria(id, criteria));
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<ReviewCriteriaResponse> updateCriteria(@PathVariable Long id, @RequestBody ReviewCriteriaRequest request) {
+        return ResponseEntity.ok(reviewCriteriaService.updateCriteria(id, request));
     }
 
     // Get reviews for a chef
@@ -100,93 +108,56 @@ public class ReviewController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         
-        Chef chef = chefRepository.findById(chefId)
-                .orElseThrow(() -> new RuntimeException("Chef not found with id: " + chefId));
-        
-        Page<Review> reviewPage = reviewService.getReviewsByChef(
-                chef, PageRequest.of(page, size, Sort.by("createAt").descending()));
-        
-        List<ReviewResponse> reviews = reviewPage.getContent().stream()
-                .map(this::convertToReviewResponse)
-                .collect(Collectors.toList());
+        Page<ReviewResponse> reviewPage = reviewService.getReviewsByChef(
+                chefId, PageRequest.of(page, size, Sort.by("createAt").descending()));
         
         Map<String, Object> response = new HashMap<>();
-        response.put("reviews", reviews);
+        response.put("reviews", reviewPage.getContent());
         response.put("currentPage", reviewPage.getNumber());
         response.put("totalItems", reviewPage.getTotalElements());
         response.put("totalPages", reviewPage.getTotalPages());
-        response.put("averageRating", reviewService.getAverageRatingForChef(chef));
-        response.put("totalReviews", reviewService.getReviewCountForChef(chef));
-        response.put("ratingDistribution", reviewService.getRatingDistributionForChef(chef));
+        response.put("averageRating", reviewService.getAverageRatingForChef(chefId));
+        response.put("totalReviews", reviewService.getReviewCountForChef(chefId));
+        response.put("ratingDistribution", reviewService.getRatingDistributionForChef(chefId));
         
         return ResponseEntity.ok(response);
     }
 
     // Get a specific review
     @GetMapping("/reviews/{id}")
-    public ResponseEntity<ReviewDetailResponse> getReviewById(@PathVariable Long id) {
-        Review review = reviewService.getReviewById(id);
-        return ResponseEntity.ok(convertToReviewDetailResponse(review));
+    public ResponseEntity<ReviewResponse> getReviewById(@PathVariable Long id) {
+        ReviewResponse review = reviewService.getReviewById(id);
+        return ResponseEntity.ok(review);
     }
 
     // Create a new review
     @PostMapping("/reviews")
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
     public ResponseEntity<ReviewResponse> createReview(@RequestBody ReviewCreateRequest request) {
-        User currentUser = getCurrentUser();
-        
-        Chef chef = chefRepository.findById(request.getChefId())
-                .orElseThrow(() -> new RuntimeException("Chef not found with id: " + request.getChefId()));
-        
-        Review review = new Review();
-        review.setUser(currentUser);
-        review.setChef(chef);
-        review.setDescription(request.getDescription());
-        review.setOverallExperience(request.getOverallExperience());
-        review.setPhotos(request.getPhotos());
-        
-        // Link to booking if provided
-        if (request.getBookingId() != null) {
-            Booking booking = bookingRepository.findById(request.getBookingId())
-                    .orElseThrow(() -> new RuntimeException("Booking not found with id: " + request.getBookingId()));
-            review.setBooking(booking);
-        }
-        
-        Review savedReview = reviewService.createReview(review, request.getCriteriaRatings(), request.getCriteriaComments());
-        return new ResponseEntity<>(convertToReviewResponse(savedReview), HttpStatus.CREATED);
+        UserDto currentUser = getCurrentUser();
+        ReviewResponse savedReview = reviewService.createReview(request, currentUser.getId());
+        return new ResponseEntity<>(savedReview, HttpStatus.CREATED);
     }
 
     // Update a review
     @PutMapping("/reviews/{id}")
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
     public ResponseEntity<ReviewResponse> updateReview(@PathVariable Long id, @RequestBody ReviewUpdateRequest request) {
-        User currentUser = getCurrentUser();
-        Review existingReview = reviewService.getReviewById(id);
-        
-        // Verify the current user is the author of the review
-        if (!existingReview.getUser().getId().equals(currentUser.getId())) {
-            return new ResponseEntity<>(HttpStatus.FORBIDDEN);
-        }
-        
-        Review reviewToUpdate = new Review();
-        reviewToUpdate.setDescription(request.getDescription());
-        reviewToUpdate.setOverallExperience(request.getOverallExperience());
-        reviewToUpdate.setPhotos(request.getPhotos());
-        
-        Review updatedReview = reviewService.updateReview(id, reviewToUpdate, request.getCriteriaRatings(), request.getCriteriaComments());
-        return ResponseEntity.ok(convertToReviewResponse(updatedReview));
+        UserDto currentUser = getCurrentUser();
+        ReviewResponse updatedReview = reviewService.updateReview(id, request, currentUser.getId());
+        return ResponseEntity.ok(updatedReview);
     }
 
     // Delete a review
     @DeleteMapping("/reviews/{id}")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_ADMIN')")
     public ResponseEntity<Void> deleteReview(@PathVariable Long id) {
-        User currentUser = getCurrentUser();
-        Review review = reviewService.getReviewById(id);
+        UserDto currentUser = getCurrentUser();
+        ReviewResponse review = reviewService.getReviewById(id);
         
         // Allow deletion if user is the author or an admin
-        if (review.getUser().getId().equals(currentUser.getId()) || 
-                "ROLE_ADMIN".equals(currentUser.getRole().getRoleName())) {
+        if (review.getUserId().equals(currentUser.getId()) || 
+                "ROLE_ADMIN".equals(roleService.getRoleNameById(currentUser.getRoleId()))) {
             reviewService.deleteReview(id);
             return new ResponseEntity<>(HttpStatus.NO_CONTENT);
         } else {
@@ -196,89 +167,45 @@ public class ReviewController {
 
     // Chef: Respond to a review
     @PostMapping("/reviews/{id}/response")
-    @PreAuthorize("hasRole('CHEF')")
+    @PreAuthorize("hasRole('ROLE_CHEF')")
     public ResponseEntity<ReviewResponse> respondToReview(@PathVariable Long id, @RequestBody Map<String, String> request) {
-        User currentUser = getCurrentUser();
-        Review review = reviewService.getReviewById(id);
+        UserDto currentUser = getCurrentUser();
+        ReviewResponse review = reviewService.getReviewById(id);
         
         // Verify the chef being reviewed is the current user
-        if (!review.getChef().getUser().getId().equals(currentUser.getId())) {
+        ChefResponseDto chef = chefService.getChefById(review.getChefId());
+        
+        // Check if the chef's user ID matches the current user's ID
+        if (chef.getUser().getId() != currentUser.getId()) {
             return new ResponseEntity<>(HttpStatus.FORBIDDEN);
         }
         
         String response = request.get("response");
-        Review updatedReview = reviewService.addChefResponse(id, response, currentUser);
+        ReviewResponse updatedReview = reviewService.addChefResponse(id, response, currentUser.getId());
         
-        return ResponseEntity.ok(convertToReviewResponse(updatedReview));
+        return ResponseEntity.ok(updatedReview);
     }
 
     // Add a reply to a review
     @PostMapping("/reviews/{id}/reply")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> addReply(@PathVariable Long id, @RequestBody ReviewReplyRequest request) {
-        User currentUser = getCurrentUser();
-        Review review = reviewService.getReviewById(id);
-        
-        ReviewReply reply = reviewReplyService.addReply(review, currentUser, request.getContent());
+    public ResponseEntity<ReviewReplyResponse> addReply(@PathVariable Long id, @RequestBody ReviewReplyRequest request) {
+        UserDto currentUser = getCurrentUser();
+        ReviewReplyResponse reply = reviewReplyService.addReply(id, currentUser.getId(), request);
         return new ResponseEntity<>(reply, HttpStatus.CREATED);
     }
 
     // Add a reaction to a review
     @PostMapping("/reviews/{id}/reaction")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> addReaction(@PathVariable Long id, @RequestBody ReviewReactionRequest request) {
-        User currentUser = getCurrentUser();
-        Review review = reviewService.getReviewById(id);
-        
-        ReviewReaction reaction = reviewReactionService.addReaction(review, currentUser, request.getReactionType());
+    public ResponseEntity<Map<String, Object>> addReaction(@PathVariable Long id, @RequestBody ReviewReactionRequest request) {
+        UserDto currentUser = getCurrentUser();
+        ReviewReactionResponse reaction = reviewReactionService.addReaction(id, currentUser.getId(), request);
         
         Map<String, Object> response = new HashMap<>();
         response.put("reaction", reaction);
-        response.put("counts", reviewReactionService.getReactionCountsByReview(review));
+        response.put("counts", reviewReactionService.getReactionCountsByReview(id));
         
         return new ResponseEntity<>(response, HttpStatus.CREATED);
-    }
-
-    // Convert Review to ReviewResponse
-    private ReviewResponse convertToReviewResponse(Review review) {
-        ReviewResponse response = modelMapper.map(review, ReviewResponse.class);
-        
-        // Add additional information
-        response.setVerified(review.getIsVerified());
-        response.setUserName(review.getUser().getUsername());
-        
-        // Add reaction counts
-        Map<String, Long> reactionCounts = reviewReactionService.getReactionCountsByReview(review);
-        response.setReactionCounts(reactionCounts);
-        
-        return response;
-    }
-
-    // Convert Review to DetailedReviewResponse
-    private ReviewDetailResponse convertToReviewDetailResponse(Review review) {
-        ReviewDetailResponse response = modelMapper.map(review, ReviewDetailResponse.class);
-        
-        // Add criteria details
-        response.setCriteriaRatings(review.getReviewDetails().stream()
-                .collect(Collectors.toMap(
-                        detail -> detail.getCriteria().getName(),
-                        ReviewDetail::getRating
-                )));
-        
-        response.setCriteriaComments(review.getReviewDetails().stream()
-                .filter(detail -> detail.getComment() != null && !detail.getComment().isEmpty())
-                .collect(Collectors.toMap(
-                        detail -> detail.getCriteria().getName(),
-                        ReviewDetail::getComment
-                )));
-        
-        // Add replies
-        response.setReplies(reviewReplyService.getRepliesByReview(review));
-        
-        // Add reaction counts
-        Map<String, Long> reactionCounts = reviewReactionService.getReactionCountsByReview(review);
-        response.setReactionCounts(reactionCounts);
-        
-        return response;
     }
 } 
