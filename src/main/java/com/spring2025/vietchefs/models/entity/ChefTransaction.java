@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -39,9 +41,12 @@ public class ChefTransaction {
     private String description;
 
     @Column(nullable = false)
-    private LocalDateTime transactionDate;
-
-    // Trạng thái giao dịch: PENDING, COMPLETED, FAILED
+    private LocalDateTime transactionDate=LocalDateTime.now();
+    @CreationTimestamp
+    @Column(updatable = false)
+    private LocalDateTime createdAt;
+    @UpdateTimestamp
+    private LocalDateTime updatedAt;
     @Column(nullable = false)
     private String status;
 

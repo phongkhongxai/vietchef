@@ -191,6 +191,22 @@ public class BookingController {
         PaymentCycleResponseDto cancelPaymentCycle = paymentCycleService.cancelPaymentCycle(cycleId);
         return new ResponseEntity<>(cancelPaymentCycle, HttpStatus.OK);
     }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PutMapping("/booking-details/{bookingDetailId}/complete-chef")
+    public ResponseEntity<?> updateWaitingCustomer(@AuthenticationPrincipal UserDetails userDetails,@PathVariable Long bookingDetailId) {
+        UserDto userDto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(), userDetails.getUsername());
+        BookingDetailDto bookingDetail = bookingDetailService.updateStatusBookingDetailWatingCompleted(bookingDetailId, userDto.getId());
+        return new ResponseEntity<>(bookingDetail, HttpStatus.OK);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PutMapping("/booking-details/{bookingDetailId}/complete-customer")
+    public ResponseEntity<?> completeBookingDetailFromCustomer(@AuthenticationPrincipal UserDetails userDetails,@PathVariable Long bookingDetailId) {
+        UserDto userDto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(), userDetails.getUsername());
+        BookingDetailDto bookingDetail = bookingDetailService.confirmBookingCompletionByCustomer(bookingDetailId, userDto.getId());
+        return new ResponseEntity<>(bookingDetail, HttpStatus.OK);
+    }
 
 
 
