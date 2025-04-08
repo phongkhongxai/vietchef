@@ -2,9 +2,11 @@ package com.spring2025.vietchefs.controllers;
 
 import com.spring2025.vietchefs.models.payload.dto.BookingResponseDto;
 import com.spring2025.vietchefs.models.payload.dto.UserDto;
+import com.spring2025.vietchefs.models.payload.dto.WalletDto;
 import com.spring2025.vietchefs.models.payload.requestModel.ChangePasswordRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.UserRequest;
 import com.spring2025.vietchefs.services.UserService;
+import com.spring2025.vietchefs.services.WalletService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,12 +22,22 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
     @Autowired
     private UserService userService;
+    @Autowired
+    private WalletService walletService;
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
     @GetMapping("/profile")
     public ResponseEntity<UserDto> viewProfile(@AuthenticationPrincipal UserDetails userDetails) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
         return new ResponseEntity<>(bto, HttpStatus.OK);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @GetMapping("/profile/my-wallet")
+    public ResponseEntity<WalletDto> viewPWalletrofile(@AuthenticationPrincipal UserDetails userDetails) {
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        WalletDto bs = walletService.getWalletByUserId(bto.getId());
+        return new ResponseEntity<>(bs, HttpStatus.OK);
     }
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
