@@ -1,0 +1,31 @@
+name: Deploy to GCP
+
+on:
+  push:
+    branches: [deploy-gg]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to GCP Server
+        env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          SERVER_USERNAME: ${{ secrets.SERVER_USERNAME }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          # Tạo SSH key từ secrets
+          echo "$SSH_PRIVATE_KEY" > private_key && chmod 600 private_key
+
+          # Kết nối SSH và thực hiện deploy
+          ssh -o StrictHostKeyChecking=no -i private_key $SERVER_USERNAME@$SERVER_IP << 'EOF'
+            cd ~/vietchef || { git clone https://github.com/phongkhongxai/vietchef.git && cd vietchef; }
+            git reset --hard origin/deploy-gg
+            git pull origin deploy-gg 
+            docker-compose down
+            docker-compose up -d --build
+          EOF
