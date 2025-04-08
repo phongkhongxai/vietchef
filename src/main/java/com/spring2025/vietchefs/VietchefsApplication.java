@@ -13,6 +13,7 @@ import java.util.TimeZone;
 public class VietchefsApplication {
 
 	public static void main(String[] args) {
+		TimeZone.setDefault(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
 		SpringApplication.run(VietchefsApplication.class, args);
 	}
 
