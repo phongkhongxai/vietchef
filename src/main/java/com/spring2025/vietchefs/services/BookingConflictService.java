@@ -33,4 +33,14 @@ public interface BookingConflictService {
      * @return true if there's a conflict, false otherwise
      */
     boolean hasBookingConflictOnDayOfWeek(Chef chef, Integer dayOfWeek, LocalTime startTime, LocalTime endTime, Integer daysToCheck);
+    
+    /**
+     * Check if a chef has any active bookings for a specific day of week
+     * This is used when deleting all schedules for a day of week
+     * 
+     * @param chefId The ID of the chef to check
+     * @param dayOfWeek The day of week (0-6, 0 is Sunday)
+     * @return true if there are active bookings, false otherwise
+     */
+    boolean hasActiveBookingsForDayOfWeek(Long chefId, Integer dayOfWeek);
 } 
