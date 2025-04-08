@@ -19,6 +19,7 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           # Tạo SSH key từ secrets
+          #hehe
           echo "$SSH_PRIVATE_KEY" > private_key && chmod 600 private_key
 
           # Kết nối SSH và thực hiện deploy
