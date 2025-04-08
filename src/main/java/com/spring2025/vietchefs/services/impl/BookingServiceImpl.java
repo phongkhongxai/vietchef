@@ -244,19 +244,15 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 List<Long> dishIds = new ArrayList<>(uniqueDishIds);
-                if (!dishIds.isEmpty()) {
-                    if (detailDto.getMenuId() != null) {
-                        // Nếu có menuId, gọi hàm tính tổng thời gian từ menu và món ngoài menu
-                        totalCookTime = calculateService.calculateTotalCookTimeFromMenu(detailDto.getMenuId(), dishIds, dto.getGuestCount());
-                    } else {
-                        // Nếu không có menuId, chỉ tính tổng thời gian cho các món trong dishIds
-                        totalCookTime = calculateService.calculateTotalCookTime(dishIds, dto.getGuestCount());
-                    }
-                    reviewSingleBookingResponse.setCookTimeMinutes(totalCookTime.multiply(BigDecimal.valueOf(60)));
-
+                if (detailDto.getMenuId() != null) {
+                    // Nếu có menuId, gọi hàm tính tổng thời gian từ menu và món ngoài menu
+                    totalCookTime = calculateService.calculateTotalCookTimeFromMenu(detailDto.getMenuId(), dishIds, dto.getGuestCount());
                 } else {
-                    throw new VchefApiException(HttpStatus.BAD_REQUEST, "At least one dish must be selected.");
+                    // Nếu không có menuId, chỉ tính tổng thời gian cho các món trong dishIds
+                    totalCookTime = calculateService.calculateTotalCookTime(dishIds, dto.getGuestCount());
                 }
+                reviewSingleBookingResponse.setCookTimeMinutes(totalCookTime.multiply(BigDecimal.valueOf(60)));
+
             }
 
             // 🔹 Tính phí dịch vụ đầu bếp (công nấu ăn)
@@ -350,15 +346,11 @@ public class BookingServiceImpl implements BookingService {
                     }
 
                     List<Long> dishIds = new ArrayList<>(uniqueDishIds);
-                    if (!dishIds.isEmpty()) {
-                        if (detailDto.getMenuId() != null) {
-                            totalCookTime = calculateService.calculateTotalCookTimeFromMenu(detailDto.getMenuId(), dishIds, dto.getGuestCount());
-                        } else {
-                            // Nếu không có menuId, chỉ tính tổng thời gian cho các món trong dishIds
-                            totalCookTime = calculateService.calculateTotalCookTime(dishIds, dto.getGuestCount());
-                        }
+                    if (detailDto.getMenuId() != null) {
+                        totalCookTime = calculateService.calculateTotalCookTimeFromMenu(detailDto.getMenuId(), dishIds, dto.getGuestCount());
                     } else {
-                        throw new VchefApiException(HttpStatus.BAD_REQUEST, "At least one dish must be selected.");
+                        // Nếu không có menuId, chỉ tính tổng thời gian cho các món trong dishIds
+                        totalCookTime = calculateService.calculateTotalCookTime(dishIds, dto.getGuestCount());
                     }
                 }
             }

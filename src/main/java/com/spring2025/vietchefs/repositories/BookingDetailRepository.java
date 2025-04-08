@@ -21,6 +21,8 @@ import java.util.List;
 public interface BookingDetailRepository extends JpaRepository<BookingDetail, Long> {
     Page<BookingDetail> findByBookingAndIsDeletedFalse(Booking booking, Pageable pageable);
     List<BookingDetail> findByBooking(Booking booking);
+    List<BookingDetail> findByBookingOrderBySessionDateAsc(Booking booking);
+
     @Query("SELECT bd FROM BookingDetail bd WHERE bd.booking.id = :bookingId")
     List<BookingDetail> findByBookingId(@Param("bookingId") Long bookingId);
     @Query("SELECT COALESCE(SUM(bd.totalPrice), 0) FROM BookingDetail bd WHERE bd.booking.id = :bookingId")

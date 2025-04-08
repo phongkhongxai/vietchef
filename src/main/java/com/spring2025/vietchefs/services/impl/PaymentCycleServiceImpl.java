@@ -34,7 +34,7 @@ public class PaymentCycleServiceImpl implements PaymentCycleService {
 
     @Override
     public void createPaymentCycles(Booking booking) {
-        List<BookingDetail> details = bookingDetailRepository.findByBooking(booking);
+        List<BookingDetail> details = bookingDetailRepository.findByBookingOrderBySessionDateAsc(booking);
         int numOfCycles = getNumOfCycles(booking);
 
         int detailsPerCycle = (int) Math.ceil((double) details.size() / numOfCycles);
@@ -69,7 +69,7 @@ public class PaymentCycleServiceImpl implements PaymentCycleService {
 
     @Override
     public void updatePaymentCycles(Booking booking) {
-        List<BookingDetail> details = bookingDetailRepository.findByBooking(booking);
+        List<BookingDetail> details = bookingDetailRepository.findByBookingOrderBySessionDateAsc(booking);
         List<PaymentCycle> paymentCycles = paymentCycleRepository.findByBookingOrderByCycleOrder(booking);
 
         int numOfCycles = paymentCycles.size();
