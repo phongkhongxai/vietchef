@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 @Service
@@ -37,14 +38,20 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     @Autowired
     private BookingDetailItemRepository bookingDetailItemRepository;
     @Autowired
+    private ChefTransactionRepository chefTransactionRepository;
+    @Autowired
     private PaymentCycleService paymentCycleService;
 
+    @Autowired
+    private ChefRepository chefRepository;
     @Autowired
     private DishRepository dishRepository;
     @Autowired
     private MenuRepository menuRepository;
     @Autowired
     private CalculateService calculateService;
+    @Autowired
+    private WalletRepository walletRepository;
     @Autowired
     private ModelMapper modelMapper;
     @Override
@@ -163,16 +170,10 @@ public class BookingDetailServiceImpl implements BookingDetailService {
             }
 
             List<Long> dishIds = new ArrayList<>(uniqueDishIds);
-            if (!dishIds.isEmpty()) {
-                if (dto.getMenuId() != null) {
-                    // Nếu có menuId, gọi hàm tính tổng thời gian từ menu và món ngoài menu
-                    totalCookTime = calculateService.calculateTotalCookTimeFromMenu(dto.getMenuId(), dishIds, bookingDetail.getBooking().getGuestCount());
-                } else {
-                    // Nếu không có menuId, chỉ tính tổng thời gian cho các món trong dishIds
-                    totalCookTime = calculateService.calculateTotalCookTime(dishIds, bookingDetail.getBooking().getGuestCount());
-                }
+            if (dto.getMenuId() != null) {
+                totalCookTime = calculateService.calculateTotalCookTimeFromMenu(dto.getMenuId(), dishIds, bookingDetail.getBooking().getGuestCount());
             } else {
-                throw new VchefApiException(HttpStatus.BAD_REQUEST, "At least one dish must be selected.");
+                totalCookTime = calculateService.calculateTotalCookTime(dishIds, bookingDetail.getBooking().getGuestCount());
             }
         }
 
@@ -263,6 +264,81 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         return modelMapper.map(ba, BookingDetailDto.class);
     }
 
+    @Override
+    public BookingDetailDto updateStatusBookingDetailWatingCompleted(Long bookingDetailId, Long userId) {
+        Chef chef = chefRepository.findByUserId(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found"));
+        LocalTime completedTime = LocalTime.now();
+        BookingDetail bookingDetail = bookingDetailRepository.findById(bookingDetailId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "BookingDetail not found"));
+        if(!Objects.equals(chef.getId(), bookingDetail.getBooking().getChef().getId())){
+            throw new VchefApiException(HttpStatus.BAD_REQUEST,
+                    "Cannot change this status because you not in this booking.");
+        }
+        if (!completedTime.isBefore(bookingDetail.getTimeBeginCook()) && !completedTime.isAfter(bookingDetail.getStartTime()) &&bookingDetail.getStatus().equalsIgnoreCase("IN_PROGRESS")) {
+            bookingDetail.setStatus("WAITING_FOR_CONFIRMATION");
+            bookingDetail = bookingDetailRepository.save(bookingDetail);
+        }
+        return modelMapper.map(bookingDetail, BookingDetailDto.class);
+    }
+
+    @Override
+    @Transactional
+    public BookingDetailDto confirmBookingCompletionByCustomer(Long bookingDetailId,Long userId) {
+        BookingDetail bookingDetail = bookingDetailRepository.findById(bookingDetailId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "BookingDetail not found"));
+
+        Booking booking = bookingDetail.getBooking();
+        if(!Objects.equals(booking.getCustomer().getId(), userId)){
+            throw new VchefApiException(HttpStatus.BAD_REQUEST,
+                    "Cannot complete this booking because you not in booking.");
+        }
+
+        if (!"WAITING_FOR_CONFIRMATION".equalsIgnoreCase(bookingDetail.getStatus())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST,
+                    "Cannot complete this booking. Current status: " + bookingDetail.getStatus());
+        }
+
+        bookingDetail.setStatus("COMPLETED");
+        bookingDetail = bookingDetailRepository.save(bookingDetail);
+        if(booking.getBookingType().equalsIgnoreCase("SINGLE")){
+            booking.setStatus("COMPLETED");
+            bookingRepository.save(booking);
+        }else {
+            boolean allDetailsCompleted = booking.getBookingDetails()
+                    .stream()
+                    .allMatch(detail -> "COMPLETED".equalsIgnoreCase(detail.getStatus()));
+
+            if (allDetailsCompleted) {
+                booking.setStatus("COMPLETED");
+                bookingRepository.save(booking);
+            }
+        }
+
+
+        // 2. Update wallet balance
+        Chef chef = booking.getChef();
+        BigDecimal amountToTransfer = bookingDetail.getTotalChefFeePrice();
+
+        Wallet wallet = walletRepository.findByUserId(chef.getUser().getId())
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef's wallet not found"));
+
+        wallet.setBalance(wallet.getBalance().add(amountToTransfer));
+        walletRepository.save(wallet);
+
+        // 3. Create transaction
+        ChefTransaction transaction = new ChefTransaction();
+        transaction.setWallet(wallet);
+        transaction.setBookingDetail(bookingDetail);
+        transaction.setTransactionType("CREDIT"); // or use enum
+        transaction.setAmount(amountToTransfer);
+        transaction.setDescription("Payment for completed bookingDetail #" + bookingDetail.getId());
+
+        chefTransactionRepository.save(transaction);
+
+        return modelMapper.map(bookingDetail, BookingDetailDto.class);
+    }
+
     @Scheduled(cron = "0 0 0 * * ?") // Mỗi ngày vào lúc nửa đêm
     public void updateBookingDetailsStatus() {
         LocalDate currentDate = LocalDate.now();
@@ -270,7 +346,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
 
         for (BookingDetail bookingDetail : bookingDetails) {
                 bookingDetail.setStatus("IN_PROGRESS");
-                bookingDetailRepository.save(bookingDetail);  // Lưu lại các thay đổi
+                bookingDetailRepository.save(bookingDetail);
         }
     }
 }
