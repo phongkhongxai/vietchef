@@ -26,7 +26,6 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/vietchef?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: vietchef_user
       SPRING_DATASOURCE_PASSWORD: vietchef_pass
-      TZ: Asia/Ho_Chi_Minh
     ports:
       - "80:8080"
     networks:
