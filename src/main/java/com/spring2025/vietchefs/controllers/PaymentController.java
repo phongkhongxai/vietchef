@@ -24,8 +24,8 @@ public class PaymentController {
             @RequestParam String currency,
             @RequestParam Long bookingId) {
 
-        String returnUrl = "http://localhost:8080/api/v1/payment/success";
-        String cancelUrl = "http://localhost:8080/api/v1/payment/cancel";
+        String returnUrl = "http://35.240.147.10/api/v1/payment/success";
+        String cancelUrl = "http://35.240.147.10/api/v1/payment/cancel";
         return paypalService.createPayment(amount, currency, bookingId, returnUrl, cancelUrl)
                 .map(orderId -> ResponseEntity.ok(orderId))
                 .onErrorResume(e -> Mono.just(ResponseEntity.status(500).body("Error: " + e.getMessage())));
@@ -35,8 +35,8 @@ public class PaymentController {
     @PostMapping("/deposit")
     public Mono<String> depositToWallet(@RequestParam Long walletId,
                                         @RequestParam BigDecimal amount) {
-        String returnUrl = "http://localhost:8080/api/v1/payment/success";
-        String cancelUrl = "http://localhost:8080/api/v1/payment/cancel";
+        String returnUrl = "http://35.240.147.10/api/v1/payment/success";
+        String cancelUrl = "http://35.240.147.10/api/v1/payment/cancel";
         String currency = "USD";
         return paypalService.depositToWallet(walletId, amount, currency, returnUrl, cancelUrl);
     }
