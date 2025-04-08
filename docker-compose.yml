@@ -1,38 +1,38 @@
-#version: '3.8'
-#services:
-#  mysql:
-#    image: mysql:8.0
-#    container_name: mysql_vietchef
-#    restart: always
-#    environment:
-#      MYSQL_ROOT_PASSWORD: 12345
-#      MYSQL_DATABASE: vietchef
-#      MYSQL_USER: vietchef_user
-#      MYSQL_PASSWORD: vietchef_pass
-#    ports:
-#      - "3307:3306"
-#    volumes:
-#      - mysql_data:/var/lib/mysql
-#    networks:
-#      - vietchef_network
-#
-#  spring_app:
-#    build: .
-#    container_name: vietchef_app
-#    restart: always
-#    depends_on:
-#      - mysql
-#    environment:
-#      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/vietchef?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-#      SPRING_DATASOURCE_USERNAME: vietchef_user
-#      SPRING_DATASOURCE_PASSWORD: vietchef_pass
-#    ports:
-#      - "8080:8080"
-#    networks:
-#      - vietchef_network
-#
-#volumes:
-#  mysql_data:
-#
-#networks:
-#  vietchef_network:
+version: '3.8'
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_vietchef
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 12345
+      MYSQL_DATABASE: vietchef
+      MYSQL_USER: vietchef_user
+      MYSQL_PASSWORD: vietchef_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - vietchef_network
+
+  spring_app:
+    build: .
+    container_name: vietchef_app
+    restart: always
+    depends_on:
+      - mysql
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/vietchef?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: vietchef_user
+      SPRING_DATASOURCE_PASSWORD: vietchef_pass
+    ports:
+      - "80:8080"
+    networks:
+      - vietchef_network
+
+volumes:
+  mysql_data:
+
+networks:
+  vietchef_network:
