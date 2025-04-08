@@ -1,12 +1,4 @@
-FROM openjdk:17-jdk
-
-ENV TZ=Asia/Ho_Chi_Minh
-
-RUN apt-get update && \
-    apt-get install -y tzdata && \
-    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && \
-    echo $TZ > /etc/timezone && \
-    dpkg-reconfigure -f noninteractive tzdata
+FROM openjdk:17-slim
 
 WORKDIR /app
 COPY target/vietchefs-0.0.1-SNAPSHOT.jar app.jar
