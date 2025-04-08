@@ -17,7 +17,7 @@ import java.util.List;
 @AllArgsConstructor
 public class WalletDto {
     private Long id;
-    private User user;
+    private Long userId;
     private BigDecimal balance;
     private String walletType;
 }
