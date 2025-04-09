@@ -81,5 +81,7 @@ public class User {
 
     @OneToOne(mappedBy = "user")
     private Chef chef;
+    @Column(name = "expo_token")
+    private String expoToken;
 
 }

@@ -20,7 +20,7 @@ public interface BookingService {
     BookingResponseDto paymentBooking(Long bookingId, Long userId);
     List<PaymentCycleResponse> getPaymentCyclesWithDetails(Long bookingId);
     PaymentCycleResponse payForPaymentCycle(Long paymentCycleId, Long userId);
-    BookingResponseDto depositBooking(Long bookingId, Long userId);
+    ApiResponse<BookingResponseDto> depositBooking(Long bookingId, Long userId);
     BookingResponseDto cancelSingleBooking(Long bookingId);
     BookingResponseDto cancelLongTermBooking(Long bookingId);
 

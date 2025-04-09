@@ -3,6 +3,7 @@ package com.spring2025.vietchefs.services.impl;
 import com.spring2025.vietchefs.models.entity.Chef;
 import com.spring2025.vietchefs.models.entity.Dish;
 import com.spring2025.vietchefs.models.entity.Menu;
+import com.spring2025.vietchefs.models.entity.MenuItem;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.responseModel.DistanceFeeResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.DistanceResponse;
@@ -46,16 +47,48 @@ public class CalculateService {
     public  BigDecimal calculateTotalCookTime(List<Long> dishIds, int numberOfGuests) {
         List<Dish> dishes = dishRepository.findAllById(dishIds);
 
-        BigDecimal totalTime = dishes.stream()
-                .map(dish -> {
-                    // Đảm bảo estimatedCookGroup không bằng 0
-                    BigDecimal estimatedCookGroup = BigDecimal.valueOf(dish.getEstimatedCookGroup());
-                    return dish.getCookTime().divide(estimatedCookGroup, 2, RoundingMode.HALF_UP);
-                })
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Nhóm theo estimatedCookGroup để xử lý từng nhóm khác nhau nếu có
+        Map<Integer, List<Dish>> groupedByGroupSize = dishes.stream()
+                .collect(Collectors.groupingBy(Dish::getEstimatedCookGroup));
 
+        BigDecimal totalTime = BigDecimal.ZERO;
+
+        for (Map.Entry<Integer, List<Dish>> entry : groupedByGroupSize.entrySet()) {
+            int groupSize = entry.getKey();
+            List<Dish> groupDishes = entry.getValue();
+
+            // Tổng số món trong nhóm
+            int totalDishes = groupDishes.size();
+
+            // Số nhóm đầy đủ để chia
+            int fullGroups = totalDishes / groupSize;
+            //int remainder = totalDishes % groupSize;
+
+            // Lấy danh sách dish time
+            List<BigDecimal> cookTimes = groupDishes.stream()
+                    .map(Dish::getCookTime)
+                    .toList();
+
+            // Tính cho các nhóm đầy đủ
+            for (int i = 0; i < fullGroups * groupSize; i += groupSize) {
+                BigDecimal groupTime = BigDecimal.ZERO;
+                for (int j = 0; j < groupSize; j++) {
+                    groupTime = groupTime.add(cookTimes.get(i + j));
+                }
+                totalTime = totalTime.add(groupTime.divide(BigDecimal.valueOf(groupSize), 2, RoundingMode.HALF_UP));
+            }
+
+            // Tính phần dư (món lẻ nấu riêng)
+            for (int i = fullGroups * groupSize; i < totalDishes; i++) {
+                totalTime = totalTime.add(cookTimes.get(i));
+            }
+        }
+
+        // Nhân với multiplier theo số lượng khách
         BigDecimal multiplier = getCookTimeMultiplier(numberOfGuests);
         totalTime = totalTime.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
+
+        // Chuyển phút → giờ
         return totalTime.divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
     }
     public BigDecimal calculateTotalCookTimeFromMenu(Long menuId, List<Long> dishIds, int guestCount) {
@@ -99,39 +132,73 @@ public class CalculateService {
     public BigDecimal calculateMaxCookTime(Long chefId, int maxNumberOfDishes, int numberOfGuests) {
         Chef chef = chefRepository.findById(chefId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found"));
-        List<Dish> dishes = dishRepository.findByChefAndIsDeletedFalse(chef);
 
-        // Lọc các món ăn có estimatedCookGroup = 1
-        List<Dish> availableDishes = dishes.stream()
-                .filter(dish -> dish.getEstimatedCookGroup() == 1)
-                .collect(Collectors.toList());
+        List<Dish> allDishes = dishRepository.findByChefAndIsDeletedFalse(chef);
 
-        // Giới hạn số món ăn tối đa (maxNumberOfDishes)
-        availableDishes = availableDishes.stream()
-                .limit(maxNumberOfDishes)
+        // --- Lấy menu có thời gian nấu lâu nhất ---
+        List<Menu> chefMenus = menuRepository.findByChef(chef);
+        Optional<Menu> maxCookTimeMenu = chefMenus.stream()
+                .max(Comparator.comparing(Menu::getTotalCookTime));
+
+        List<Dish> menuDishes = new ArrayList<>();
+        if (maxCookTimeMenu.isPresent()) {
+            menuDishes = maxCookTimeMenu.get().getMenuItems().stream()
+                    .map(MenuItem::getDish)
+                    .toList();
+        }
+
+        // --- Món KHÔNG có trong menu ---
+        Set<Long> menuDishIds = menuDishes.stream()
+                .map(Dish::getId)
+                .collect(Collectors.toSet());
+
+        List<Dish> notInMenu = allDishes.stream()
+                .filter(d -> !menuDishIds.contains(d.getId()))
                 .toList();
 
-        // Tính tổng thời gian nấu cho các món ăn này
-        BigDecimal totalCookTime = availableDishes.stream()
-                .map(dish -> dish.getCookTime().divide(BigDecimal.valueOf(dish.getEstimatedCookGroup()), 2, RoundingMode.HALF_UP))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Lấy 1 món group=1, lâu nhất
+        Optional<Dish> g1Dish = notInMenu.stream()
+                .filter(d -> d.getEstimatedCookGroup() == 1)
+                .max(Comparator.comparing(Dish::getCookTime));
 
-        // Lấy hệ số điều chỉnh thời gian nấu cho số khách
+        // Lấy 2 món group=2, lâu nhất
+        List<Dish> g2Dishes = notInMenu.stream()
+                .filter(d -> d.getEstimatedCookGroup() == 2)
+                .sorted((a, b) -> b.getCookTime().compareTo(a.getCookTime()))
+                .limit(2)
+                .toList();
+
+        // --- Tính thời gian nấu ---
+        BigDecimal totalTime = BigDecimal.ZERO;
+        if (maxCookTimeMenu.isPresent()) {
+            BigDecimal menuCookTimeInMinutes = maxCookTimeMenu.get().getTotalCookTime()
+                    .multiply(BigDecimal.valueOf(60));
+            totalTime = totalTime.add(menuCookTimeInMinutes);
+        }
+        if (g1Dish.isPresent()) {
+            totalTime = totalTime.add(g1Dish.get().getCookTime());
+        }
+
+        if (!g2Dishes.isEmpty()) {
+            BigDecimal g2Total = g2Dishes.stream()
+                    .map(Dish::getCookTime)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            totalTime = totalTime.add(g2Total.divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP));
+        }
+
+        // --- Nhân hệ số theo số khách ---
         BigDecimal multiplier = getCookTimeMultiplier(numberOfGuests);
+        totalTime = totalTime.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
 
-        // Điều chỉnh tổng thời gian nấu theo số khách
-        totalCookTime = totalCookTime.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
-
-        // Kiểm tra nếu thời gian nấu vượt quá 2 giờ (120 phút), giới hạn lại ở 3 giờ
-        if (totalCookTime.compareTo(BigDecimal.valueOf(210)) > 0) {
-            totalCookTime = BigDecimal.valueOf(210);
+        if (totalTime.compareTo(BigDecimal.valueOf(210)) > 0) {
+            totalTime = BigDecimal.valueOf(210);
         }
-        if (totalCookTime.compareTo(BigDecimal.valueOf(60)) < 0) {
-            totalCookTime = BigDecimal.valueOf(60);
+        if (totalTime.compareTo(BigDecimal.valueOf(60)) < 0) {
+            totalTime = BigDecimal.valueOf(60);
         }
 
-        // Chuyển thời gian từ phút sang giờ
-        return totalCookTime.divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+        // --- Trả về thời gian giờ ---
+        return totalTime.divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
     }
 
     public BigDecimal calculateDishPrice(Long menuId, int guestCount, List<Long> extraDishIds) {
