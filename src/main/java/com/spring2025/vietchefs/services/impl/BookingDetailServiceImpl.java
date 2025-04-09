@@ -8,6 +8,7 @@ import com.spring2025.vietchefs.models.payload.dto.BookingDetailRequestDto;
 import com.spring2025.vietchefs.models.payload.dto.DishDto;
 import com.spring2025.vietchefs.models.payload.requestModel.BookingDetailUpdateDto;
 import com.spring2025.vietchefs.models.payload.requestModel.BookingDetailUpdateRequest;
+import com.spring2025.vietchefs.models.payload.requestModel.NotificationRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.*;
 import com.spring2025.vietchefs.repositories.*;
 import com.spring2025.vietchefs.services.BookingDetailService;
@@ -52,6 +53,8 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     private CalculateService calculateService;
     @Autowired
     private WalletRepository walletRepository;
+    @Autowired
+    private NotificationService notificationService;
     @Autowired
     private ModelMapper modelMapper;
     @Override
@@ -184,6 +187,9 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                 .add(dishPrice.multiply(BigDecimal.valueOf(0.20))); // 20% của dishPrice
 
         DistanceFeeResponse travelFeeResponse = calculateService.calculateTravelFee(chef.getAddress(), bookingDetail.getLocation());
+        if(travelFeeResponse.getDistanceKm().compareTo(BigDecimal.valueOf(50))>0){
+            throw new VchefApiException(HttpStatus.BAD_REQUEST,"Distance between you and chef cannot bigger than 50km.");
+        }
         BigDecimal travelFee = travelFeeResponse.getTravelFee();
         TimeTravelResponse timeTravelResponse = calculateService.calculateArrivalTime(bookingDetail.getStartTime(), totalCookTime, travelFeeResponse.getDurationHours());
 
@@ -275,10 +281,25 @@ public class BookingDetailServiceImpl implements BookingDetailService {
             throw new VchefApiException(HttpStatus.BAD_REQUEST,
                     "Cannot change this status because you not in this booking.");
         }
-        if (!completedTime.isBefore(bookingDetail.getTimeBeginCook()) && !completedTime.isAfter(bookingDetail.getStartTime()) &&bookingDetail.getStatus().equalsIgnoreCase("IN_PROGRESS")) {
+        if (bookingDetail.getStatus().equalsIgnoreCase("IN_PROGRESS")
+                && !completedTime.isBefore(bookingDetail.getTimeBeginCook())
+                && !completedTime.isAfter(bookingDetail.getStartTime())) {
             bookingDetail.setStatus("WAITING_FOR_CONFIRMATION");
             bookingDetail = bookingDetailRepository.save(bookingDetail);
+            NotificationRequest notification = NotificationRequest.builder()
+                    .userId(bookingDetail.getBooking().getCustomer().getId())
+                    .title("Booking Completed")
+                    .body("The chef has completed your service and is waiting for your confirmation.")
+                    .bookingDetailId(bookingDetail.getId())
+                    .screen("BookingDetail")
+                    .build();
+            notificationService.sendPushNotification(notification);
+
+        }else {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST,
+                    "Cannot update status. Current time is not within the allowed time window.");
         }
+
         return modelMapper.map(bookingDetail, BookingDetailDto.class);
     }
 
@@ -332,21 +353,54 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         transaction.setBookingDetail(bookingDetail);
         transaction.setTransactionType("CREDIT"); // or use enum
         transaction.setAmount(amountToTransfer);
+        transaction.setStatus("COMPLETED");
         transaction.setDescription("Payment for completed bookingDetail #" + bookingDetail.getId());
 
         chefTransactionRepository.save(transaction);
+        NotificationRequest notification = NotificationRequest.builder()
+                .userId(booking.getChef().getUser().getId())
+                .title("Booking Completed")
+                .body("The customer has confirmed the completion of your service.")
+                .bookingId(booking.getId())
+                .screen("ChefEarningsScreen")
+                .build();
+        notificationService.sendPushNotification(notification);
+
 
         return modelMapper.map(bookingDetail, BookingDetailDto.class);
     }
 
-    @Scheduled(cron = "0 0 0 * * ?") // Mỗi ngày vào lúc nửa đêm
+    @Scheduled(cron = "0 10 13 * * ?") // Mỗi ngày vào lúc nửa đêm 12h01
     public void updateBookingDetailsStatus() {
         LocalDate currentDate = LocalDate.now();
         List<BookingDetail> bookingDetails = bookingDetailRepository.findBySessionDateAndStatus(currentDate, "LOCKED");
 
         for (BookingDetail bookingDetail : bookingDetails) {
-                bookingDetail.setStatus("IN_PROGRESS");
-                bookingDetailRepository.save(bookingDetail);
+            bookingDetail.setStatus("IN_PROGRESS");
+            bookingDetailRepository.save(bookingDetail);
+
+            Booking booking = bookingDetail.getBooking();
+            Chef chef = booking.getChef();
+            Long chefUserId = chef.getUser().getId();
+
+            NotificationRequest chefNotification = NotificationRequest.builder()
+                    .userId(chefUserId)
+                    .title("Cooking Session Started")
+                    .body("Your scheduled session for " + currentDate + " has started. Time to get cooking!")
+                    .bookingDetailId(booking.getId())
+                    .screen("nothing")
+                    .build();
+            notificationService.sendPushNotification(chefNotification);
+            // Send notification to the Customer
+            Long customerUserId = booking.getCustomer().getId();
+            NotificationRequest customerNotification = NotificationRequest.builder()
+                    .userId(customerUserId)
+                    .title("Your Booking Has Started")
+                    .body("Your cooking session for " + currentDate + " has started. Get ready to enjoy your meal!")
+                    .bookingDetailId(booking.getId())
+                    .screen("nothing")
+                    .build();
+            notificationService.sendPushNotification(customerNotification);
         }
     }
 }

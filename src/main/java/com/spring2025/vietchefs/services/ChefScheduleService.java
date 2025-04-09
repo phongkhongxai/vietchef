@@ -1,5 +1,6 @@
 package com.spring2025.vietchefs.services;
 
+import com.spring2025.vietchefs.models.payload.requestModel.ChefMultipleScheduleRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefScheduleRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefScheduleUpdateRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.ChefScheduleResponse;
@@ -18,4 +19,8 @@ public interface ChefScheduleService {
     // Phương thức dành cho chef hiện tại:
     ChefScheduleResponse createScheduleForCurrentChef(ChefScheduleRequest request);
     List<ChefScheduleResponse> getSchedulesForCurrentChef();
+
+    // Phương thức mới: tạo nhiều lịch cùng một ngày và xóa tất cả lịch của một ngày
+    List<ChefScheduleResponse> createMultipleSchedulesForCurrentChef(ChefMultipleScheduleRequest request);
+    void deleteSchedulesByDayOfWeek(Integer dayOfWeek);
 }

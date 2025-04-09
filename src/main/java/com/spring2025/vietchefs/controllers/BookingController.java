@@ -72,7 +72,7 @@ public class BookingController {
     @PostMapping("/{bookingId}/deposit")
     public ResponseEntity<?> depositBooking(@AuthenticationPrincipal UserDetails userDetails, @PathVariable Long bookingId) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
-        BookingResponseDto bookingResponseDto = bookingService.depositBooking(bookingId, bto.getId());
+        ApiResponse<BookingResponseDto> bookingResponseDto = bookingService.depositBooking(bookingId, bto.getId());
         return new ResponseEntity<>(bookingResponseDto, HttpStatus.OK);
 
     }

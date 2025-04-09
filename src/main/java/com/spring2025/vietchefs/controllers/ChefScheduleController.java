@@ -1,5 +1,6 @@
 package com.spring2025.vietchefs.controllers;
 
+import com.spring2025.vietchefs.models.payload.requestModel.ChefMultipleScheduleRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefScheduleRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefScheduleUpdateRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.ChefScheduleResponse;
@@ -31,6 +32,19 @@ public class ChefScheduleController {
             @Valid @RequestBody ChefScheduleRequest request) {
         ChefScheduleResponse response = chefScheduleService.createScheduleForCurrentChef(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
+    /**
+     * Tạo nhiều lịch cho chef hiện tại trong cùng một ngày trong tuần.
+     * Endpoint: POST /api/v1/chef-schedules/multiple
+     */
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PostMapping("/multiple")
+    public ResponseEntity<List<ChefScheduleResponse>> createMultipleSchedules(
+            @Valid @RequestBody ChefMultipleScheduleRequest request) {
+        List<ChefScheduleResponse> responses = chefScheduleService.createMultipleSchedulesForCurrentChef(request);
+        return new ResponseEntity<>(responses, HttpStatus.CREATED);
     }
 
     /**
@@ -80,5 +94,17 @@ public class ChefScheduleController {
     public ResponseEntity<String> deleteSchedule(@PathVariable Long scheduleId) {
         chefScheduleService.deleteSchedule(scheduleId);
         return ResponseEntity.ok("Chef schedule deleted successfully");
+    }
+
+    /**
+     * Xóa mềm tất cả lịch của chef theo ngày trong tuần.
+     * Endpoint: DELETE /api/v1/chef-schedules/day/{dayOfWeek}
+     */
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @DeleteMapping("/day/{dayOfWeek}")
+    public ResponseEntity<String> deleteSchedulesByDayOfWeek(@PathVariable Integer dayOfWeek) {
+        chefScheduleService.deleteSchedulesByDayOfWeek(dayOfWeek);
+        return ResponseEntity.ok("All chef schedules for day of week " + dayOfWeek + " deleted successfully");
     }
 }

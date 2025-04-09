@@ -15,5 +15,6 @@ public class LoginDto {
     private String usernameOrEmail;
     @NotEmpty(message = "Password cannot be empty")
     private String password;
+    private String expoToken;
 
 }
