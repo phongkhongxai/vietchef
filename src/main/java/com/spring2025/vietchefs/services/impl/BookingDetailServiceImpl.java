@@ -11,6 +11,7 @@ import com.spring2025.vietchefs.models.payload.requestModel.BookingDetailUpdateR
 import com.spring2025.vietchefs.models.payload.requestModel.NotificationRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.*;
 import com.spring2025.vietchefs.repositories.*;
+import com.spring2025.vietchefs.services.AvailabilityFinderService;
 import com.spring2025.vietchefs.services.BookingDetailService;
 import com.spring2025.vietchefs.services.PaymentCycleService;
 import org.modelmapper.ModelMapper;
@@ -56,9 +57,14 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     @Autowired
     private NotificationService notificationService;
     @Autowired
+    private AvailabilityFinderService availabilityFinderService;
+    @Autowired
     private ModelMapper modelMapper;
     @Override
     public BookingDetail createBookingDetail(Booking booking, BookingDetailRequestDto dto) {
+        if (isOverlappingWithExistingBookings(booking.getChef(), dto.getSessionDate(), dto.getTimeBeginTravel(), dto.getStartTime())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef đã có lịch trong khoảng thời gian này cho ngày "+dto.getSessionDate()+". Vui lòng chọn khung giờ khác.");
+        }
         BookingDetail detail =  new BookingDetail();
         detail.setBooking(booking);
         detail.setSessionDate(dto.getSessionDate());
@@ -94,6 +100,37 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         detail.setTotalPrice(dto.getTotalPrice());
         return bookingDetailRepository.save(detail);
     }
+    private boolean isOverlappingWithExistingBookings(Chef chef, LocalDate sessionDate, LocalTime timeBeginTravel, LocalTime startTime) {
+        // Lấy toàn bộ bookingDetails của chef trong ngày đó
+        List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking_ChefAndSessionDateAndIsDeletedFalse(chef, sessionDate);
+        List<BookingDetail> activeBookings = bookingDetails.stream()
+                .filter(detail -> {
+                    Booking booking = detail.getBooking();
+                    return !booking.getIsDeleted() &&
+                            !List.of("CANCELED", "OVERDUE").contains(booking.getStatus()) &&
+                            !detail.getIsDeleted() &&
+                            !List.of("CANCELED", "OVERDUE").contains(detail.getStatus());
+                })
+                .sorted(Comparator.comparing(BookingDetail::getStartTime))
+                .collect(Collectors.toList());
+
+        // Tính khoảng thời gian cần kiểm tra (cho phép lố 10 phút)
+        LocalTime checkStart = timeBeginTravel.minusSeconds(10);
+        LocalTime checkEnd = startTime.plusMinutes(10);
+
+        for (BookingDetail detail : activeBookings) {
+            LocalTime existingStart = detail.getTimeBeginTravel();
+            LocalTime existingEnd = detail.getStartTime();
+
+            boolean isOverlap = !(checkEnd.isBefore(existingStart) || checkStart.isAfter(existingEnd));
+            if (isOverlap) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
 
     @Override
     public BookingDetailDto getBookingDetailById(Long id) {

@@ -1,6 +1,7 @@
 package com.spring2025.vietchefs.services;
 
 import com.spring2025.vietchefs.models.entity.Chef;
+import com.spring2025.vietchefs.models.payload.requestModel.AvailableTimeSlotRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.AvailableTimeSlotResponse;
 
 import java.time.LocalDate;
@@ -116,4 +117,12 @@ public interface AvailabilityFinderService {
             List<Long> dishIds,
             int guestCount,
             int maxDishesPerMeal);
+    List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithLocationConstraints(
+            Long chefId,
+            String customerLocation,
+            int guestCount,
+            int maxDishesPerMeal,
+            List<AvailableTimeSlotRequest> requests);
+
+
 } 
