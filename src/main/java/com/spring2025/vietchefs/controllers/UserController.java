@@ -5,8 +5,10 @@ import com.spring2025.vietchefs.models.payload.dto.UserDto;
 import com.spring2025.vietchefs.models.payload.dto.WalletDto;
 import com.spring2025.vietchefs.models.payload.requestModel.ChangePasswordRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.UserRequest;
+import com.spring2025.vietchefs.models.payload.responseModel.WalletPlusResponse;
 import com.spring2025.vietchefs.services.UserService;
 import com.spring2025.vietchefs.services.WalletService;
+import com.spring2025.vietchefs.utils.AppConstants;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,9 +36,13 @@ public class UserController {
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
     @GetMapping("/profile/my-wallet")
-    public ResponseEntity<WalletDto> viewPWalletrofile(@AuthenticationPrincipal UserDetails userDetails) {
+    public ResponseEntity<WalletPlusResponse> viewWalletProfile(@AuthenticationPrincipal UserDetails userDetails,
+                                                                @RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
+                                                                @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
+                                                                @RequestParam(value = "sortBy", defaultValue = "createdAt", required = false) String sortBy,
+                                                                @RequestParam(value = "sortDir", defaultValue = "desc", required = false) String sortDir) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
-        WalletDto bs = walletService.getWalletByUserId(bto.getId());
+        WalletPlusResponse bs = walletService.getWalletByUserId(bto.getId(), pageNo,  pageSize,  sortBy,  sortDir);
         return new ResponseEntity<>(bs, HttpStatus.OK);
     }
     @SecurityRequirement(name = "Bearer Authentication")

@@ -695,7 +695,7 @@ public class BookingServiceImpl implements BookingService {
 
         // 3. Lấy Booking từ PaymentCycle
         Booking booking = paymentCycle.getBooking();
-        if (!"CONFIRMED".equalsIgnoreCase(booking.getStatus()) && !"PARTIALLY_PAID".equalsIgnoreCase(booking.getStatus()) && !"PENDING_FIRST_CYCLE".equalsIgnoreCase(booking.getStatus())) {
+        if (!"CONFIRMED".equalsIgnoreCase(booking.getStatus()) && !"CONFIRMED_PARTIALLY_PAID".equalsIgnoreCase(booking.getStatus()) && !"PENDING_FIRST_CYCLE".equalsIgnoreCase(booking.getStatus())) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "This PaymentCycle cannot be paid at this time.");
         }
         List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking(booking);
@@ -1079,5 +1079,88 @@ public class BookingServiceImpl implements BookingService {
 
         return modelMapper.map(booking, BookingResponseDto.class);
     }
+    //@Scheduled(cron = "0 0 2 * * ?") // Chạy mỗi ngày lúc 02:00 sáng
+    @Transactional
+    public void markOverdueAndRefundBookings() {
+        LocalDateTime now = LocalDateTime.now();
+
+        List<Booking> overdueBookings = bookingRepository
+                .findByStatusInAndCreatedAtBefore(List.of("PAID", "DEPOSITED", "PENDING"), now);
+
+        for (Booking booking : overdueBookings) {
+            String currentStatus = booking.getStatus().toUpperCase();
+
+            // Nếu là PENDING → chỉ cập nhật OVERDUE, không hoàn tiền
+            if ("PENDING".equals(currentStatus)) {
+                booking.setStatus("OVERDUE");
+                bookingRepository.save(booking);
+
+                // Gửi thông báo nếu cần
+                NotificationRequest pendingNotice = NotificationRequest.builder()
+                        .userId(booking.getCustomer().getId())
+                        .title("Booking Expired")
+                        .body("Your booking created at " + booking.getCreatedAt() + " has expired without confirmation.")
+                        .bookingId(booking.getId())
+                        .screen("CustomerBookingScreen")
+                        .build();
+                notificationService.sendPushNotification(pendingNotice);
+                continue;
+            }
+
+            // Đã refund chưa?
+            boolean hasRefund = customerTransactionRepository
+                    .existsByBookingIdAndTransactionType(booking.getId(), "REFUND");
+            if (hasRefund) {
+                continue;
+            }
+
+            // Lấy giao dịch PAYMENT hoặc DEPOSIT
+            String transactionType = currentStatus.equals("PAID") ? "PAYMENT" : "DEPOSIT";
+            List<CustomerTransaction> transactions = customerTransactionRepository
+                    .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(
+                            booking.getId(), transactionType, "COMPLETED");
+
+            if (transactions.isEmpty()) {
+                continue;
+            }
+
+            CustomerTransaction originalTransaction = transactions.get(0);
+            Wallet wallet = originalTransaction.getWallet();
+            BigDecimal refundAmount = originalTransaction.getAmount();
+
+            // Tạo giao dịch hoàn tiền
+            CustomerTransaction refundTransaction = CustomerTransaction.builder()
+                    .wallet(wallet)
+                    .booking(booking)
+                    .transactionType("REFUND")
+                    .amount(refundAmount)
+                    .description("Refund for overdue booking")
+                    .status("COMPLETED")
+                    .isDeleted(false)
+                    .build();
+
+            customerTransactionRepository.save(refundTransaction);
+
+            // Cập nhật số dư ví
+            wallet.setBalance(wallet.getBalance().add(refundAmount));
+            walletRepository.save(wallet);
+
+            // Cập nhật trạng thái booking
+            booking.setStatus("OVERDUE");
+            bookingRepository.save(booking);
+
+            // Gửi thông báo
+            NotificationRequest refundNotice = NotificationRequest.builder()
+                    .userId(booking.getCustomer().getId())
+                    .title("Booking Overdue & Refunded")
+                    .body("Your booking created at " + booking.getCreatedAt() +
+                            " has expired. The amount " + refundAmount + " has been refunded to your wallet.")
+                    .bookingId(booking.getId())
+                    .screen("CustomerWalletScreen")
+                    .build();
+            notificationService.sendPushNotification(refundNotice);
+        }
+    }
+
 
 }

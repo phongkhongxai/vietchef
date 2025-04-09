@@ -1,7 +1,9 @@
 package com.spring2025.vietchefs.controllers;
 
+import com.spring2025.vietchefs.models.payload.requestModel.AvailableTimeSlotRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.AvailableTimeSlotResponse;
 import com.spring2025.vietchefs.services.AvailabilityFinderService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -145,6 +147,22 @@ public class AvailabilityFinderController {
                     chefId, date, customerLocation, menuId, dishIds, 
                     guestCount, maxDishesPerMeal);
         
+        return ResponseEntity.ok(availableSlots);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PostMapping("/chef/{chefId}/location-constraints-vip")
+    public ResponseEntity<List<AvailableTimeSlotResponse>> findAvailableTimeSlotsWithLocationConstraintsVip(
+            @PathVariable Long chefId,
+            @RequestParam String customerLocation,
+            @RequestParam int guestCount,
+            @RequestParam(defaultValue = "6") int maxDishesPerMeal,
+            @RequestBody List<AvailableTimeSlotRequest> availableTimeSlotRequests) {
+
+        List<AvailableTimeSlotResponse> availableSlots = availabilityFinderService
+                .findAvailableTimeSlotsWithLocationConstraints(
+                        chefId, customerLocation,guestCount, maxDishesPerMeal,availableTimeSlotRequests);
+
         return ResponseEntity.ok(availableSlots);
     }
 } 

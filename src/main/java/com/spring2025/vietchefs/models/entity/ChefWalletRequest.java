@@ -24,7 +24,7 @@ public class ChefWalletRequest {
     @JoinColumn(name = "chef_id", nullable = false)
     private Chef chef;
 
-    // Loại yêu cầu: "DEPOSIT" (nạp tiền) hoặc "WITHDRAWAL" (rút tiền)
+    //   "WITHDRAWAL" (rút tiền)
     @Column(nullable = false)
     private String requestType;
 
