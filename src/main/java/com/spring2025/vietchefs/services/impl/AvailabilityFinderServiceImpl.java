@@ -21,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -318,9 +319,9 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                     adjustedSlot.setStartTime(earliestStartTime);
                     adjustedSlot.setEndTime(slot.getEndTime());
                     adjustedSlot.setDurationMinutes((int) Duration.between(earliestStartTime, slot.getEndTime()).toMinutes());
-                    adjustedSlot.setNote("Adjusted for 30min break, " + 
-                                       travelTimeHours.setScale(2).toString() + " hours travel time and " + 
-                                       cookTimeHours.setScale(2).toString() + " hours cooking time");
+                    adjustedSlot.setNote("Adjusted for 30min break, " +
+                            travelTimeHours.setScale(2, RoundingMode.HALF_UP).toString() + " hours travel time and " +
+                            cookTimeHours.setScale(2, RoundingMode.HALF_UP).toString() + " hours cooking time");
                     
                     adjustedSlots.add(adjustedSlot);
                 }
@@ -340,7 +341,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                     adjustedSlot.setStartTime(adjustedStartTime);
                     adjustedSlot.setEndTime(slot.getEndTime());
                     adjustedSlot.setDurationMinutes((int) Duration.between(adjustedStartTime, slot.getEndTime()).toMinutes());
-                    adjustedSlot.setNote("Adjusted for " + cookTimeHours.setScale(2).toString() + " hours cooking time");
+                    adjustedSlot.setNote("Adjusted for " + cookTimeHours.setScale(2,RoundingMode.HALF_UP).toString() + " hours cooking time");
                     
                     adjustedSlots.add(adjustedSlot);
                 }
@@ -450,8 +451,8 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                         adjustedSlot.setEndTime(slot.getEndTime());
                         adjustedSlot.setDurationMinutes((int) Duration.between(earliestStartTime, slot.getEndTime()).toMinutes());
                         adjustedSlot.setNote("Adjusted for 30min break, " +
-                                travelTimeHours.setScale(2) + " hours travel time and " +
-                                cookTimeHours.setScale(2) + " hours cooking time");
+                                travelTimeHours.setScale(2,RoundingMode.HALF_UP) + " hours travel time and " +
+                                cookTimeHours.setScale(2,RoundingMode.HALF_UP) + " hours cooking time");
 
                         allAdjustedSlots.add(adjustedSlot);
                     }
@@ -467,7 +468,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                         adjustedSlot.setStartTime(adjustedStartTime);
                         adjustedSlot.setEndTime(slot.getEndTime());
                         adjustedSlot.setDurationMinutes((int) Duration.between(adjustedStartTime, slot.getEndTime()).toMinutes());
-                        adjustedSlot.setNote("Adjusted for " + cookTimeHours.setScale(2) + " hours cooking time");
+                        adjustedSlot.setNote("Adjusted for " + cookTimeHours.setScale(2,RoundingMode.HALF_UP) + " hours cooking time");
 
                         allAdjustedSlots.add(adjustedSlot);
                     }
@@ -475,7 +476,10 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
             }
         }
 
-        Collections.sort(allAdjustedSlots, Comparator.comparing(AvailableTimeSlotResponse::getStartTime));
+        Collections.sort(allAdjustedSlots, Comparator
+                .comparing(AvailableTimeSlotResponse::getDate)
+                .thenComparing(AvailableTimeSlotResponse::getStartTime));
+
         return allAdjustedSlots;
 
     }
