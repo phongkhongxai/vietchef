@@ -106,7 +106,6 @@ public class CalculateService {
         // Kiểm tra và tính thêm thời gian nấu cho các món không có trong menu
         if (dishIds != null && !dishIds.isEmpty()) {
             Set<Long> uniqueDishIds = new HashSet<>(dishIds);
-
             // Nếu đã có menuId, loại bỏ những món đã có trong menu
             if (menuId != null) {
                 Menu menu = menuRepository.findById(menuId)

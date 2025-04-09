@@ -9,12 +9,7 @@ import com.spring2025.vietchefs.models.entity.ChefTimeSettings;
 import com.spring2025.vietchefs.models.entity.User;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.responseModel.AvailableTimeSlotResponse;
-import com.spring2025.vietchefs.repositories.BookingDetailRepository;
-import com.spring2025.vietchefs.repositories.ChefBlockedDateRepository;
-import com.spring2025.vietchefs.repositories.ChefRepository;
-import com.spring2025.vietchefs.repositories.ChefScheduleRepository;
-import com.spring2025.vietchefs.repositories.ChefTimeSettingsRepository;
-import com.spring2025.vietchefs.repositories.UserRepository;
+import com.spring2025.vietchefs.repositories.*;
 import com.spring2025.vietchefs.services.AvailabilityFinderService;
 import com.spring2025.vietchefs.services.BookingConflictService;
 import com.spring2025.vietchefs.services.impl.CalculateService;
@@ -65,6 +60,8 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
     
     @Autowired
     private CalculateService calculateService;
+    @Autowired
+    private PackageRepository packageRepository;
     
     @Autowired
     private BookingDetailRepository bookingDetailRepository;
@@ -154,7 +151,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
     
     @Override
     public List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithCookingTime(
-            Long chefId, LocalDate date, Long menuId, List<Long> dishIds, int guestCount, Integer minDuration) {
+            Long chefId, LocalDate date, Long menuId, List<Long> dishIds, int guestCount,int maxDishesPerMeal, Integer minDuration) {
         
         // Kiểm tra tham số đầu vào
         if (date == null) {
@@ -163,9 +160,6 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         if (date.isBefore(LocalDate.now())) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot search for dates in the past");
         }
-        if (minDuration == null || minDuration <= 0) {
-            minDuration = DEFAULT_MIN_SLOT_DURATION_MINUTES;
-        }
         
         // Lấy thông tin chef
         Chef chef = chefRepository.findById(chefId)
@@ -173,8 +167,12 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                     "Chef not found with id: " + chefId));
         
         // Tính toán thời gian nấu (giờ)
-        BigDecimal cookTimeHours = calculateService.calculateTotalCookTimeFromMenu(menuId, dishIds, guestCount);
-        
+        BigDecimal cookTimeHours = BigDecimal.ZERO;
+        if (menuId != null) {
+            cookTimeHours = calculateService.calculateTotalCookTimeFromMenu(menuId, dishIds, guestCount);
+        } else {
+            cookTimeHours = calculateService.calculateTotalCookTime(dishIds, guestCount);
+        }
         // Lấy danh sách khung giờ trống
         List<AvailableTimeSlotResponse> availableSlots = findAvailableTimeSlots(chef, date, date, minDuration);
         
@@ -317,10 +315,10 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                 .filter(detail -> {
                     // Booking vẫn còn active
                     Booking booking = detail.getBooking();
-                    return !booking.getIsDeleted() && 
-                           List.of("PENDING", "CONFIRMED", "IN_PROGRESS").contains(booking.getStatus()) &&
+                    return !booking.getIsDeleted() &&
+                           !List.of("CANCELED", "OVERDUE").contains(booking.getStatus()) &&
                            !detail.getIsDeleted() && 
-                           List.of("PENDING", "CONFIRMED", "IN_PROGRESS").contains(detail.getStatus());
+                           !List.of("CANCELED", "OVERDUE").contains(detail.getStatus());
                 })
                 .collect(Collectors.toList());
         
