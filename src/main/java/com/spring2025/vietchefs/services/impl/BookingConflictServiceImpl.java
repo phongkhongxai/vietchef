@@ -5,6 +5,7 @@ import com.spring2025.vietchefs.models.entity.BookingDetail;
 import com.spring2025.vietchefs.models.entity.Chef;
 import com.spring2025.vietchefs.repositories.BookingDetailRepository;
 import com.spring2025.vietchefs.repositories.BookingRepository;
+import com.spring2025.vietchefs.repositories.ChefRepository;
 import com.spring2025.vietchefs.services.BookingConflictService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,9 @@ public class BookingConflictServiceImpl implements BookingConflictService {
     
     @Autowired
     private BookingDetailRepository bookingDetailRepository;
+    
+    @Autowired
+    private ChefRepository chefRepository;
 
     @Override
     public boolean hasBookingConflict(Chef chef, LocalDate date, LocalTime startTime, LocalTime endTime) {
@@ -60,6 +64,39 @@ public class BookingConflictServiceImpl implements BookingConflictService {
         // Kiểm tra từng ngày
         for (LocalDate date : datesToCheck) {
             if (hasBookingConflict(chef, date, startTime, endTime)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    @Override
+    public boolean hasActiveBookingsForDayOfWeek(Long chefId, Integer dayOfWeek) {
+        // Lấy thông tin Chef từ ID
+        Chef chef = chefRepository.findById(chefId)
+                .orElseThrow(() -> new RuntimeException("Chef not found with id: " + chefId));
+                
+        LocalDate today = LocalDate.now();
+        LocalDate endDate = today.plusDays(60); // Kiểm tra trong 60 ngày tới
+        
+        // Lọc ra tất cả các ngày trong khoảng thời gian có cùng thứ trong tuần
+        List<LocalDate> datesToCheck = today.datesUntil(endDate.plusDays(1))
+                .filter(date -> {
+                    // Điều chỉnh dayOfWeek để phù hợp với DayOfWeek.getValue() (1-7 với 1 là Thứ 2)
+                    int adjustedDayOfWeek = (dayOfWeek % 7) + 1;
+                    if (adjustedDayOfWeek == 8) adjustedDayOfWeek = 1; // Chủ nhật
+                    
+                    return date.getDayOfWeek().getValue() == adjustedDayOfWeek;
+                })
+                .collect(Collectors.toList());
+        
+        // Kiểm tra xem có booking detail nào active vào các ngày này không
+        for (LocalDate date : datesToCheck) {
+            List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking_ChefAndSessionDateAndIsDeletedFalse(chef, date);
+            List<BookingDetail> activeDetails = filterActiveBookingDetails(bookingDetails);
+            
+            if (!activeDetails.isEmpty()) {
                 return true;
             }
         }

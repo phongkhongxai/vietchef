@@ -5,12 +5,15 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "reviews")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Review {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,15 +27,40 @@ public class Review {
     @JoinColumn(name = "chef_id", nullable = false)
     private Chef chef;
 
+    @ManyToOne
+    @JoinColumn(name = "booking_id")
+    private Booking booking;
+
     @Column(nullable = false)
     private BigDecimal rating;
 
     private String description;
+    
+    @Column(columnDefinition = "TEXT")
+    private String overallExperience;
+    
+    @Column(columnDefinition = "JSON")
+    private String photos;
+    
+    @Column(nullable = false)
+    private Boolean isVerified = false;
+    
     private String response;
+    
+    private LocalDateTime chefResponseAt;
 
     @Column(nullable = false)
     private LocalDateTime createAt;
 
     @Column(nullable = false)
     private Boolean isDeleted = false;
+    
+    @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ReviewDetail> reviewDetails = new ArrayList<>();
+    
+    @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ReviewReply> replies = new ArrayList<>();
+    
+    @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ReviewReaction> reactions = new ArrayList<>();
 }
