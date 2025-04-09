@@ -45,7 +45,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/v1")
 public class ReviewController {
 
     private final ReviewService reviewService;
