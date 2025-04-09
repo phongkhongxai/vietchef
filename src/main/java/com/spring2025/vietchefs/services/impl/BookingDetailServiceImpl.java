@@ -332,6 +332,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         transaction.setBookingDetail(bookingDetail);
         transaction.setTransactionType("CREDIT"); // or use enum
         transaction.setAmount(amountToTransfer);
+        transaction.setStatus("COMPLETED");
         transaction.setDescription("Payment for completed bookingDetail #" + bookingDetail.getId());
 
         chefTransactionRepository.save(transaction);
@@ -339,7 +340,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         return modelMapper.map(bookingDetail, BookingDetailDto.class);
     }
 
-    @Scheduled(cron = "0 0 0 * * ?") // Mỗi ngày vào lúc nửa đêm
+    @Scheduled(cron = "0 1 0 * * ?") // Mỗi ngày vào lúc nửa đêm 12h01
     public void updateBookingDetailsStatus() {
         LocalDate currentDate = LocalDate.now();
         List<BookingDetail> bookingDetails = bookingDetailRepository.findBySessionDateAndStatus(currentDate, "LOCKED");

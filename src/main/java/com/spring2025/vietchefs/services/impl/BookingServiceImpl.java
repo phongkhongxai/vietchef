@@ -672,12 +672,11 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
-    public BookingResponseDto depositBooking(Long bookingId, Long userId) {
+    public ApiResponse<BookingResponseDto> depositBooking(Long bookingId, Long userId) {
         // 1. Lấy Booking theo ID
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Booking not found with ID: " + bookingId));
 
-        // 2. Kiểm tra điều kiện booking phải là LONG_TERM và PENDING
         if (!"PENDING".equals(booking.getStatus())) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Booking is not in PENDING status.");
         }
@@ -685,26 +684,50 @@ public class BookingServiceImpl implements BookingService {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Booking is not Long-Term.");
         }
 
-        // 3. Lấy ví của người dùng
+        List<BookingDetail> details = bookingDetailRepository.findByBookingOrderBySessionDateAsc(booking);
+        if (details.isEmpty()) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Booking has no BookingDetails.");
+        }
+
+        LocalDate now = LocalDate.now();
+        LocalDate firstSession = details.get(0).getSessionDate();
+
+        if (!firstSession.isAfter(now)) {
+            return ApiResponse.<BookingResponseDto>builder()
+                    .success(false)
+                    .message("Cannot deposit. The first session has already started or is today.")
+                    .build();
+        }
+
+        if (!firstSession.isAfter(now.plusDays(2))) {
+            booking.setStatus("PENDING_FIRST_CYCLE");
+            bookingRepository.save(booking);
+            return ApiResponse.<BookingResponseDto>builder()
+                    .success(false)
+                    .message("Session is too close. Status updated to PENDING_FIRST_CYCLE. Please proceed with first payment.")
+                    .data(modelMapper.map(booking, BookingResponseDto.class))
+                    .build();
+        }
+
+        // Tiến hành đặt cọc như bình thường
         Wallet wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for customer."));
 
-        // 4. Kiểm tra số dư có đủ thanh toán tiền đặt cọc không
-        BigDecimal depositAmount = booking.getTotalPrice().multiply(BigDecimal.valueOf(0.05)); // Lấy số tiền đặt cọc
+        BigDecimal depositAmount = booking.getTotalPrice().multiply(BigDecimal.valueOf(0.05));
         if (wallet.getBalance().compareTo(depositAmount) < 0) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Insufficient balance in the wallet.");
+            return ApiResponse.<BookingResponseDto>builder()
+                    .success(false)
+                    .message("Insufficient balance in the wallet.")
+                    .build();
         }
 
-        // 5. Trừ tiền đặt cọc trong ví
         wallet.setBalance(wallet.getBalance().subtract(depositAmount));
         walletRepository.save(wallet);
 
-        // 6. Cập nhật trạng thái Booking thành DEPOSITED
         booking.setStatus("DEPOSITED");
-        booking.setDepositPaid(depositAmount); // Lưu số tiền đặt cọc đã thanh toán
+        booking.setDepositPaid(depositAmount);
         bookingRepository.save(booking);
 
-        // 7. Ghi lại giao dịch vào bảng Transaction
         CustomerTransaction transaction = new CustomerTransaction();
         transaction.setWallet(wallet);
         transaction.setBooking(booking);
@@ -715,8 +738,12 @@ public class BookingServiceImpl implements BookingService {
                 " with " + booking.getChef().getUser().getFullName() + " Chef.");
         customerTransactionRepository.save(transaction);
 
-        // 8. Trả về Booking đã thanh toán đặt cọc
-        return modelMapper.map(booking, BookingResponseDto.class);
+        return ApiResponse.<BookingResponseDto>builder()
+                .success(true)
+                .message("Deposit successfully.")
+                .data(modelMapper.map(booking, BookingResponseDto.class))
+                .build();
+
     }
 
     @Override
@@ -737,7 +764,6 @@ public class BookingServiceImpl implements BookingService {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel booking less than 2 days before session date");
         }
 
-        // Nếu booking là PENDING thì chỉ cần hủy, không cần hoàn tiền
         if ("PENDING".equalsIgnoreCase(booking.getStatus())) {
             booking.setStatus("CANCELED");
             bookingRepository.save(booking);
