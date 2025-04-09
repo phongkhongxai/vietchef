@@ -78,6 +78,11 @@ public class AuthServiceImpl implements AuthService {
         if (!user.isEmailVerified()) {
             throw new VchefApiException(HttpStatus.FORBIDDEN, "Email is not verified. Please verify your email.");
         }
+        if (loginDto.getExpoToken() != null && !loginDto.getExpoToken().isBlank()) {
+            user.setExpoToken(loginDto.getExpoToken());
+            userRepository.save(user);
+        }
+
         String accessToken = jwtTokenProvider.generateAccessToken(authentication, user);
         String refreshToken = jwtTokenProvider.generateRefreshToken(authentication, user);
 

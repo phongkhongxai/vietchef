@@ -60,7 +60,14 @@ public class PaymentCycleServiceImpl implements PaymentCycleService {
             paymentCycle.setAmountDue(adjustedCycleAmount); //  Số tiền thực tế
             paymentCycle.setStartDate(startDate);
             paymentCycle.setEndDate(endDate);
-            paymentCycle.setDueDate(startDate.minusDays(2)); // Hạn thanh toán trước 2 ngày
+            LocalDate calculatedDueDate = startDate.minusDays(2);
+            LocalDate today = LocalDate.now();
+
+            if (calculatedDueDate.isBefore(today)) {
+                calculatedDueDate = today;
+            }
+
+            paymentCycle.setDueDate(calculatedDueDate);
             paymentCycle.setStatus("PENDING");
 
             paymentCycleRepository.save(paymentCycle);

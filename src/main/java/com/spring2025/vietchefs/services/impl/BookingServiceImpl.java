@@ -4,10 +4,7 @@ import com.spring2025.vietchefs.models.entity.*;
 import com.spring2025.vietchefs.models.entity.Package;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.dto.*;
-import com.spring2025.vietchefs.models.payload.requestModel.BookingDetailPriceLTRequest;
-import com.spring2025.vietchefs.models.payload.requestModel.BookingDetailPriceRequestDto;
-import com.spring2025.vietchefs.models.payload.requestModel.BookingLTPriceRequestDto;
-import com.spring2025.vietchefs.models.payload.requestModel.BookingPriceRequestDto;
+import com.spring2025.vietchefs.models.payload.requestModel.*;
 import com.spring2025.vietchefs.models.payload.responseModel.*;
 import com.spring2025.vietchefs.repositories.*;
 import com.spring2025.vietchefs.services.BookingDetailService;
@@ -63,6 +60,8 @@ public class BookingServiceImpl implements BookingService {
     private WalletRepository walletRepository;
     @Autowired
     private CustomerTransactionRepository customerTransactionRepository;
+    @Autowired
+    private NotificationService notificationService;
     @Autowired
     private ModelMapper modelMapper;
 
@@ -144,6 +143,14 @@ public class BookingServiceImpl implements BookingService {
 
         booking.setTotalPrice(totalPrice);
         Booking booking1 = bookingRepository.save(booking);
+        NotificationRequest notification = NotificationRequest.builder()
+                .userId(customer.getId())
+                .title("Booking Created Successfully")
+                .body("Your booking has been created. Please proceed to payment to confirm your reservation.")
+                .bookingId(booking.getId())
+                .screen("Booking")
+                .build();
+        notificationService.sendPushNotification(notification);
         return modelMapper.map(booking1, BookingResponseDto.class);
 
     }
@@ -196,6 +203,15 @@ public class BookingServiceImpl implements BookingService {
 
         // Chia các kỳ thanh toán
         paymentCycleService.createPaymentCycles(booking);
+        NotificationRequest notification = NotificationRequest.builder()
+                .userId(customer.getId())
+                .title("Please Confirm Your Booking with a Deposit")
+                .body("Your long-term booking has been created. Please pay the deposit to confirm your reservation.")
+                .bookingId(booking.getId())
+                .screen("Booking")
+                .build();
+        notificationService.sendPushNotification(notification);
+
 
         // Chuyển Booking sang DTO để trả về
         return modelMapper.map(booking, BookingResponseDto.class);
@@ -267,6 +283,9 @@ public class BookingServiceImpl implements BookingService {
 
             // 🔹 Tính phí di chuyển
             DistanceFeeResponse price3Of = calculateService.calculateTravelFee(chef.getAddress(), detailDto.getLocation());
+            if(price3Of.getDistanceKm().compareTo(BigDecimal.valueOf(50))>0){
+                throw new VchefApiException(HttpStatus.BAD_REQUEST,"Distance between you and chef cannot bigger than 50km.");
+            }
             BigDecimal price3 = price3Of.getTravelFee();
             TimeTravelResponse ttp = calculateService.calculateArrivalTime(detailDto.getStartTime(), totalCookTime, price3Of.getDurationHours());
             reviewSingleBookingResponse.setArrivalFee(price3);
@@ -299,6 +318,9 @@ public class BookingServiceImpl implements BookingService {
         }
         // 🔹 Tính phí di chuyển
         DistanceFeeResponse travelFeeResponse = calculateService.calculateTravelFee(chef.getAddress(), dto.getLocation());
+        if(travelFeeResponse.getDistanceKm().compareTo(BigDecimal.valueOf(50))>0){
+            throw new VchefApiException(HttpStatus.BAD_REQUEST,"Distance between you and chef cannot bigger than 50km.");
+        }
         BigDecimal travelFee = travelFeeResponse.getTravelFee();
         BigDecimal totalBookingPrice = BigDecimal.ZERO;
         BigDecimal discountAmount = BigDecimal.ZERO;
@@ -444,6 +466,17 @@ public class BookingServiceImpl implements BookingService {
                 }
                 booking.setStatus("CONFIRMED");
                 bookingRepository.save(booking);
+                NotificationRequest confirmNotification = NotificationRequest.builder()
+                        .userId(booking.getCustomer().getId())
+                        .title("Booking Confirmed")
+                        .body("Your booking #" + booking.getBookingType() + " has been confirmed by " +
+                                booking.getChef().getUser().getFullName() + ".")
+                        .bookingId(booking.getId())
+                        .screen("Booking")
+                        .build();
+
+                notificationService.sendPushNotification(confirmNotification);
+
                 return modelMapper.map(booking, BookingResponseDto.class);
             } else {
                 throw new VchefApiException(HttpStatus.BAD_REQUEST, "Booking does not meet the conditions for confirmation.");
@@ -481,6 +514,19 @@ public class BookingServiceImpl implements BookingService {
                 // 7. Cập nhật trạng thái Booking thành REJECTED
                 booking.setStatus("REJECTED");
                 bookingRepository.save(booking);
+
+                NotificationRequest rejectNotification = NotificationRequest.builder()
+                        .userId(booking.getCustomer().getId())
+                        .title("Booking Rejected")
+                        .body("Your booking #" + booking.getBookingType() + " was rejected by " +
+                                booking.getChef().getUser().getFullName() + ". A refund of " +
+                                refundAmount + " has been issued to your wallet.")
+                        .bookingId(booking.getId())
+                        .screen("Booking")
+                        .build();
+
+                notificationService.sendPushNotification(rejectNotification);
+
 
                 return modelMapper.map(booking, BookingResponseDto.class);
             } else {
@@ -521,6 +567,26 @@ public class BookingServiceImpl implements BookingService {
         transaction.setStatus("COMPLETED");
         transaction.setDescription("Payment for Booking #" + booking.getId()+" with "+booking.getChef().getUser().getFullName()+" Chef.");
         customerTransactionRepository.save(transaction);
+
+        NotificationRequest notification = NotificationRequest.builder()
+                .userId(userId)
+                .title("Payment Successful")
+                .body("Your booking has been successfully paid. Chef " + booking.getChef().getUser().getFullName() + " will be ready as scheduled.")
+                .bookingId(booking.getId())
+                .screen("BookingDetail")
+                .build();
+
+        notificationService.sendPushNotification(notification);
+        NotificationRequest chefNotification = NotificationRequest.builder()
+                .userId(booking.getChef().getUser().getId())
+                .title("New Booking Requires Confirmation")
+                .body("A customer has completed a payment for Booking #" + booking.getBookingType() +
+                        ". Please confirm before the scheduled session.")
+                .bookingId(booking.getId())
+                .screen("ChefBookingManagementScreen")
+                .build();
+        notificationService.sendPushNotification(chefNotification);
+
 
         // Trả về Booking đã thanh toán
         return modelMapper.map(booking, BookingResponseDto.class);
@@ -655,6 +721,17 @@ public class BookingServiceImpl implements BookingService {
                 .description("Payment for PaymentCycle #" + paymentCycle.getId())
                 .build();
         customerTransactionRepository.save(transaction);
+        NotificationRequest chefNotification = NotificationRequest.builder()
+                .userId(booking.getChef().getUser().getId())
+                .title("Customer Paid for Upcoming Sessions")
+                .body("Customer has paid for Payment Cycle #" + paymentCycle.getCycleOrder() +
+                        ". Please check your schedule.")
+                .bookingId(booking.getId())
+                .screen("ChefBookingManagementScreen")
+                .build();
+
+        notificationService.sendPushNotification(chefNotification);
+
 
         // 11. Trả về PaymentCycleResponse sau khi thanh toán
         return PaymentCycleResponse.builder()
@@ -672,12 +749,11 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
-    public BookingResponseDto depositBooking(Long bookingId, Long userId) {
+    public ApiResponse<BookingResponseDto> depositBooking(Long bookingId, Long userId) {
         // 1. Lấy Booking theo ID
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Booking not found with ID: " + bookingId));
 
-        // 2. Kiểm tra điều kiện booking phải là LONG_TERM và PENDING
         if (!"PENDING".equals(booking.getStatus())) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Booking is not in PENDING status.");
         }
@@ -685,26 +761,50 @@ public class BookingServiceImpl implements BookingService {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Booking is not Long-Term.");
         }
 
-        // 3. Lấy ví của người dùng
+        List<BookingDetail> details = bookingDetailRepository.findByBookingOrderBySessionDateAsc(booking);
+        if (details.isEmpty()) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Booking has no BookingDetails.");
+        }
+
+        LocalDate now = LocalDate.now();
+        LocalDate firstSession = details.get(0).getSessionDate();
+
+        if (!firstSession.isAfter(now)) {
+            return ApiResponse.<BookingResponseDto>builder()
+                    .success(false)
+                    .message("Cannot deposit. The first session has already started or is today.")
+                    .build();
+        }
+
+        if (!firstSession.isAfter(now.plusDays(2))) {
+            booking.setStatus("PENDING_FIRST_CYCLE");
+            bookingRepository.save(booking);
+            return ApiResponse.<BookingResponseDto>builder()
+                    .success(false)
+                    .message("Session is too close. Status updated to PENDING_FIRST_CYCLE. Please proceed with first payment.")
+                    .data(modelMapper.map(booking, BookingResponseDto.class))
+                    .build();
+        }
+
+        // Tiến hành đặt cọc như bình thường
         Wallet wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for customer."));
 
-        // 4. Kiểm tra số dư có đủ thanh toán tiền đặt cọc không
-        BigDecimal depositAmount = booking.getTotalPrice().multiply(BigDecimal.valueOf(0.05)); // Lấy số tiền đặt cọc
+        BigDecimal depositAmount = booking.getTotalPrice().multiply(BigDecimal.valueOf(0.05));
         if (wallet.getBalance().compareTo(depositAmount) < 0) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Insufficient balance in the wallet.");
+            return ApiResponse.<BookingResponseDto>builder()
+                    .success(false)
+                    .message("Insufficient balance in the wallet.")
+                    .build();
         }
 
-        // 5. Trừ tiền đặt cọc trong ví
         wallet.setBalance(wallet.getBalance().subtract(depositAmount));
         walletRepository.save(wallet);
 
-        // 6. Cập nhật trạng thái Booking thành DEPOSITED
         booking.setStatus("DEPOSITED");
-        booking.setDepositPaid(depositAmount); // Lưu số tiền đặt cọc đã thanh toán
+        booking.setDepositPaid(depositAmount);
         bookingRepository.save(booking);
 
-        // 7. Ghi lại giao dịch vào bảng Transaction
         CustomerTransaction transaction = new CustomerTransaction();
         transaction.setWallet(wallet);
         transaction.setBooking(booking);
@@ -714,9 +814,33 @@ public class BookingServiceImpl implements BookingService {
         transaction.setDescription("Deposit for Long-Term Booking #" + booking.getId() +
                 " with " + booking.getChef().getUser().getFullName() + " Chef.");
         customerTransactionRepository.save(transaction);
+        NotificationRequest notification = NotificationRequest.builder()
+                .userId(userId)
+                .title("Deposit Successful")
+                .body("Your deposit for the long-term booking with Chef " + booking.getChef().getUser().getFullName() + " has been received. Get ready for pay your first cycle!")
+                .bookingId(booking.getId())
+                .screen("BookingDetail")
+                .build();
+        notificationService.sendPushNotification(notification);
+        NotificationRequest chefNotification = NotificationRequest.builder()
+                .userId(booking.getChef().getUser().getId())
+                .title("New Booking Requires Confirmation")
+                .body("A customer has completed a payment for Booking #" + booking.getBookingType() +
+                        ". Please confirm before the scheduled session.")
+                .bookingId(booking.getId())
+                .screen("ChefBookingManagementScreen")
+                .build();
+        notificationService.sendPushNotification(chefNotification);
 
-        // 8. Trả về Booking đã thanh toán đặt cọc
-        return modelMapper.map(booking, BookingResponseDto.class);
+
+
+
+        return ApiResponse.<BookingResponseDto>builder()
+                .success(true)
+                .message("Deposit successfully.")
+                .data(modelMapper.map(booking, BookingResponseDto.class))
+                .build();
+
     }
 
     @Override
@@ -737,7 +861,6 @@ public class BookingServiceImpl implements BookingService {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel booking less than 2 days before session date");
         }
 
-        // Nếu booking là PENDING thì chỉ cần hủy, không cần hoàn tiền
         if ("PENDING".equalsIgnoreCase(booking.getStatus())) {
             booking.setStatus("CANCELED");
             bookingRepository.save(booking);
@@ -781,6 +904,16 @@ public class BookingServiceImpl implements BookingService {
         bookingDetailRepository.save(bookingDetail);
         booking.setStatus("CANCELED");
         bookingRepository.save(booking);
+        NotificationRequest chefNotification = NotificationRequest.builder()
+                .userId(booking.getChef().getUser().getId())
+                .title("Booking Canceled")
+                .body("The customer has canceled their booking for " + bookingDetail.getSessionDate() + ".")
+                .bookingId(booking.getId())
+                .screen("ChefBookingManagementScreen")
+                .build();
+
+        notificationService.sendPushNotification(chefNotification);
+
 
         // Trả về DTO phản hồi
         return modelMapper.map(booking, BookingResponseDto.class);
@@ -856,12 +989,35 @@ public class BookingServiceImpl implements BookingService {
 
                 customerWallet.setBalance(customerWallet.getBalance().add(refundAmount));
                 walletRepository.save(customerWallet);
+
             }
         }
 
         // Cập nhật trạng thái booking
         booking.setStatus("CANCELED");
         bookingRepository.save(booking);
+        if("DEPOSITED".equalsIgnoreCase(booking.getStatus())){
+            NotificationRequest customerNotification = NotificationRequest.builder()
+                    .userId(booking.getCustomer().getId())
+                    .title("Refund Successful")
+                    .body("Your deposit for the canceled long-term booking has been refunded.")
+                    .bookingId(booking.getId())
+                    .screen("CustomerWalletScreen")
+                    .build();
+            notificationService.sendPushNotification(customerNotification);
+        }
+        NotificationRequest chefNotification = NotificationRequest.builder()
+                .userId(booking.getChef().getUser().getId())
+                .title("Long-term Booking Canceled")
+                .body("The customer has canceled the long-term booking that was scheduled.")
+                .bookingId(booking.getId())
+                .screen("ChefBookingManagementScreen")
+                .build();
+
+        notificationService.sendPushNotification(chefNotification);
+
+
+
 
         return modelMapper.map(booking, BookingResponseDto.class);
     }

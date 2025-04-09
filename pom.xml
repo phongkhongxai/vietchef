@@ -122,8 +122,6 @@
 			<artifactId>azure-storage-blob</artifactId>
 			<version>12.22.0</version>
 		</dependency>
-
-
 	</dependencies>
 
 	<build>
