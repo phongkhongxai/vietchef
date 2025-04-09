@@ -85,6 +85,7 @@ public interface AvailabilityFinderService {
             Long menuId,
             List<Long> dishIds,
             int guestCount,
+            int maxDishesPerMeal,
             Integer minDuration);
     
     /**

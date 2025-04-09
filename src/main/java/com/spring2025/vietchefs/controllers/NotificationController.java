@@ -6,9 +6,11 @@ import com.spring2025.vietchefs.models.payload.responseModel.NotificationsRespon
 import com.spring2025.vietchefs.services.UserService;
 import com.spring2025.vietchefs.services.impl.NotificationService;
 import com.spring2025.vietchefs.utils.AppConstants;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.Data;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -23,7 +25,8 @@ public class NotificationController {
     private NotificationService notificationService;
     @Autowired
     private UserService userService;
-
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PostMapping("/send")
     public ResponseEntity<?> sendNotification(@RequestBody NotificationRequest request) {
         notificationService.sendPushNotification(request);

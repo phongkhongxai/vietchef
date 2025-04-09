@@ -95,10 +95,11 @@ public class AvailabilityFinderController {
             @RequestParam(required = false) Long menuId,
             @RequestParam(required = false) List<Long> dishIds,
             @RequestParam int guestCount,
+            @RequestParam(required = false) int maxDishesPerMeal,
             @RequestParam(required = false) Integer minDuration) {
         
         List<AvailableTimeSlotResponse> availableSlots = availabilityFinderService
-                .findAvailableTimeSlotsWithCookingTime(chefId, date, menuId, dishIds, guestCount, minDuration);
+                .findAvailableTimeSlotsWithCookingTime(chefId, date, menuId, dishIds, guestCount,maxDishesPerMeal, minDuration);
         
         return ResponseEntity.ok(availableSlots);
     }
