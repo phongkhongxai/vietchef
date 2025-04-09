@@ -100,6 +100,40 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    public BookingsResponse getBookingsByChefId(Long userId, int pageNo, int pageSize, String sortBy, String sortDir) {
+        Chef chef = chefRepository.findByUserId(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"Chef not found with userid: "+ userId));
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+
+        // create Pageable instance
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+
+        Page<Booking> bookings = bookingRepository.findByChefIdAndIsDeletedFalse(chef.getId(),pageable);
+
+        // get content for page object
+        List<Booking> listOfBookings = bookings.getContent();
+
+        List<BookingResponseDto> content = listOfBookings.stream().map(bt -> {
+            BookingResponseDto dto = modelMapper.map(bt, BookingResponseDto.class);
+
+            // Chỉ set bookingDetails khi bookingType là "single"
+            if (!"single".equalsIgnoreCase(bt.getBookingType())) {
+                dto.setBookingDetails(null);
+            }
+            return dto;
+        }).collect(Collectors.toList());
+        BookingsResponse templatesResponse = new BookingsResponse();
+        templatesResponse.setContent(content);
+        templatesResponse.setPageNo(bookings.getNumber());
+        templatesResponse.setPageSize(bookings.getSize());
+        templatesResponse.setTotalElements(bookings.getTotalElements());
+        templatesResponse.setTotalPages(bookings.getTotalPages());
+        templatesResponse.setLast(bookings.isLast());
+        return templatesResponse;
+    }
+
+    @Override
     public BookingResponseDto getBookingById(Long id) {
         Optional<Booking> booking = bookingRepository.findById(id);
         if (booking.isEmpty()){

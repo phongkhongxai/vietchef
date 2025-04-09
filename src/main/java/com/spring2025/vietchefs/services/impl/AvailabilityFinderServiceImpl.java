@@ -8,6 +8,7 @@ import com.spring2025.vietchefs.models.entity.ChefSchedule;
 import com.spring2025.vietchefs.models.entity.ChefTimeSettings;
 import com.spring2025.vietchefs.models.entity.User;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
+import com.spring2025.vietchefs.models.payload.requestModel.AvailableTimeSlotRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.AvailableTimeSlotResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.DistanceResponse;
 import com.spring2025.vietchefs.repositories.*;
@@ -351,7 +352,134 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         
         return adjustedSlots;
     }
-    
+
+    @Override
+    public List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithLocationConstraints(Long chefId, String customerLocation, int guestCount, int maxDishesPerMeal, List<AvailableTimeSlotRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Requests list cannot be empty");
+        }
+
+        if (customerLocation == null || customerLocation.trim().isEmpty()) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Customer location cannot be empty");
+        }
+
+        Chef chef = chefRepository.findById(chefId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,
+                        "Chef not found with id: " + chefId));
+
+        String chefAddress = chef.getAddress();
+        if (chefAddress == null || chefAddress.trim().isEmpty()) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef address not found");
+        }
+
+        DistanceResponse distanceResponse = distanceService.calculateDistanceAndTime(chefAddress, customerLocation);
+        BigDecimal travelTimeHours = distanceResponse.getDurationHours();
+
+        if (travelTimeHours.compareTo(BigDecimal.ZERO) == 0) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Could not calculate travel time between locations");
+        }
+
+        List<AvailableTimeSlotResponse> allAdjustedSlots = new ArrayList<>();
+
+        for (AvailableTimeSlotRequest request : requests) {
+            LocalDate date = request.getSessionDate();
+            if (date == null || date.isBefore(LocalDate.now())) {
+                continue; // bỏ qua nếu ngày không hợp lệ
+            }
+
+            List<Long> dishIds = request.getDishIds();
+            Long menuId = request.getMenuId();
+
+            BigDecimal cookTimeHours;
+            if (menuId != null) {
+                cookTimeHours = calculateService.calculateTotalCookTimeFromMenu(menuId, dishIds, guestCount);
+            } else if (dishIds != null && !dishIds.isEmpty()) {
+                cookTimeHours = calculateService.calculateTotalCookTime(dishIds, guestCount);
+            } else {
+                cookTimeHours = calculateService.calculateMaxCookTime(chefId, maxDishesPerMeal, guestCount);
+            }
+
+            List<AvailableTimeSlotResponse> availableSlots = findAvailableTimeSlots(chef, date, date, null);
+
+            List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking_ChefAndSessionDateAndIsDeletedFalse(chef, date);
+            List<BookingDetail> activeBookings = bookingDetails.stream()
+                    .filter(detail -> {
+                        Booking booking = detail.getBooking();
+                        return !booking.getIsDeleted() &&
+                                !List.of("CANCELED", "OVERDUE").contains(booking.getStatus()) &&
+                                !detail.getIsDeleted() &&
+                                !List.of("CANCELED", "OVERDUE").contains(detail.getStatus());
+                    })
+                    .sorted(Comparator.comparing(BookingDetail::getStartTime))
+                    .collect(Collectors.toList());
+
+            for (AvailableTimeSlotResponse slot : availableSlots) {
+                boolean isSlotValid = true;
+                LocalTime earliestStartTime = null;
+
+                for (BookingDetail booking : activeBookings) {
+                    LocalTime existingBookingEndTime = booking.getStartTime();
+
+                    if (slot.getStartTime().isAfter(existingBookingEndTime) ||
+                            slot.getStartTime().equals(existingBookingEndTime)) {
+
+                        LocalTime availableAfterExisting = existingBookingEndTime
+                                .plusMinutes(30)
+                                .plusSeconds((int) (travelTimeHours.doubleValue() * 3600))
+                                .plusSeconds((int) (cookTimeHours.doubleValue() * 3600));
+
+                        if (earliestStartTime == null || availableAfterExisting.isAfter(earliestStartTime)) {
+                            earliestStartTime = availableAfterExisting;
+                        }
+                    }
+
+                    if (slot.getStartTime().isBefore(existingBookingEndTime) &&
+                            slot.getEndTime().isAfter(existingBookingEndTime.minusMinutes(30))) {
+                        isSlotValid = false;
+                        break;
+                    }
+                }
+
+                if (isSlotValid && earliestStartTime != null) {
+                    if (earliestStartTime.isBefore(slot.getEndTime())) {
+                        AvailableTimeSlotResponse adjustedSlot = new AvailableTimeSlotResponse();
+                        adjustedSlot.setChefId(slot.getChefId());
+                        adjustedSlot.setChefName(slot.getChefName());
+                        adjustedSlot.setDate(slot.getDate());
+                        adjustedSlot.setStartTime(earliestStartTime);
+                        adjustedSlot.setEndTime(slot.getEndTime());
+                        adjustedSlot.setDurationMinutes((int) Duration.between(earliestStartTime, slot.getEndTime()).toMinutes());
+                        adjustedSlot.setNote("Adjusted for 30min break, " +
+                                travelTimeHours.setScale(2) + " hours travel time and " +
+                                cookTimeHours.setScale(2) + " hours cooking time");
+
+                        allAdjustedSlots.add(adjustedSlot);
+                    }
+                } else if (isSlotValid && earliestStartTime == null) {
+                    LocalTime adjustedStartTime = slot.getStartTime()
+                            .plusSeconds((int) (cookTimeHours.doubleValue() * 3600));
+
+                    if (adjustedStartTime.isBefore(slot.getEndTime())) {
+                        AvailableTimeSlotResponse adjustedSlot = new AvailableTimeSlotResponse();
+                        adjustedSlot.setChefId(slot.getChefId());
+                        adjustedSlot.setChefName(slot.getChefName());
+                        adjustedSlot.setDate(slot.getDate());
+                        adjustedSlot.setStartTime(adjustedStartTime);
+                        adjustedSlot.setEndTime(slot.getEndTime());
+                        adjustedSlot.setDurationMinutes((int) Duration.between(adjustedStartTime, slot.getEndTime()).toMinutes());
+                        adjustedSlot.setNote("Adjusted for " + cookTimeHours.setScale(2) + " hours cooking time");
+
+                        allAdjustedSlots.add(adjustedSlot);
+                    }
+                }
+            }
+        }
+
+        Collections.sort(allAdjustedSlots, Comparator.comparing(AvailableTimeSlotResponse::getStartTime));
+        return allAdjustedSlots;
+
+    }
+
     /**
      * Tìm tất cả các khung giờ trống cho một chef trong khoảng ngày
      */
