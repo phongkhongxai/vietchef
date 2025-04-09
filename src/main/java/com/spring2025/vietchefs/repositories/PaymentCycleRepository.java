@@ -15,4 +15,6 @@ public interface PaymentCycleRepository extends JpaRepository<PaymentCycle, Long
     @Query("SELECT p FROM PaymentCycle p WHERE p.booking.id = :bookingId ORDER BY p.cycleOrder")
     List<PaymentCycle> findByBookingId(@Param("bookingId") Long bookingId);
     List<PaymentCycle>findByBookingOrderByCycleOrderAsc(Booking booking);
+    PaymentCycle findByBookingAndCycleOrder(Booking booking, int cycleOrder);
+
 }

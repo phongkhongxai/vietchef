@@ -436,35 +436,48 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Booking not found with ID: " + bookingId));
         Chef chef = chefRepository.findByUserId(userId)
-                        .orElseThrow(() ->new VchefApiException(HttpStatus.NOT_FOUND,"Chef not found with userId"));
-        if(!chef.getId().equals(booking.getChef().getId())){
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found with userId"));
+        if (!chef.getId().equals(booking.getChef().getId())) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef not in booking.");
         }
 
         // 3. Kiểm tra trạng thái và loại Booking trước khi xác nhận/từ chối
         boolean isSinglePaid = "PAID".equals(booking.getStatus()) && "SINGLE".equals(booking.getBookingType());
         boolean isLongTermDeposited = "DEPOSITED".equals(booking.getStatus()) && "LONG_TERM".equals(booking.getBookingType());
-
+        boolean isPaidFirst = "PAID_FIRST_CYCLE".equals(booking.getStatus()) && "LONG_TERM".equalsIgnoreCase(booking.getBookingType());
         if (isConfirmed) {
             // Trường hợp xác nhận booking
-            if (isSinglePaid || isLongTermDeposited) {
+            if (isSinglePaid || isLongTermDeposited || isPaidFirst) {
                 if (isSinglePaid) {
                     List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking(booking);
                     for (BookingDetail detail : bookingDetails) {
                         detail.setStatus("LOCKED");
                         bookingDetailRepository.save(detail);
                     }
+                    booking.setStatus("CONFIRMED");
+
                 }
                 if (isLongTermDeposited) {
                     List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking(booking);
                     for (BookingDetail detail : bookingDetails) {
-                        if(detail.getIsUpdated()){
+                        if (detail.getIsUpdated()) {
                             detail.setStatus("LOCKED");
                             bookingDetailRepository.save(detail);
                         }
                     }
+                    booking.setStatus("CONFIRMED");
+
                 }
-                booking.setStatus("CONFIRMED");
+                if (isPaidFirst){
+                    List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking(booking);
+                    for (BookingDetail detail : bookingDetails) {
+                        if (detail.getIsUpdated()) {
+                            detail.setStatus("LOCKED");
+                            bookingDetailRepository.save(detail);
+                        }
+                    }
+                    booking.setStatus("CONFIRMED_PARTIALLY_PAID");
+                }
                 bookingRepository.save(booking);
                 NotificationRequest confirmNotification = NotificationRequest.builder()
                         .userId(booking.getCustomer().getId())
@@ -478,12 +491,13 @@ public class BookingServiceImpl implements BookingService {
                 notificationService.sendPushNotification(confirmNotification);
 
                 return modelMapper.map(booking, BookingResponseDto.class);
-            } else {
+            }
+            else {
                 throw new VchefApiException(HttpStatus.BAD_REQUEST, "Booking does not meet the conditions for confirmation.");
             }
         } else {
             // Trường hợp từ chối booking và hoàn tiền lại
-            if (isSinglePaid || isLongTermDeposited) {
+            if (isSinglePaid || isLongTermDeposited || isPaidFirst) {
                 List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking(booking);
                 for (BookingDetail detail : bookingDetails) {
                     detail.setStatus("CANCELLED");
@@ -492,9 +506,11 @@ public class BookingServiceImpl implements BookingService {
                 // 4. Lấy ví của khách hàng để hoàn tiền
                 Wallet wallet = walletRepository.findByUserId(booking.getCustomer().getId())
                         .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for customer."));
-
                 BigDecimal refundAmount = isSinglePaid ? booking.getTotalPrice() : booking.getDepositPaid();
-
+                if(isPaidFirst){
+                    PaymentCycle paymentCycle = paymentCycleRepository.findByBookingAndCycleOrder(booking,1);
+                    refundAmount = paymentCycle.getAmountDue();
+                }
                 // 5. Hoàn tiền vào ví khách hàng
                 wallet.setBalance(wallet.getBalance().add(refundAmount));
                 walletRepository.save(wallet);
@@ -527,11 +543,11 @@ public class BookingServiceImpl implements BookingService {
 
                 notificationService.sendPushNotification(rejectNotification);
 
-
                 return modelMapper.map(booking, BookingResponseDto.class);
             } else {
                 throw new VchefApiException(HttpStatus.BAD_REQUEST, "Booking does not meet the conditions for rejection.");
             }
+
         }
     }
 
@@ -587,8 +603,6 @@ public class BookingServiceImpl implements BookingService {
                 .build();
         notificationService.sendPushNotification(chefNotification);
 
-
-        // Trả về Booking đã thanh toán
         return modelMapper.map(booking, BookingResponseDto.class);
     }
 
@@ -647,7 +661,7 @@ public class BookingServiceImpl implements BookingService {
 
         // 3. Lấy Booking từ PaymentCycle
         Booking booking = paymentCycle.getBooking();
-        if (!"CONFIRMED".equalsIgnoreCase(booking.getStatus()) && !"PARTIALLY_PAID".equalsIgnoreCase(booking.getStatus())) {
+        if (!"CONFIRMED".equalsIgnoreCase(booking.getStatus()) && !"PARTIALLY_PAID".equalsIgnoreCase(booking.getStatus()) && !"PENDING_FIRST_CYCLE".equalsIgnoreCase(booking.getStatus())) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "This PaymentCycle cannot be paid at this time.");
         }
         List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking(booking);
@@ -696,20 +710,21 @@ public class BookingServiceImpl implements BookingService {
         }
         bookingDetailRepository.saveAll(bookingDetails);
 
-
         // 9. Cập nhật trạng thái Booking dựa vào tình trạng PaymentCycle
         List<PaymentCycle> allCycles = paymentCycleRepository.findByBookingId(booking.getId());
-
-        long paidCount = allCycles.stream().filter(pc -> "PAID".equals(pc.getStatus())).count();
-        if (paidCount == 0) {
-            booking.setStatus("CONFIRMED");
-        } else if (paidCount < allCycles.size()) {
-            booking.setStatus("PARTIALLY_PAID");
-        } else {
-            booking.setStatus("CONFIRMED_PAID");
+        if("PENDING_FIRST_CYCLE".equalsIgnoreCase(booking.getStatus())){
+            booking.setStatus("PAID_FIRST_CYCLE");
+        }else{
+            long paidCount = allCycles.stream().filter(pc -> "PAID".equals(pc.getStatus())).count();
+            if (paidCount == 0) {
+                booking.setStatus("CONFIRMED");
+            } else if (paidCount < allCycles.size()) {
+                booking.setStatus("CONFIRMED_PARTIALLY_PAID");
+            } else {
+                booking.setStatus("CONFIRMED_PAID");
+            }
         }
-        bookingRepository.save(booking);
-
+        booking = bookingRepository.save(booking);
         // 10. Ghi lại giao dịch vào bảng Transaction
         CustomerTransaction transaction = CustomerTransaction.builder()
                 .wallet(wallet)
@@ -721,18 +736,28 @@ public class BookingServiceImpl implements BookingService {
                 .description("Payment for PaymentCycle #" + paymentCycle.getId())
                 .build();
         customerTransactionRepository.save(transaction);
-        NotificationRequest chefNotification = NotificationRequest.builder()
-                .userId(booking.getChef().getUser().getId())
-                .title("Customer Paid for Upcoming Sessions")
-                .body("Customer has paid for Payment Cycle #" + paymentCycle.getCycleOrder() +
-                        ". Please check your schedule.")
-                .bookingId(booking.getId())
-                .screen("ChefBookingManagementScreen")
-                .build();
+        if(booking.getStatus().equalsIgnoreCase("PAID_FIRST_CYCLE")){
+            NotificationRequest chefNotification = NotificationRequest.builder()
+                    .userId(booking.getChef().getUser().getId())
+                    .title("New Booking Requires Confirmation")
+                    .body("A customer has completed a payment for Booking #" + booking.getBookingType() +
+                            ". Please confirm before the scheduled session.")
+                    .bookingId(booking.getId())
+                    .screen("ChefBookingManagementScreen")
+                    .build();
+            notificationService.sendPushNotification(chefNotification);
+        }else{
+            NotificationRequest chefNotification = NotificationRequest.builder()
+                    .userId(booking.getChef().getUser().getId())
+                    .title("Customer Paid for Upcoming Sessions")
+                    .body("Customer has paid for Payment Cycle #" + paymentCycle.getCycleOrder() +
+                            ". Please check your schedule.")
+                    .bookingId(booking.getId())
+                    .screen("ChefBookingManagementScreen")
+                    .build();
 
-        notificationService.sendPushNotification(chefNotification);
-
-
+            notificationService.sendPushNotification(chefNotification);
+        }
         // 11. Trả về PaymentCycleResponse sau khi thanh toán
         return PaymentCycleResponse.builder()
                 .id(paymentCycle.getId())
@@ -768,7 +793,6 @@ public class BookingServiceImpl implements BookingService {
 
         LocalDate now = LocalDate.now();
         LocalDate firstSession = details.get(0).getSessionDate();
-
         if (!firstSession.isAfter(now)) {
             return ApiResponse.<BookingResponseDto>builder()
                     .success(false)
@@ -778,6 +802,7 @@ public class BookingServiceImpl implements BookingService {
 
         if (!firstSession.isAfter(now.plusDays(2))) {
             booking.setStatus("PENDING_FIRST_CYCLE");
+            booking.setDepositPaid(BigDecimal.valueOf(0));
             bookingRepository.save(booking);
             return ApiResponse.<BookingResponseDto>builder()
                     .success(false)
@@ -785,7 +810,6 @@ public class BookingServiceImpl implements BookingService {
                     .data(modelMapper.map(booking, BookingResponseDto.class))
                     .build();
         }
-
         // Tiến hành đặt cọc như bình thường
         Wallet wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for customer."));

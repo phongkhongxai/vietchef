@@ -164,17 +164,35 @@ public class CalculateService {
         // Lấy 2 món group=2, lâu nhất
         List<Dish> g2Dishes = notInMenu.stream()
                 .filter(d -> d.getEstimatedCookGroup() == 2)
-                .sorted((a, b) -> b.getCookTime().compareTo(a.getCookTime()))
+                .sorted(Comparator.comparing(Dish::getCookTime).reversed())
                 .limit(2)
                 .toList();
 
+        // --- Tính số món đã chọn ---
+        int currentDishCount = menuDishes.size();
+        if (g1Dish.isPresent()) currentDishCount += 1;
+        currentDishCount += g2Dishes.size();
+
+        // Nếu chưa đủ, chọn thêm các món group=3
+        int needed = maxNumberOfDishes - currentDishCount;
+        List<Dish> group3Dishes = (needed > 0) ?
+                notInMenu.stream()
+                        .filter(d -> d.getEstimatedCookGroup() == 3)
+                        .sorted(Comparator.comparing(Dish::getCookTime).reversed())
+                        .limit(needed)
+                        .toList()
+                : List.of();
+
+
         // --- Tính thời gian nấu ---
         BigDecimal totalTime = BigDecimal.ZERO;
+
         if (maxCookTimeMenu.isPresent()) {
             BigDecimal menuCookTimeInMinutes = maxCookTimeMenu.get().getTotalCookTime()
                     .multiply(BigDecimal.valueOf(60));
             totalTime = totalTime.add(menuCookTimeInMinutes);
         }
+
         if (g1Dish.isPresent()) {
             totalTime = totalTime.add(g1Dish.get().getCookTime());
         }
@@ -184,6 +202,13 @@ public class CalculateService {
                     .map(Dish::getCookTime)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             totalTime = totalTime.add(g2Total.divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP));
+        }
+
+        if (!group3Dishes.isEmpty()) {
+            BigDecimal g3Total = group3Dishes.stream()
+                    .map(Dish::getCookTime)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            totalTime = totalTime.add(g3Total.divide(BigDecimal.valueOf(3), 2, RoundingMode.HALF_UP));
         }
 
         // --- Nhân hệ số theo số khách ---
