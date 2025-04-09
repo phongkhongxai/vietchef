@@ -1,6 +1,7 @@
 package com.spring2025.vietchefs.services;
 
 import com.spring2025.vietchefs.models.entity.Chef;
+import com.spring2025.vietchefs.models.payload.requestModel.AvailableTimeSlotRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.AvailableTimeSlotResponse;
 
 import java.time.LocalDate;
@@ -18,40 +19,34 @@ public interface AvailabilityFinderService {
      * @param chefId ID của chef
      * @param startDate Ngày bắt đầu tìm kiếm
      * @param endDate Ngày kết thúc tìm kiếm
-     * @param minDuration Thời lượng tối thiểu cần thiết (tính bằng phút)
      * @return Danh sách các khung giờ trống
      */
     List<AvailableTimeSlotResponse> findAvailableTimeSlotsForChef(
             Long chefId, 
             LocalDate startDate, 
-            LocalDate endDate, 
-            Integer minDuration);
+            LocalDate endDate);
     
     /**
      * Tìm các khung giờ trống cho chef hiện tại trong khoảng ngày
      * 
      * @param startDate Ngày bắt đầu tìm kiếm
      * @param endDate Ngày kết thúc tìm kiếm
-     * @param minDuration Thời lượng tối thiểu cần thiết (tính bằng phút)
      * @return Danh sách các khung giờ trống
      */
     List<AvailableTimeSlotResponse> findAvailableTimeSlotsForCurrentChef(
             LocalDate startDate, 
-            LocalDate endDate, 
-            Integer minDuration);
+            LocalDate endDate);
     
     /**
      * Tìm các khung giờ trống cho một chef trong một ngày cụ thể
      * 
      * @param chefId ID của chef
      * @param date Ngày cần tìm khung giờ trống
-     * @param minDuration Thời lượng tối thiểu cần thiết (tính bằng phút)
      * @return Danh sách các khung giờ trống
      */
     List<AvailableTimeSlotResponse> findAvailableTimeSlotsForChefByDate(
             Long chefId, 
-            LocalDate date, 
-            Integer minDuration);
+            LocalDate date);
     
     /**
      * Kiểm tra xem một khung giờ cụ thể có khả dụng cho chef hay không
@@ -67,4 +62,67 @@ public interface AvailabilityFinderService {
             LocalDate date, 
             LocalTime startTime, 
             LocalTime endTime);
+    
+    /**
+     * Tìm các khung giờ trống cho chef với tính toán thời gian nấu
+     * 
+     * @param chefId ID của chef
+     * @param date Ngày cần tìm khung giờ trống
+     * @param menuId ID của menu (có thể null)
+     * @param dishIds Danh sách ID của các món ăn
+     * @param guestCount Số lượng khách
+     * @param maxDishesPerMeal Số lượng món ăn tối đa trong bữa ăn
+     * @return Danh sách các khung giờ trống đã điều chỉnh theo thời gian nấu
+     */
+    List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithCookingTime(
+            Long chefId,
+            LocalDate date,
+            Long menuId,
+            List<Long> dishIds,
+            int guestCount,
+            int maxDishesPerMeal);
+    
+    /**
+     * Tìm các khung giờ trống cho chef hiện tại với tính toán thời gian nấu
+     * 
+     * @param date Ngày cần tìm khung giờ trống
+     * @param menuId ID của menu (có thể null)
+     * @param dishIds Danh sách ID của các món ăn
+     * @param guestCount Số lượng khách
+     * @return Danh sách các khung giờ trống đã điều chỉnh theo thời gian nấu
+     */
+    List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithCookingTimeForCurrentChef(
+            LocalDate date,
+            Long menuId,
+            List<Long> dishIds,
+            int guestCount);
+    
+    /**
+     * Tìm các khung giờ trống cho chef với tính toán thời gian nấu, thời gian di chuyển và thời gian nghỉ giữa các booking
+     * 
+     * @param chefId ID của chef
+     * @param date Ngày cần tìm khung giờ trống
+     * @param customerLocation Địa chỉ của khách hàng
+     * @param menuId ID của menu (có thể null)
+     * @param dishIds Danh sách ID của các món ăn (có thể null nếu menuId không null)
+     * @param guestCount Số lượng khách
+     * @param maxDishesPerMeal Số lượng món ăn tối đa trong bữa ăn (dùng khi không có menuId và dishIds)
+     * @return Danh sách các khung giờ trống đã điều chỉnh theo thời gian nấu, thời gian di chuyển và thời gian nghỉ
+     */
+    List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithLocationConstraints(
+            Long chefId,
+            LocalDate date,
+            String customerLocation,
+            Long menuId,
+            List<Long> dishIds,
+            int guestCount,
+            int maxDishesPerMeal);
+    List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithLocationConstraints(
+            Long chefId,
+            String customerLocation,
+            int guestCount,
+            int maxDishesPerMeal,
+            List<AvailableTimeSlotRequest> requests);
+
+
 } 

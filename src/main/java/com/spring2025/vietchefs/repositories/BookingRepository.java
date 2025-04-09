@@ -12,5 +12,6 @@ import org.springframework.stereotype.Repository;
 @EnableJpaRepositories
 public interface BookingRepository extends JpaRepository<Booking, Long> {
     Page<Booking> findByCustomerIdAndIsDeletedFalse(Long customerId, Pageable pageable);
+    Page<Booking> findByChefIdAndIsDeletedFalse(Long chefId, Pageable pageable);
 
 }

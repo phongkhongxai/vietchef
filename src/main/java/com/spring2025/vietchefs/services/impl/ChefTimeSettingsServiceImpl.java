@@ -87,12 +87,12 @@ public class ChefTimeSettingsServiceImpl implements ChefTimeSettingsService {
         ChefTimeSettings timeSettings = getOrCreateTimeSettings(chef);
         
         // Đặt lại các giá trị mặc định
-        timeSettings.setStandardPrepTime(30);
-        timeSettings.setStandardCleanupTime(30);
-        timeSettings.setTravelBufferPercentage(30);
-        timeSettings.setCookingEfficiencyFactor(new BigDecimal("0.80"));
+        timeSettings.setStandardPrepTime(0);
+        timeSettings.setStandardCleanupTime(0);
+        timeSettings.setTravelBufferPercentage(0);
+        timeSettings.setCookingEfficiencyFactor(new BigDecimal("0.0"));
         timeSettings.setMinBookingNoticeHours(24);
-        timeSettings.setMaxBookingDaysAhead(60);
+        timeSettings.setMaxBookingDaysAhead(7);
         timeSettings.setMaxDishesPerSession(5);
         timeSettings.setMaxGuestsPerSession(8);
         timeSettings.setServiceRadiusKm(15);

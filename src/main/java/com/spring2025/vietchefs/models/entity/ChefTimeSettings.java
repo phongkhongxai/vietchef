@@ -19,22 +19,22 @@ public class ChefTimeSettings {
     private Long settingId;
     
     @Column(name = "standard_prep_time")
-    private Integer standardPrepTime = 30;
+    private Integer standardPrepTime = 0;
     
     @Column(name = "standard_cleanup_time")
-    private Integer standardCleanupTime = 30;
+    private Integer standardCleanupTime = 0;
     
     @Column(name = "travel_buffer_percentage")
-    private Integer travelBufferPercentage = 30;
+    private Integer travelBufferPercentage = 0;
     
     @Column(name = "cooking_efficiency_factor")
-    private BigDecimal cookingEfficiencyFactor = new BigDecimal("0.80");
+    private BigDecimal cookingEfficiencyFactor = new BigDecimal("0.0");
     
     @Column(name = "min_booking_notice_hours")
     private Integer minBookingNoticeHours = 24;
     
     @Column(name = "max_booking_days_ahead")
-    private Integer maxBookingDaysAhead = 60;
+    private Integer maxBookingDaysAhead = 7;
     
     @Column(name = "max_dishes_per_session")
     private Integer maxDishesPerSession = 5;

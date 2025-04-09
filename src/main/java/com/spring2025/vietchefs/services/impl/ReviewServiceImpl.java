@@ -2,6 +2,7 @@ package com.spring2025.vietchefs.services.impl;
 
 import com.spring2025.vietchefs.models.entity.*;
 import com.spring2025.vietchefs.models.exception.ResourceNotFoundException;
+import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.requestModel.ReviewCreateRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ReviewUpdateRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.ReviewCriteriaResponse;
@@ -14,12 +15,16 @@ import com.spring2025.vietchefs.services.ReviewService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +41,8 @@ public class ReviewServiceImpl implements ReviewService {
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final ChefRepository chefRepository;
+    private final ImageRepository imageRepository;
+    private final ImageService imageService;
 
     @Autowired
     public ReviewServiceImpl(
@@ -45,7 +52,9 @@ public class ReviewServiceImpl implements ReviewService {
             ReviewReactionService reviewReactionService,
             BookingRepository bookingRepository,
             UserRepository userRepository,
-            ChefRepository chefRepository) {
+            ChefRepository chefRepository,
+            ImageRepository imageRepository,
+            ImageService imageService) {
         this.reviewRepository = reviewRepository;
         this.reviewDetailRepository = reviewDetailRepository;
         this.reviewCriteriaService = reviewCriteriaService;
@@ -53,6 +62,8 @@ public class ReviewServiceImpl implements ReviewService {
         this.bookingRepository = bookingRepository;
         this.userRepository = userRepository;
         this.chefRepository = chefRepository;
+        this.imageRepository = imageRepository;
+        this.imageService = imageService;
     }
 
     @Override
@@ -125,7 +136,6 @@ public class ReviewServiceImpl implements ReviewService {
         review.setBooking(booking);
         review.setDescription(request.getDescription());
         review.setOverallExperience(request.getOverallExperience());
-        review.setPhotos(request.getPhotos());
         review.setCreateAt(LocalDateTime.now());
         review.setIsDeleted(false);
         review.setIsVerified(false);
@@ -139,8 +149,28 @@ public class ReviewServiceImpl implements ReviewService {
         BigDecimal calculatedRating = calculateWeightedRating(request.getCriteriaRatings());
         review.setRating(calculatedRating);
         
-        // Save the review
+        // Save the review first to get ID for image uploads
         Review savedReview = reviewRepository.save(review);
+        
+        // Handle main image upload
+        try {
+            if (request.getMainImage() != null && !request.getMainImage().isEmpty()) {
+                String imageUrl = imageService.uploadImage(request.getMainImage(), savedReview.getId(), "REVIEW");
+                savedReview.setImageUrl(imageUrl);
+                reviewRepository.save(savedReview);
+            }
+            
+            // Handle additional images
+            if (request.getAdditionalImages() != null && !request.getAdditionalImages().isEmpty()) {
+                for (MultipartFile imageFile : request.getAdditionalImages()) {
+                    if (imageFile != null && !imageFile.isEmpty()) {
+                        imageService.uploadImage(imageFile, savedReview.getId(), "REVIEW");
+                    }
+                }
+            }
+        } catch (IOException e) {
+            throw new VchefApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to upload review images: " + e.getMessage());
+        }
         
         // Create review details for each criterion
         for (Map.Entry<Long, BigDecimal> entry : request.getCriteriaRatings().entrySet()) {
@@ -176,7 +206,40 @@ public class ReviewServiceImpl implements ReviewService {
         // Update basic info
         existingReview.setDescription(request.getDescription());
         existingReview.setOverallExperience(request.getOverallExperience());
-        existingReview.setPhotos(request.getPhotos());
+        
+        // Handle main image upload
+        try {
+            if (request.getMainImage() != null && !request.getMainImage().isEmpty()) {
+                String imageUrl = imageService.uploadImage(request.getMainImage(), existingReview.getId(), "REVIEW");
+                existingReview.setImageUrl(imageUrl);
+            }
+            
+            // Handle additional images
+            if (request.getAdditionalImages() != null && !request.getAdditionalImages().isEmpty()) {
+                for (MultipartFile imageFile : request.getAdditionalImages()) {
+                    if (imageFile != null && !imageFile.isEmpty()) {
+                        imageService.uploadImage(imageFile, existingReview.getId(), "REVIEW");
+                    }
+                }
+            }
+            
+            // Delete images if requested
+            if (request.getImagesToDelete() != null && !request.getImagesToDelete().isEmpty()) {
+                for (Long imageId : request.getImagesToDelete()) {
+                    Image image = imageRepository.findById(imageId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Image not found with id: " + imageId));
+                    
+                    // Verify that this image belongs to the review
+                    if ("REVIEW".equals(image.getEntityType()) && existingReview.getId().equals(image.getEntityId())) {
+                        imageRepository.delete(image);
+                    } else {
+                        throw new IllegalArgumentException("Cannot delete image that does not belong to this review");
+                    }
+                }
+            }
+        } catch (IOException e) {
+            throw new VchefApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to upload review images: " + e.getMessage());
+        }
         
         // Calculate and update weighted rating
         BigDecimal calculatedRating = calculateWeightedRating(request.getCriteriaRatings());
@@ -319,24 +382,34 @@ public class ReviewServiceImpl implements ReviewService {
     }
     
     private ReviewResponse mapToResponse(Review review) {
-        Map<String, Long> reactionCounts = reviewReactionService.getReactionCountsByReview(review.getId());
+        ReviewResponse response = new ReviewResponse();
+        response.setId(review.getId());
+        response.setUserId(review.getUser().getId());
+        response.setUserName(review.getUser().getFullName());
+        response.setChefId(review.getChef().getId());
+        response.setBookingId(review.getBooking() != null ? review.getBooking().getId() : null);
+        response.setRating(review.getRating());
+        response.setDescription(review.getDescription());
+        response.setOverallExperience(review.getOverallExperience());
+        response.setMainImageUrl(review.getImageUrl());
         
-        return new ReviewResponse(
-                review.getId(),
-                review.getUser().getId(),
-                review.getUser().getFullName(),
-                review.getChef().getId(),
-                review.getBooking() != null ? review.getBooking().getId() : null,
-                review.getRating(),
-                review.getDescription(),
-                review.getOverallExperience(),
-                review.getPhotos(),
-                review.getIsVerified(),
-                review.getResponse(),
-                review.getChefResponseAt(),
-                review.getCreateAt(),
-                reactionCounts
-        );
+        // Get all additional images for this review
+        List<Image> reviewImages = imageRepository.findByEntityTypeAndEntityId("REVIEW", review.getId());
+        List<String> additionalImageUrls = reviewImages.stream()
+                .map(Image::getImageUrl)
+                .collect(Collectors.toList());
+        response.setAdditionalImageUrls(additionalImageUrls);
+        
+        response.setVerified(review.getIsVerified());
+        response.setResponse(review.getResponse());
+        response.setChefResponseAt(review.getChefResponseAt());
+        response.setCreateAt(review.getCreateAt());
+        
+        // Add reaction counts
+        Map<String, Long> reactionCounts = reviewReactionService.getReactionCountsByReview(review.getId());
+        response.setReactionCounts(reactionCounts);
+        
+        return response;
     }
     
     private ReviewCriteria mapToCriteriaEntity(ReviewCriteriaResponse response) {
