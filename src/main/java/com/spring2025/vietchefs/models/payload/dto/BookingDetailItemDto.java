@@ -16,6 +16,6 @@ import lombok.Setter;
 public class BookingDetailItemDto {
     private Long id;
     private Long bookingDetailId;
-    private Long dishId;
+    private DishDto dish;
     private String notes;
 }
