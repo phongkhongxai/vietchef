@@ -6,6 +6,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -20,7 +21,8 @@ public class ReviewResponse {
     private BigDecimal rating;
     private String description;
     private String overallExperience;
-    private String photos;
+    private String mainImageUrl;
+    private List<String> additionalImageUrls;
     private Boolean verified;
     private String response;
     private LocalDateTime chefResponseAt;

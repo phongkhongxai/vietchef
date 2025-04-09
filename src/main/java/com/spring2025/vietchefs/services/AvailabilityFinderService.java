@@ -67,4 +67,40 @@ public interface AvailabilityFinderService {
             LocalDate date, 
             LocalTime startTime, 
             LocalTime endTime);
+    
+    /**
+     * Tìm các khung giờ trống cho chef với tính toán thời gian nấu
+     * 
+     * @param chefId ID của chef
+     * @param date Ngày cần tìm khung giờ trống
+     * @param menuId ID của menu (có thể null)
+     * @param dishIds Danh sách ID của các món ăn
+     * @param guestCount Số lượng khách
+     * @param minDuration Thời lượng tối thiểu cần thiết (tính bằng phút)
+     * @return Danh sách các khung giờ trống đã điều chỉnh theo thời gian nấu
+     */
+    List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithCookingTime(
+            Long chefId,
+            LocalDate date,
+            Long menuId,
+            List<Long> dishIds,
+            int guestCount,
+            Integer minDuration);
+    
+    /**
+     * Tìm các khung giờ trống cho chef hiện tại với tính toán thời gian nấu
+     * 
+     * @param date Ngày cần tìm khung giờ trống
+     * @param menuId ID của menu (có thể null)
+     * @param dishIds Danh sách ID của các món ăn
+     * @param guestCount Số lượng khách
+     * @param minDuration Thời lượng tối thiểu cần thiết (tính bằng phút)
+     * @return Danh sách các khung giờ trống đã điều chỉnh theo thời gian nấu
+     */
+    List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithCookingTimeForCurrentChef(
+            LocalDate date,
+            Long menuId,
+            List<Long> dishIds,
+            int guestCount,
+            Integer minDuration);
 } 

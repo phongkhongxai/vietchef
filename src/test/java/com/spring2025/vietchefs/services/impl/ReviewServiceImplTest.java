@@ -18,7 +18,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -51,6 +54,12 @@ public class ReviewServiceImplTest {
 
     @Mock
     private BookingRepository bookingRepository;
+    
+    @Mock
+    private ImageRepository imageRepository;
+    
+    @Mock
+    private ImageService imageService;
 
     @InjectMocks
     private ReviewServiceImpl reviewService;
@@ -65,6 +74,11 @@ public class ReviewServiceImplTest {
     private Map<Long, BigDecimal> criteriaRatings;
     private Map<Long, String> criteriaComments;
     private Map<String, Long> reactionCounts;
+    private MockMultipartFile testMainImage;
+    private MockMultipartFile testAdditionalImage;
+    private List<MultipartFile> additionalImages;
+    private Image testImage;
+    private List<Image> testImages;
 
     @BeforeEach
     void setUp() {
@@ -95,7 +109,7 @@ public class ReviewServiceImplTest {
         testReview.setRating(new BigDecimal("4.5"));
         testReview.setDescription("Test review");
         testReview.setOverallExperience("Great experience");
-        testReview.setPhotos("[\"photo1.jpg\", \"photo2.jpg\"]");
+        testReview.setImageUrl("http://example.com/images/main-review-image.jpg");
         testReview.setIsVerified(true);
         testReview.setCreateAt(LocalDateTime.now());
         testReview.setIsDeleted(false);
@@ -116,20 +130,51 @@ public class ReviewServiceImplTest {
 
         criteriaComments = new HashMap<>();
         criteriaComments.put(1L, "Excellent taste");
+        
+        // Set up mock multipart files
+        testMainImage = new MockMultipartFile(
+                "mainImage",
+                "main-image.jpg",
+                "image/jpeg",
+                "test image content".getBytes()
+        );
+        
+        testAdditionalImage = new MockMultipartFile(
+                "additionalImage",
+                "additional-image.jpg",
+                "image/jpeg",
+                "test additional image content".getBytes()
+        );
+        
+        additionalImages = new ArrayList<>();
+        additionalImages.add(testAdditionalImage);
+        
+        // Set up mock images
+        testImage = new Image();
+        testImage.setId(1L);
+        testImage.setImageUrl("http://example.com/images/additional-image.jpg");
+        testImage.setEntityType("REVIEW");
+        testImage.setEntityId(5L);
+        
+        testImages = new ArrayList<>();
+        testImages.add(testImage);
 
         createRequest = new ReviewCreateRequest();
         createRequest.setChefId(testChef.getId());
         createRequest.setBookingId(testBooking.getId());
         createRequest.setDescription("Test review");
         createRequest.setOverallExperience("Great experience");
-        createRequest.setPhotos("[\"photo1.jpg\", \"photo2.jpg\"]");
+        createRequest.setMainImage(testMainImage);
+        createRequest.setAdditionalImages(additionalImages);
         createRequest.setCriteriaRatings(criteriaRatings);
         createRequest.setCriteriaComments(criteriaComments);
 
         updateRequest = new ReviewUpdateRequest();
         updateRequest.setDescription("Updated review");
         updateRequest.setOverallExperience("Updated experience");
-        updateRequest.setPhotos("[\"photo3.jpg\"]");
+        updateRequest.setMainImage(testMainImage);
+        updateRequest.setAdditionalImages(additionalImages);
+        updateRequest.setImagesToDelete(Collections.singletonList(1L));
         updateRequest.setCriteriaRatings(criteriaRatings);
         updateRequest.setCriteriaComments(criteriaComments);
 
@@ -143,6 +188,7 @@ public class ReviewServiceImplTest {
     void getReviewById_ShouldReturnReview_WhenReviewExists() {
         // Arrange
         when(reviewRepository.findById(testReview.getId())).thenReturn(Optional.of(testReview));
+        when(imageRepository.findByEntityTypeAndEntityId("REVIEW", testReview.getId())).thenReturn(testImages);
         when(reviewReactionService.getReactionCountsByReview(testReview.getId())).thenReturn(reactionCounts);
 
         // Act
@@ -153,7 +199,9 @@ public class ReviewServiceImplTest {
         assertEquals(testReview.getId(), result.getId());
         assertEquals(testReview.getDescription(), result.getDescription());
         assertEquals(testReview.getOverallExperience(), result.getOverallExperience());
-        assertEquals(testReview.getPhotos(), result.getPhotos());
+        assertEquals(testReview.getImageUrl(), result.getMainImageUrl());
+        assertNotNull(result.getAdditionalImageUrls());
+        assertEquals(1, result.getAdditionalImageUrls().size());
         assertEquals(testReview.getIsVerified(), result.getVerified());
         assertEquals(reactionCounts, result.getReactionCounts());
     }
@@ -170,13 +218,16 @@ public class ReviewServiceImplTest {
     }
 
     @Test
-    void createReview_ShouldReturnCreatedReview() {
+    void createReview_ShouldReturnCreatedReview() throws IOException {
         // Arrange
         when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
         when(chefRepository.findById(testChef.getId())).thenReturn(Optional.of(testChef));
         when(bookingRepository.findById(testBooking.getId())).thenReturn(Optional.of(testBooking));
         when(reviewCriteriaService.getCriteriaById(1L)).thenReturn(testCriteria);
         when(reviewRepository.save(any(Review.class))).thenReturn(testReview);
+        when(imageService.uploadImage(any(MultipartFile.class), anyLong(), eq("REVIEW")))
+                .thenReturn("http://example.com/images/test-image.jpg");
+        when(imageRepository.findByEntityTypeAndEntityId("REVIEW", testReview.getId())).thenReturn(testImages);
         when(reviewReactionService.getReactionCountsByReview(anyLong())).thenReturn(reactionCounts);
 
         // Act
@@ -185,16 +236,21 @@ public class ReviewServiceImplTest {
         // Assert
         assertNotNull(result);
         assertEquals(testReview.getId(), result.getId());
-        verify(reviewRepository).save(any(Review.class));
+        verify(reviewRepository, times(2)).save(any(Review.class)); // Initial save and after image upload
+        verify(imageService, times(2)).uploadImage(any(MultipartFile.class), anyLong(), eq("REVIEW"));
         verify(reviewDetailRepository, atLeastOnce()).save(any(ReviewDetail.class));
     }
 
     @Test
-    void updateReview_ShouldReturnUpdatedReview() {
+    void updateReview_ShouldReturnUpdatedReview() throws IOException {
         // Arrange
         when(reviewRepository.findById(testReview.getId())).thenReturn(Optional.of(testReview));
         when(reviewCriteriaService.getCriteriaById(1L)).thenReturn(testCriteria);
         when(reviewRepository.save(any(Review.class))).thenReturn(testReview);
+        when(imageService.uploadImage(any(MultipartFile.class), anyLong(), eq("REVIEW")))
+                .thenReturn("http://example.com/images/updated-image.jpg");
+        when(imageRepository.findById(1L)).thenReturn(Optional.of(testImage));
+        when(imageRepository.findByEntityTypeAndEntityId("REVIEW", testReview.getId())).thenReturn(testImages);
         when(reviewReactionService.getReactionCountsByReview(anyLong())).thenReturn(reactionCounts);
 
         // Act
@@ -203,6 +259,8 @@ public class ReviewServiceImplTest {
         // Assert
         assertNotNull(result);
         verify(reviewRepository).save(any(Review.class));
+        verify(imageRepository).delete(testImage);
+        verify(imageService, times(2)).uploadImage(any(MultipartFile.class), anyLong(), eq("REVIEW"));
         verify(reviewDetailRepository).deleteAll(anyList());
         verify(reviewDetailRepository, atLeastOnce()).save(any(ReviewDetail.class));
     }
@@ -252,6 +310,7 @@ public class ReviewServiceImplTest {
         when(reviewRepository.findById(testReview.getId())).thenReturn(Optional.of(testReview));
         when(userRepository.findById(testChef.getUser().getId())).thenReturn(Optional.of(testChef.getUser()));
         when(reviewRepository.save(any(Review.class))).thenReturn(testReview);
+        when(imageRepository.findByEntityTypeAndEntityId("REVIEW", testReview.getId())).thenReturn(testImages);
         when(reviewReactionService.getReactionCountsByReview(anyLong())).thenReturn(reactionCounts);
         String responseText = "Thank you for your review";
         

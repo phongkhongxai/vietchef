@@ -220,12 +220,12 @@ public class ChefTimeSettingsServiceImplTest {
             verify(timeSettingsRepository).save(testTimeSettings);
             
             // Verify default values were set
-            assertEquals(30, testTimeSettings.getStandardPrepTime());
-            assertEquals(30, testTimeSettings.getStandardCleanupTime());
-            assertEquals(30, testTimeSettings.getTravelBufferPercentage());
-            assertEquals(new BigDecimal("0.80"), testTimeSettings.getCookingEfficiencyFactor());
+            assertEquals(0, testTimeSettings.getStandardPrepTime());
+            assertEquals(0, testTimeSettings.getStandardCleanupTime());
+            assertEquals(0, testTimeSettings.getTravelBufferPercentage());
+            assertEquals(new BigDecimal("0.0"), testTimeSettings.getCookingEfficiencyFactor());
             assertEquals(24, testTimeSettings.getMinBookingNoticeHours());
-            assertEquals(60, testTimeSettings.getMaxBookingDaysAhead());
+            assertEquals(7, testTimeSettings.getMaxBookingDaysAhead());
             assertEquals(5, testTimeSettings.getMaxDishesPerSession());
             assertEquals(8, testTimeSettings.getMaxGuestsPerSession());
             assertEquals(15, testTimeSettings.getServiceRadiusKm());

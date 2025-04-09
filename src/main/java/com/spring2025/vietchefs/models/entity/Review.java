@@ -39,8 +39,7 @@ public class Review {
     @Column(columnDefinition = "TEXT")
     private String overallExperience;
     
-    @Column(columnDefinition = "JSON")
-    private String photos;
+    private String imageUrl;
     
     @Column(nullable = false)
     private Boolean isVerified = false;

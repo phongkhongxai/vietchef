@@ -83,6 +83,7 @@ public class ChefScheduleServiceImpl implements ChefScheduleService {
         }
 
         // Validate các ràng buộc thời gian
+        validateScheduleAvailableDayConstraint(request.getDayOfWeek());
         validateScheduleTimeConstraints(schedule.getStartTime(), schedule.getEndTime());
 
         // Kiểm tra số buổi tối đa trong ngày
@@ -121,6 +122,7 @@ public class ChefScheduleServiceImpl implements ChefScheduleService {
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef profile not found for user id: " + userId));
 
         // Validate các ràng buộc thời gian
+        validateScheduleAvailableDayConstraint(request.getDayOfWeek());
         validateScheduleTimeConstraints(request.getStartTime(), request.getEndTime());
 
         // Kiểm tra số buổi tối đa trong ngày
@@ -155,6 +157,10 @@ public class ChefScheduleServiceImpl implements ChefScheduleService {
         return schedules.stream()
                 .map(schedule -> modelMapper.map(schedule, ChefScheduleResponse.class))
                 .collect(Collectors.toList());
+    }
+
+    private void validateScheduleAvailableDayConstraint(Integer dayOfWeek) {
+        if(dayOfWeek<0 || dayOfWeek>6) throw new VchefApiException(HttpStatus.BAD_REQUEST, "Day of week must between 0-6");
     }
 
     /**
