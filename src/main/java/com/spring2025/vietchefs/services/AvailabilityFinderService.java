@@ -18,40 +18,34 @@ public interface AvailabilityFinderService {
      * @param chefId ID của chef
      * @param startDate Ngày bắt đầu tìm kiếm
      * @param endDate Ngày kết thúc tìm kiếm
-     * @param minDuration Thời lượng tối thiểu cần thiết (tính bằng phút)
      * @return Danh sách các khung giờ trống
      */
     List<AvailableTimeSlotResponse> findAvailableTimeSlotsForChef(
             Long chefId, 
             LocalDate startDate, 
-            LocalDate endDate, 
-            Integer minDuration);
+            LocalDate endDate);
     
     /**
      * Tìm các khung giờ trống cho chef hiện tại trong khoảng ngày
      * 
      * @param startDate Ngày bắt đầu tìm kiếm
      * @param endDate Ngày kết thúc tìm kiếm
-     * @param minDuration Thời lượng tối thiểu cần thiết (tính bằng phút)
      * @return Danh sách các khung giờ trống
      */
     List<AvailableTimeSlotResponse> findAvailableTimeSlotsForCurrentChef(
             LocalDate startDate, 
-            LocalDate endDate, 
-            Integer minDuration);
+            LocalDate endDate);
     
     /**
      * Tìm các khung giờ trống cho một chef trong một ngày cụ thể
      * 
      * @param chefId ID của chef
      * @param date Ngày cần tìm khung giờ trống
-     * @param minDuration Thời lượng tối thiểu cần thiết (tính bằng phút)
      * @return Danh sách các khung giờ trống
      */
     List<AvailableTimeSlotResponse> findAvailableTimeSlotsForChefByDate(
             Long chefId, 
-            LocalDate date, 
-            Integer minDuration);
+            LocalDate date);
     
     /**
      * Kiểm tra xem một khung giờ cụ thể có khả dụng cho chef hay không
@@ -76,7 +70,7 @@ public interface AvailabilityFinderService {
      * @param menuId ID của menu (có thể null)
      * @param dishIds Danh sách ID của các món ăn
      * @param guestCount Số lượng khách
-     * @param minDuration Thời lượng tối thiểu cần thiết (tính bằng phút)
+     * @param maxDishesPerMeal Số lượng món ăn tối đa trong bữa ăn
      * @return Danh sách các khung giờ trống đã điều chỉnh theo thời gian nấu
      */
     List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithCookingTime(
@@ -85,8 +79,7 @@ public interface AvailabilityFinderService {
             Long menuId,
             List<Long> dishIds,
             int guestCount,
-            int maxDishesPerMeal,
-            Integer minDuration);
+            int maxDishesPerMeal);
     
     /**
      * Tìm các khung giờ trống cho chef hiện tại với tính toán thời gian nấu
@@ -95,13 +88,32 @@ public interface AvailabilityFinderService {
      * @param menuId ID của menu (có thể null)
      * @param dishIds Danh sách ID của các món ăn
      * @param guestCount Số lượng khách
-     * @param minDuration Thời lượng tối thiểu cần thiết (tính bằng phút)
      * @return Danh sách các khung giờ trống đã điều chỉnh theo thời gian nấu
      */
     List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithCookingTimeForCurrentChef(
             LocalDate date,
             Long menuId,
             List<Long> dishIds,
+            int guestCount);
+    
+    /**
+     * Tìm các khung giờ trống cho chef với tính toán thời gian nấu, thời gian di chuyển và thời gian nghỉ giữa các booking
+     * 
+     * @param chefId ID của chef
+     * @param date Ngày cần tìm khung giờ trống
+     * @param customerLocation Địa chỉ của khách hàng
+     * @param menuId ID của menu (có thể null)
+     * @param dishIds Danh sách ID của các món ăn (có thể null nếu menuId không null)
+     * @param guestCount Số lượng khách
+     * @param maxDishesPerMeal Số lượng món ăn tối đa trong bữa ăn (dùng khi không có menuId và dishIds)
+     * @return Danh sách các khung giờ trống đã điều chỉnh theo thời gian nấu, thời gian di chuyển và thời gian nghỉ
+     */
+    List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithLocationConstraints(
+            Long chefId,
+            LocalDate date,
+            String customerLocation,
+            Long menuId,
+            List<Long> dishIds,
             int guestCount,
-            Integer minDuration);
+            int maxDishesPerMeal);
 } 
