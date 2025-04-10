@@ -92,16 +92,20 @@ public class DistanceService {
     }
     public double[] getLatLngFromAddress(String address) {
         try {
-            String encodedAddress = URLEncoder.encode(address, StandardCharsets.UTF_8);
+            String encodedAddress = address.trim().replaceAll("\\s+", "+");
             String url = "https://maps.googleapis.com/maps/api/geocode/json?address=" + encodedAddress + "&key=" + googleApiKey;
 
             // Sử dụng WebClient đã cấu hình
-            String response = webClient
-                    .get()
+            String response = webClient.get()
                     .uri(url)
+                    .header(HttpHeaders.USER_AGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                     .retrieve()
                     .bodyToMono(String.class)
-                    .block();  // Chú ý là chúng ta sử dụng block() để đợi kết quả đồng bộ
+                    .doOnError(e -> System.err.println("❌ WebClient lỗi: " + e.getMessage()))
+                    .block();
+//            System.out.println("🔍 Requesting address: " + url);
+//            System.out.println("📦 Google Response: " + response);
+
 
             // Parse JSON với ObjectMapper
             ObjectMapper mapper = new ObjectMapper();
