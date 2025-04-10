@@ -30,6 +30,8 @@ public class AddressServiceImpl implements AddressService {
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
+    @Autowired
+    private DistanceService distanceService;
 
     @Autowired
     private ModelMapper modelMapper;
@@ -70,7 +72,9 @@ public class AddressServiceImpl implements AddressService {
         Address address = modelMapper.map(request, Address.class);
 
         address.setUser(user);
-
+        double[] latLng = distanceService.getLatLngFromAddress(address.getAddress());
+        address.setLatitude(latLng[0]);
+        address.setLongitude(latLng[1]);
         Address savedAddress = addressRepository.save(address);
         return modelMapper.map(savedAddress, AddressResponse.class);
     }
@@ -87,8 +91,10 @@ public class AddressServiceImpl implements AddressService {
 
         if (request.getAddress() != null) {
             existingAddress.setAddress(request.getAddress());
+            double[] latLng = distanceService.getLatLngFromAddress(request.getAddress());
+            existingAddress.setLatitude(latLng[0]);
+            existingAddress.setLongitude(latLng[1]);
         }
-
         Address updatedAddress = addressRepository.save(existingAddress);
         return modelMapper.map(updatedAddress, AddressResponse.class);
     }
