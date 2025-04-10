@@ -39,8 +39,8 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
     private static final LocalTime DEFAULT_MIN_WORK_HOUR = LocalTime.of(8, 0);
     private static final LocalTime DEFAULT_MAX_WORK_HOUR = LocalTime.of(22, 0);
     private static final int DEFAULT_MIN_SLOT_DURATION_MINUTES = 120; // 2 giờ
-    private static final int DEFAULT_PREP_TIME_MINUTES = 0; // 30 phút
-    private static final int DEFAULT_CLEANUP_TIME_MINUTES = 0; // 30 phút
+    private static final int DEFAULT_PREP_TIME_MINUTES = 0; // 0 phút
+    private static final int DEFAULT_CLEANUP_TIME_MINUTES = 0; // 0 phút
     private static final int MAX_DAYS_TO_SEARCH = 60; // Giới hạn tìm kiếm 60 ngày
     
     @Autowired
@@ -84,7 +84,8 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, 
                     "Chef not found with id: " + chefId));
         
-        return findAvailableTimeSlots(chef, startDate, endDate, null);
+        // Wrap the result in filterValidTimeSlots
+        return filterValidTimeSlots(findAvailableTimeSlots(chef, startDate, endDate));
     }
     
     @Override
@@ -97,7 +98,8 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         // Lấy thông tin chef hiện tại
         Chef chef = getCurrentChef();
         
-        return findAvailableTimeSlots(chef, startDate, endDate, null);
+        // Wrap the result in filterValidTimeSlots
+        return filterValidTimeSlots(findAvailableTimeSlots(chef, startDate, endDate));
     }
     
     @Override
@@ -117,7 +119,8 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, 
                     "Chef not found with id: " + chefId));
         
-        return findAvailableTimeSlots(chef, date, date, null);
+        // Wrap the result in filterValidTimeSlots
+        return filterValidTimeSlots(findAvailableTimeSlots(chef, date, date));
     }
     
     @Override
@@ -152,64 +155,9 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         return !bookingConflictService.hasBookingConflict(chef, date, startTime, endTime);
     }
     
-    @Override
-    public List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithCookingTime(
-            Long chefId, LocalDate date, Long menuId, List<Long> dishIds, int guestCount, int maxDishesPerMeal) {
-        
-        // Kiểm tra tham số đầu vào
-        if (date == null) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Date cannot be null");
-        }
-        if (date.isBefore(LocalDate.now())) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot search for dates in the past");
-        }
-        
-        // Lấy thông tin chef
-        Chef chef = chefRepository.findById(chefId)
-                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, 
-                    "Chef not found with id: " + chefId));
-        
-        // Tính toán thời gian nấu (giờ)
-        BigDecimal cookTimeHours = BigDecimal.ZERO;
-        if (menuId != null) {
-            cookTimeHours = calculateService.calculateTotalCookTimeFromMenu(menuId, dishIds, guestCount);
-        } else {
-            cookTimeHours = calculateService.calculateTotalCookTime(dishIds, guestCount);
-        }
-        // Lấy danh sách khung giờ trống
-        List<AvailableTimeSlotResponse> availableSlots = findAvailableTimeSlots(chef, date, date, null);
-        
-        // Điều chỉnh các khung giờ dựa trên thời gian nấu
-        return adjustTimeSlotsByCookingTime(availableSlots, cookTimeHours);
-    }
     
     @Override
-    public List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithCookingTimeForCurrentChef(
-            LocalDate date, Long menuId, List<Long> dishIds, int guestCount) {
-        
-        // Kiểm tra tham số đầu vào
-        if (date == null) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Date cannot be null");
-        }
-        if (date.isBefore(LocalDate.now())) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot search for dates in the past");
-        }
-        
-        // Lấy thông tin chef hiện tại
-        Chef chef = getCurrentChef();
-        
-        // Tính toán thời gian nấu (giờ)
-        BigDecimal cookTimeHours = calculateService.calculateTotalCookTimeFromMenu(menuId, dishIds, guestCount);
-        
-        // Lấy danh sách khung giờ trống
-        List<AvailableTimeSlotResponse> availableSlots = findAvailableTimeSlots(chef, date, date, null);
-        
-        // Điều chỉnh các khung giờ dựa trên thời gian nấu
-        return adjustTimeSlotsByCookingTime(availableSlots, cookTimeHours);
-    }
-    
-    @Override
-    public List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithLocationConstraints(
+    public List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithInSingleDate(
             Long chefId, LocalDate date, String customerLocation, 
             Long menuId, List<Long> dishIds, int guestCount, 
             int maxDishesPerMeal) {
@@ -255,7 +203,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         }
         
         // Sử dụng minDuration null để lấy tất cả các khung giờ trống cơ bản
-        List<AvailableTimeSlotResponse> availableSlots = findAvailableTimeSlots(chef, date, date, null);
+        List<AvailableTimeSlotResponse> availableSlots = findAvailableTimeSlots(chef, date, date);
         
         // Lấy danh sách các booking hiện có của chef vào ngày đó
         List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking_ChefAndSessionDateAndIsDeletedFalse(chef, date);
@@ -263,9 +211,9 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                 .filter(detail -> {
                     Booking booking = detail.getBooking();
                     return !booking.getIsDeleted() && 
-                           !List.of("CANCELED", "OVERDUE").contains(booking.getStatus()) &&
+                           !List.of("CANCELED", "OVERDUE", "REJECTED").contains(booking.getStatus()) &&
                            !detail.getIsDeleted() && 
-                           !List.of("CANCELED", "OVERDUE").contains(detail.getStatus());
+                           !List.of("CANCELED", "OVERDUE", "REJECTED").contains(detail.getStatus());
                 })
                 .sorted(Comparator.comparing(BookingDetail::getStartTime))
                 .collect(Collectors.toList());
@@ -323,7 +271,11 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                             travelTimeHours.setScale(2, RoundingMode.HALF_UP).toString() + " hours travel time and " +
                             cookTimeHours.setScale(2, RoundingMode.HALF_UP).toString() + " hours cooking time");
                     
-                    adjustedSlots.add(adjustedSlot);
+                    // Only add slots where start time is before end time and duration is positive
+                    if (!adjustedSlot.getStartTime().isAfter(adjustedSlot.getEndTime()) && 
+                            adjustedSlot.getDurationMinutes() > 0) {
+                        adjustedSlots.add(adjustedSlot);
+                    }
                 }
             }
             // Nếu không có booking trước đó nhưng khung giờ vẫn hợp lệ
@@ -343,7 +295,11 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                     adjustedSlot.setDurationMinutes((int) Duration.between(adjustedStartTime, slot.getEndTime()).toMinutes());
                     adjustedSlot.setNote("Adjusted for " + cookTimeHours.setScale(2,RoundingMode.HALF_UP).toString() + " hours cooking time");
                     
-                    adjustedSlots.add(adjustedSlot);
+                    // Only add slots where start time is before end time and duration is positive
+                    if (!adjustedSlot.getStartTime().isAfter(adjustedSlot.getEndTime()) && 
+                            adjustedSlot.getDurationMinutes() > 0) {
+                        adjustedSlots.add(adjustedSlot);
+                    }
                 }
             }
         }
@@ -351,11 +307,11 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         // Sắp xếp kết quả theo thời gian bắt đầu
         Collections.sort(adjustedSlots, Comparator.comparing(AvailableTimeSlotResponse::getStartTime));
         
-        return adjustedSlots;
+        return filterValidTimeSlots(adjustedSlots);
     }
 
     @Override
-    public List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithLocationConstraints(Long chefId, String customerLocation, int guestCount, int maxDishesPerMeal, List<AvailableTimeSlotRequest> requests) {
+    public List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithInMultipleDates(Long chefId, String customerLocation, int guestCount, int maxDishesPerMeal, List<AvailableTimeSlotRequest> requests) {
         if (requests == null || requests.isEmpty()) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Requests list cannot be empty");
         }
@@ -400,16 +356,16 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                 cookTimeHours = calculateService.calculateMaxCookTime(chefId, maxDishesPerMeal, guestCount);
             }
 
-            List<AvailableTimeSlotResponse> availableSlots = findAvailableTimeSlots(chef, date, date, null);
+            List<AvailableTimeSlotResponse> availableSlots = findAvailableTimeSlots(chef, date, date);
 
             List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking_ChefAndSessionDateAndIsDeletedFalse(chef, date);
             List<BookingDetail> activeBookings = bookingDetails.stream()
                     .filter(detail -> {
                         Booking booking = detail.getBooking();
                         return !booking.getIsDeleted() &&
-                                !List.of("CANCELED", "OVERDUE").contains(booking.getStatus()) &&
+                                !List.of("CANCELED", "OVERDUE", "REJECTED").contains(booking.getStatus()) &&
                                 !detail.getIsDeleted() &&
-                                !List.of("CANCELED", "OVERDUE").contains(detail.getStatus());
+                                !List.of("CANCELED", "OVERDUE", "REJECTED").contains(detail.getStatus());
                     })
                     .sorted(Comparator.comparing(BookingDetail::getStartTime))
                     .collect(Collectors.toList());
@@ -454,7 +410,11 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                                 travelTimeHours.setScale(2,RoundingMode.HALF_UP) + " hours travel time and " +
                                 cookTimeHours.setScale(2,RoundingMode.HALF_UP) + " hours cooking time");
 
-                        allAdjustedSlots.add(adjustedSlot);
+                        // Only add slots where start time is before end time and duration is positive
+                        if (!adjustedSlot.getStartTime().isAfter(adjustedSlot.getEndTime()) && 
+                                adjustedSlot.getDurationMinutes() > 0) {
+                            allAdjustedSlots.add(adjustedSlot);
+                        }
                     }
                 } else if (isSlotValid && earliestStartTime == null) {
                     LocalTime adjustedStartTime = slot.getStartTime()
@@ -470,7 +430,11 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                         adjustedSlot.setDurationMinutes((int) Duration.between(adjustedStartTime, slot.getEndTime()).toMinutes());
                         adjustedSlot.setNote("Adjusted for " + cookTimeHours.setScale(2,RoundingMode.HALF_UP) + " hours cooking time");
 
-                        allAdjustedSlots.add(adjustedSlot);
+                        // Only add slots where start time is before end time and duration is positive
+                        if (!adjustedSlot.getStartTime().isAfter(adjustedSlot.getEndTime()) && 
+                                adjustedSlot.getDurationMinutes() > 0) {
+                            allAdjustedSlots.add(adjustedSlot);
+                        }
                     }
                 }
             }
@@ -480,15 +444,14 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                 .comparing(AvailableTimeSlotResponse::getDate)
                 .thenComparing(AvailableTimeSlotResponse::getStartTime));
 
-        return allAdjustedSlots;
-
+        return filterValidTimeSlots(allAdjustedSlots);
     }
 
     /**
      * Tìm tất cả các khung giờ trống cho một chef trong khoảng ngày
      */
     private List<AvailableTimeSlotResponse> findAvailableTimeSlots(
-            Chef chef, LocalDate startDate, LocalDate endDate, Integer minDuration) {
+            Chef chef, LocalDate startDate, LocalDate endDate) {
         
         // Lấy cài đặt thời gian của chef
         ChefTimeSettings timeSettings = getChefTimeSettings(chef);
@@ -580,9 +543,9 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                     // Booking vẫn còn active
                     Booking booking = detail.getBooking();
                     return !booking.getIsDeleted() &&
-                           !List.of("CANCELED", "OVERDUE").contains(booking.getStatus()) &&
+                           !List.of("CANCELED", "OVERDUE", "REJECTED").contains(booking.getStatus()) &&
                            !detail.getIsDeleted() && 
-                           !List.of("CANCELED", "OVERDUE").contains(detail.getStatus());
+                           !List.of("CANCELED", "OVERDUE", "REJECTED").contains(detail.getStatus());
                 })
                 .collect(Collectors.toList());
         
@@ -647,6 +610,11 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         for (TimeRange availableRange : availableRanges) {
             LocalTime bookingStart = availableRange.getStart().plusMinutes(prepTimeMinutes);
             LocalTime bookingEnd = availableRange.getEnd().minusMinutes(cleanupTimeMinutes);
+            
+            // Kiểm tra nếu thời gian kết thúc vẫn sau thời gian bắt đầu
+            if (bookingEnd.isBefore(bookingStart) || bookingEnd.equals(bookingStart)) {
+                continue; // Bỏ qua khoảng thời gian không hợp lệ
+            }
             
             // Kiểm tra nếu có booking tiếp theo, thêm 1 giờ cho việc di chuyển
             LocalTime adjustedBookingEnd = bookingEnd;
@@ -860,6 +828,20 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
     }
     
     /**
+     * Lọc các khung giờ không hợp lệ (thời gian bắt đầu sau thời gian kết thúc)
+     */
+    private List<AvailableTimeSlotResponse> filterValidTimeSlots(List<AvailableTimeSlotResponse> slots) {
+        return slots.stream()
+                .filter(slot -> {
+                    if (slot.getStartTime() == null || slot.getEndTime() == null) {
+                        return false;
+                    }
+                    return !slot.getStartTime().isAfter(slot.getEndTime()) && slot.getDurationMinutes() > 0;
+                })
+                .collect(Collectors.toList());
+    }
+    
+    /**
      * Lấy thông tin chef hiện tại
      */
     private Chef getCurrentChef() {
@@ -903,7 +885,11 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                 adjustedSlot.setDurationMinutes((int) Duration.between(newStartTime, slot.getEndTime()).toMinutes());
                 adjustedSlot.setNote("Cooking starts at " + slot.getStartTime() + ", service begins at " + newStartTime);
                 
-                adjustedSlots.add(adjustedSlot);
+                // Only add slots where start time is before end time and duration is positive
+                if (!adjustedSlot.getStartTime().isAfter(adjustedSlot.getEndTime()) && 
+                        adjustedSlot.getDurationMinutes() > 0) {
+                    adjustedSlots.add(adjustedSlot);
+                }
             }
         }
         
