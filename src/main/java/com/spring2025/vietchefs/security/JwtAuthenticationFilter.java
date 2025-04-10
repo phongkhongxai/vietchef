@@ -84,8 +84,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        String path = request.getRequestURI();
         String jwt = getJwtFromRequest(request);
-
+        if (path.equals("/no-auth/refresh-token")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
         if (StringUtils.hasText(jwt) && jwtTokenProvider.validateToken(jwt)) {
             AccessToken accessToken = accessTokenRepository.findByToken(jwt);
             if (accessToken == null || accessToken.isRevoked() || accessToken.isExpired()) {
