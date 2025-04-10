@@ -27,8 +27,10 @@ public class Address {
 
     @Column(nullable = false)
     private String address;
-
-
+    @Column(nullable = true)
+    private Double latitude;
+    @Column(nullable = true)
+    private Double longitude;
     @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT false")
     private boolean isDeleted = false;
 }
