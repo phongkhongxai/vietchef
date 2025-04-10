@@ -21,7 +21,7 @@ import java.util.List;
 @AllArgsConstructor
 public class BookingResponseDto {
     private Long id;
-    private Long customerId;
+    private CustomerDto customer;
     private ChefResponseDto chef;
     private String bookingType;
     private String status;
