@@ -11,9 +11,13 @@ public interface DishService {
     DishDto updateDish (Long id, DishRequest dishRequest);
     String deleteDish(Long id);
     DishesResponse getAllDishes(int pageNo, int pageSize, String sortBy, String sortDir);
+    DishesResponse getDishesNearBy(double customerLat, double customerLng, double distance,int pageNo, int pageSize, String sortBy, String sortDir);
     DishesResponse getDishesByChef(Long chefId,int pageNo, int pageSize, String sortBy, String sortDir);
     DishesResponse getDishesNotInMenu(Long menuId,int pageNo, int pageSize, String sortBy, String sortDir);
     DishesResponse getDishesByFoodType(Long foodTypeId,int pageNo, int pageSize, String sortBy, String sortDir);
+    DishesResponse searchDishByName(String keyword,int pageNo, int pageSize, String sortBy, String sortDir);
+    DishesResponse searchDishByNameNearBy(double customerLat, double customerLng, double distance,String keyword,int pageNo, int pageSize, String sortBy, String sortDir);
+
 
 
 }

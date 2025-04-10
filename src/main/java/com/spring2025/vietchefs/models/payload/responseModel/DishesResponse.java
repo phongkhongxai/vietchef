@@ -14,7 +14,7 @@ import java.util.List;
 @Getter
 @Setter
 public class DishesResponse {
-    private List<DishDto> content;
+    private List<DishResponseDto> content;
     private int pageNo;
     private int pageSize;
     private long totalElements;

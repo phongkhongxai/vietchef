@@ -53,9 +53,9 @@ public class ChefController {
     }
     @GetMapping("/nearby")
     public ChefsResponse getAllChefsNearBy(
-            @RequestParam(value = "customerLat") double customerLat,
-            @RequestParam(value = "customerLng") double customerLng,
-            @RequestParam(value = "distance") double distance,
+            @RequestParam(value = "customerLat") Double customerLat,
+            @RequestParam(value = "customerLng") Double customerLng,
+            @RequestParam(value = "distance") Double distance,
             @RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
             @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
             @RequestParam(value = "sortBy", defaultValue = AppConstants.DEFAULT_SORT_BY, required = false) String sortBy,
