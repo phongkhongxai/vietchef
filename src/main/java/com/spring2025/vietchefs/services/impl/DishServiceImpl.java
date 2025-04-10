@@ -7,6 +7,7 @@ import com.spring2025.vietchefs.models.entity.Menu;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.dto.DishDto;
 import com.spring2025.vietchefs.models.payload.requestModel.DishRequest;
+import com.spring2025.vietchefs.models.payload.responseModel.DishResponseDto;
 import com.spring2025.vietchefs.models.payload.responseModel.DishesResponse;
 import com.spring2025.vietchefs.repositories.ChefRepository;
 import com.spring2025.vietchefs.repositories.DishRepository;
@@ -41,6 +42,8 @@ public class DishServiceImpl implements DishService {
     private ChefRepository chefRepository;
     @Autowired
     private FoodTypeRepository foodTypeRepository;
+    @Autowired
+    private CalculateService calculateService;
     @Autowired
     private ImageService imageService;
     @Override
@@ -134,7 +137,7 @@ public class DishServiceImpl implements DishService {
         // get content for page object
         List<Dish> listOfDishes = dishes.getContent();
 
-        List<DishDto> content = listOfDishes.stream().map(bt -> modelMapper.map(bt, DishDto.class)).collect(Collectors.toList());
+        List<DishResponseDto> content = listOfDishes.stream().map(bt -> modelMapper.map(bt, DishResponseDto.class)).collect(Collectors.toList());
 
         DishesResponse templatesResponse = new DishesResponse();
         templatesResponse.setContent(content);
@@ -144,6 +147,44 @@ public class DishServiceImpl implements DishService {
         templatesResponse.setTotalPages(dishes.getTotalPages());
         templatesResponse.setLast(dishes.isLast());
         return templatesResponse;
+    }
+
+    @Override
+    public DishesResponse getDishesNearBy(double customerLat, double customerLng, double distance, int pageNo, int pageSize, String sortBy, String sortDir) {
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+
+        Page<Dish> dishesPage = dishRepository.findAllNotDeleted(pageable);
+        List<Dish> allDishes = dishesPage.getContent();
+
+        // Lọc các món có chef ở gần khách hàng
+        List<Dish> filteredDishes = allDishes.stream()
+                .filter(dish -> {
+                    Chef chef = dish.getChef();
+                    if (chef == null || chef.getLatitude() == null || chef.getLongitude() == null) return false;
+                    double chefLat = chef.getLatitude();
+                    double chefLng = chef.getLongitude();
+                    double distanceToCustomer = calculateService.calculateDistance(customerLat, customerLng, chefLat, chefLng);
+                    return distanceToCustomer <= distance;
+                })
+                .toList();
+
+        // Chuyển sang DTO
+        List<DishResponseDto> content = filteredDishes.stream()
+                .map(dish -> modelMapper.map(dish, DishResponseDto.class))
+                .collect(Collectors.toList());
+
+        DishesResponse response = new DishesResponse();
+        response.setContent(content);
+        response.setPageNo(pageNo);
+        response.setPageSize(pageSize);
+        response.setTotalElements(filteredDishes.size());
+        response.setTotalPages((int) Math.ceil((double) filteredDishes.size() / pageSize));
+        response.setLast(filteredDishes.size() <= (pageNo + 1) * pageSize);
+
+        return response;
     }
 
     @Override
@@ -161,7 +202,7 @@ public class DishServiceImpl implements DishService {
         // get content for page object
         List<Dish> listOfDishes = dishes.getContent();
 
-        List<DishDto> content = listOfDishes.stream().map(bt -> modelMapper.map(bt, DishDto.class)).collect(Collectors.toList());
+        List<DishResponseDto> content = listOfDishes.stream().map(bt -> modelMapper.map(bt, DishResponseDto.class)).collect(Collectors.toList());
 
         DishesResponse templatesResponse = new DishesResponse();
         templatesResponse.setContent(content);
@@ -183,12 +224,12 @@ public class DishServiceImpl implements DishService {
         // create Pageable instance
         Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
 
-        Page<Dish> dishes = dishRepository.findByNotInMenu(menu.getId(),pageable);
+        Page<Dish> dishes = dishRepository.findByNotInMenuAndIsDeletedFalse(menu.getId(),pageable);
 
         // get content for page object
         List<Dish> listOfDishes = dishes.getContent();
 
-        List<DishDto> content = listOfDishes.stream().map(bt -> modelMapper.map(bt, DishDto.class)).collect(Collectors.toList());
+        List<DishResponseDto> content = listOfDishes.stream().map(bt -> modelMapper.map(bt, DishResponseDto.class)).collect(Collectors.toList());
 
         DishesResponse templatesResponse = new DishesResponse();
         templatesResponse.setContent(content);
@@ -215,7 +256,7 @@ public class DishServiceImpl implements DishService {
         // get content for page object
         List<Dish> listOfDishes = dishes.getContent();
 
-        List<DishDto> content = listOfDishes.stream().map(bt -> modelMapper.map(bt, DishDto.class)).collect(Collectors.toList());
+        List<DishResponseDto> content = listOfDishes.stream().map(bt -> modelMapper.map(bt, DishResponseDto.class)).collect(Collectors.toList());
 
         DishesResponse templatesResponse = new DishesResponse();
         templatesResponse.setContent(content);
@@ -225,5 +266,68 @@ public class DishServiceImpl implements DishService {
         templatesResponse.setTotalPages(dishes.getTotalPages());
         templatesResponse.setLast(dishes.isLast());
         return templatesResponse;
+    }
+
+    @Override
+    public DishesResponse searchDishByName(String keyword, int pageNo, int pageSize, String sortBy, String sortDir) {
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+
+        // create Pageable instance
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+
+        Page<Dish> dishes = dishRepository.findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse(keyword,keyword,pageable);
+
+        // get content for page object
+        List<Dish> listOfDishes = dishes.getContent();
+
+        List<DishResponseDto> content = listOfDishes.stream().map(bt -> modelMapper.map(bt, DishResponseDto.class)).collect(Collectors.toList());
+
+        DishesResponse templatesResponse = new DishesResponse();
+        templatesResponse.setContent(content);
+        templatesResponse.setPageNo(dishes.getNumber());
+        templatesResponse.setPageSize(dishes.getSize());
+        templatesResponse.setTotalElements(dishes.getTotalElements());
+        templatesResponse.setTotalPages(dishes.getTotalPages());
+        templatesResponse.setLast(dishes.isLast());
+        return templatesResponse;
+    }
+
+    @Override
+    public DishesResponse searchDishByNameNearBy(double customerLat, double customerLng, double distance, String keyword, int pageNo, int pageSize, String sortBy, String sortDir) {
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+
+        Page<Dish> dishesPage = dishRepository.findByNameContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndIsDeletedFalse(keyword,keyword,pageable);
+        List<Dish> allDishes = dishesPage.getContent();
+
+        // Lọc các món có chef ở gần khách hàng
+        List<Dish> filteredDishes = allDishes.stream()
+                .filter(dish -> {
+                    Chef chef = dish.getChef();
+                    if (chef == null || chef.getLatitude() == null || chef.getLongitude() == null) return false;
+                    double chefLat = chef.getLatitude();
+                    double chefLng = chef.getLongitude();
+                    double distanceToCustomer = calculateService.calculateDistance(customerLat, customerLng, chefLat, chefLng);
+                    return distanceToCustomer <= distance;
+                })
+                .toList();
+
+        // Chuyển sang DTO
+        List<DishResponseDto> content = filteredDishes.stream()
+                .map(dish -> modelMapper.map(dish, DishResponseDto.class))
+                .collect(Collectors.toList());
+
+        DishesResponse response = new DishesResponse();
+        response.setContent(content);
+        response.setPageNo(pageNo);
+        response.setPageSize(pageSize);
+        response.setTotalElements(filteredDishes.size());
+        response.setTotalPages((int) Math.ceil((double) filteredDishes.size() / pageSize));
+        response.setLast(filteredDishes.size() <= (pageNo + 1) * pageSize);
+
+        return response;
     }
 }
