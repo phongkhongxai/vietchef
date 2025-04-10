@@ -86,6 +86,9 @@ public class ChefBlockedDateServiceImpl implements ChefBlockedDateService {
         // Validate các ràng buộc thời gian
         validateTimeConstraints(blockedDate.getStartTime(), blockedDate.getEndTime());
         
+        // Kiểm tra xung đột với các blocked date khác
+        validateNoBlockedDateConflict(currentChef, blockedDate.getBlockedDate(), blockedDate.getStartTime(), blockedDate.getEndTime(), blockedDate.getBlockId());
+        
         // Kiểm tra xung đột với lịch làm việc
         validateNoScheduleConflict(currentChef, blockedDate.getBlockedDate(), blockedDate.getStartTime(), blockedDate.getEndTime());
 
@@ -117,6 +120,9 @@ public class ChefBlockedDateServiceImpl implements ChefBlockedDateService {
 
         // Validate các ràng buộc thời gian
         validateTimeConstraints(request.getStartTime(), request.getEndTime());
+        
+        // Kiểm tra xung đột với các blocked date khác
+        validateNoBlockedDateConflict(chef, request.getBlockedDate(), request.getStartTime(), request.getEndTime(), null);
         
         // Kiểm tra xung đột với lịch làm việc
         validateNoScheduleConflict(chef, request.getBlockedDate(), request.getStartTime(), request.getEndTime());
@@ -226,5 +232,41 @@ public class ChefBlockedDateServiceImpl implements ChefBlockedDateService {
                     "Blocked date conflicts with an existing work schedule at " + schedule.getStartTime() + " - " + schedule.getEndTime());
             }
         }
+    }
+
+    /**
+     * Kiểm tra xung đột với các blocked date khác
+     * @param chef Chef cần kiểm tra
+     * @param blockedDate Ngày bị chặn
+     * @param startTime Thời gian bắt đầu
+     * @param endTime Thời gian kết thúc
+     * @param excludeId ID của blocked date cần loại trừ (dùng khi update)
+     */
+    private void validateNoBlockedDateConflict(Chef chef, LocalDate blockedDate, LocalTime startTime, LocalTime endTime, Long excludeId) {
+        // Lấy danh sách các blocked date trong ngày đó của chef
+        List<ChefBlockedDate> existingBlockedDates = blockedDateRepository.findByChefAndBlockedDateAndIsDeletedFalse(chef, blockedDate);
+        
+        for (ChefBlockedDate existing : existingBlockedDates) {
+            // Bỏ qua nếu là blocked date đang cập nhật
+            if (excludeId != null && existing.getBlockId().equals(excludeId)) {
+                continue;
+            }
+            
+            // Kiểm tra xem có chồng chéo không
+            if (isTimeOverlap(startTime, endTime, existing.getStartTime(), existing.getEndTime())) {
+                throw new VchefApiException(HttpStatus.BAD_REQUEST, 
+                    "Time slot conflicts with an existing blocked date at " + existing.getStartTime() + " - " + existing.getEndTime());
+            }
+        }
+    }
+    
+    /**
+     * Kiểm tra xem hai khoảng thời gian có chồng chéo nhau không
+     */
+    private boolean isTimeOverlap(LocalTime start1, LocalTime end1, LocalTime start2, LocalTime end2) {
+        // Hai khoảng thời gian chồng chéo nếu:
+        // 1. Thời điểm bắt đầu của khung 1 < thời điểm kết thúc của khung 2 VÀ
+        // 2. Thời điểm kết thúc của khung 1 > thời điểm bắt đầu của khung 2
+        return start1.isBefore(end2) && end1.isAfter(start2);
     }
 } 

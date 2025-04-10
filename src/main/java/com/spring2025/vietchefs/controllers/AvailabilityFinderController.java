@@ -81,46 +81,6 @@ public class AvailabilityFinderController {
         return ResponseEntity.ok(isAvailable);
     }
     
-    /**
-     * Tìm các khung giờ trống cho chef với tính toán thời gian nấu
-     * Các khung giờ đã điều chỉnh theo thời gian nấu ăn và bao gồm cả 1 giờ đệm cho việc di chuyển trước booking tiếp theo.
-     * Ví dụ: Nếu chef có lịch trống từ 14:00-18:00 nhưng đã có booking lúc 18:00 và cần bắt đầu di chuyển lúc 17:00, 
-     * thì khung giờ thực sự khả dụng sẽ được điều chỉnh thành 14:00-16:00 (trừ đi 1 giờ cho buffer di chuyển).
-     */
-    @GetMapping("/chef/{chefId}/cooking-time")
-    public ResponseEntity<List<AvailableTimeSlotResponse>> findAvailableTimeSlotsWithCookingTime(
-            @PathVariable Long chefId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestParam(required = false) Long menuId,
-            @RequestParam(required = false) List<Long> dishIds,
-            @RequestParam int guestCount,
-            @RequestParam(defaultValue = "6") int maxDishesPerMeal) {
-        
-        List<AvailableTimeSlotResponse> availableSlots = availabilityFinderService
-                .findAvailableTimeSlotsWithCookingTime(chefId, date, menuId, dishIds, guestCount, maxDishesPerMeal);
-        
-        return ResponseEntity.ok(availableSlots);
-    }
-    
-    /**
-     * Tìm các khung giờ trống cho chef hiện tại với tính toán thời gian nấu
-     * Các khung giờ đã điều chỉnh theo thời gian nấu ăn và bao gồm cả 1 giờ đệm cho việc di chuyển trước booking tiếp theo.
-     * Ví dụ: Nếu chef có lịch trống từ 14:00-18:00 nhưng đã có booking lúc 18:00 và cần bắt đầu di chuyển lúc 17:00, 
-     * thì khung giờ thực sự khả dụng sẽ được điều chỉnh thành 14:00-16:00 (trừ đi 1 giờ cho buffer di chuyển).
-     */
-    @GetMapping("/chef/me/cooking-time")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
-    public ResponseEntity<List<AvailableTimeSlotResponse>> findAvailableTimeSlotsWithCookingTimeForCurrentChef(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestParam(required = false) Long menuId,
-            @RequestParam(required = false) List<Long> dishIds,
-            @RequestParam int guestCount) {
-        
-        List<AvailableTimeSlotResponse> availableSlots = availabilityFinderService
-                .findAvailableTimeSlotsWithCookingTimeForCurrentChef(date, menuId, dishIds, guestCount);
-        
-        return ResponseEntity.ok(availableSlots);
-    }
     
     /**
      * Tìm các khung giờ trống cho chef dựa trên vị trí của khách hàng, tính toán thời gian nấu, thời gian di chuyển
@@ -132,8 +92,8 @@ public class AvailabilityFinderController {
      * - Thời gian nghỉ bắt buộc 30 phút giữa các booking
      * - Lịch làm việc hiện tại của chef và các booking đã xác nhận
      */
-    @GetMapping("/chef/{chefId}/location-constraints")
-    public ResponseEntity<List<AvailableTimeSlotResponse>> findAvailableTimeSlotsWithLocationConstraints(
+    @GetMapping("/chef/{chefId}/single-date")
+    public ResponseEntity<List<AvailableTimeSlotResponse>> findAvailableTimeSlotsInSingleDate(
             @PathVariable Long chefId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam String customerLocation,
@@ -143,7 +103,7 @@ public class AvailabilityFinderController {
             @RequestParam(defaultValue = "6") int maxDishesPerMeal) {
         
         List<AvailableTimeSlotResponse> availableSlots = availabilityFinderService
-                .findAvailableTimeSlotsWithLocationConstraints(
+                .findAvailableTimeSlotsWithInSingleDate(
                     chefId, date, customerLocation, menuId, dishIds, 
                     guestCount, maxDishesPerMeal);
         
@@ -151,8 +111,8 @@ public class AvailabilityFinderController {
     }
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CUSTOMER')")
-    @PostMapping("/chef/{chefId}/location-constraints-vip")
-    public ResponseEntity<List<AvailableTimeSlotResponse>> findAvailableTimeSlotsWithLocationConstraintsVip(
+    @PostMapping("/chef/{chefId}/multiple-dates")
+    public ResponseEntity<List<AvailableTimeSlotResponse>> findAvailableTimeSlotsInMultipleDates(
             @PathVariable Long chefId,
             @RequestParam String customerLocation,
             @RequestParam int guestCount,
@@ -160,7 +120,7 @@ public class AvailabilityFinderController {
             @RequestBody List<AvailableTimeSlotRequest> availableTimeSlotRequests) {
 
         List<AvailableTimeSlotResponse> availableSlots = availabilityFinderService
-                .findAvailableTimeSlotsWithLocationConstraints(
+                .findAvailableTimeSlotsWithInMultipleDates(
                         chefId, customerLocation,guestCount, maxDishesPerMeal,availableTimeSlotRequests);
 
         return ResponseEntity.ok(availableSlots);

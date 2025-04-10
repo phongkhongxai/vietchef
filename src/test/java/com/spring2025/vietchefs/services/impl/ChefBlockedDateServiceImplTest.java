@@ -393,4 +393,131 @@ public class ChefBlockedDateServiceImplTest {
             verify(blockedDateRepository).findByChefAndBlockedDateAndIsDeletedFalse(testChef, date);
         }
     }
+
+    @Test
+    void createBlockedDateForCurrentChef_ShouldThrowException_WhenOverlappingWithExistingBlockedDate() {
+        // Arrange
+        try (MockedStatic<SecurityUtils> securityUtils = mockStatic(SecurityUtils.class)) {
+            securityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            
+            when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
+            when(chefRepository.findByUser(any(User.class))).thenReturn(Optional.of(testChef));
+            
+            // Create a request with a time that overlaps with an existing blocked date
+            ChefBlockedDateRequest overlappingRequest = new ChefBlockedDateRequest();
+            overlappingRequest.setBlockedDate(LocalDate.of(2023, 7, 15)); // Same date as testBlockedDate
+            overlappingRequest.setStartTime(LocalTime.of(9, 0));  // Overlaps with testBlockedDate (10:00-14:00)
+            overlappingRequest.setEndTime(LocalTime.of(11, 0));
+            overlappingRequest.setReason("Overlapping event");
+            
+            // Create a list with the existing blocked date
+            List<ChefBlockedDate> existingBlockedDates = List.of(testBlockedDate);
+            
+            when(blockedDateRepository.findByChefAndBlockedDateAndIsDeletedFalse(any(Chef.class), any(LocalDate.class)))
+                    .thenReturn(existingBlockedDates);
+
+            // Act & Assert
+            VchefApiException exception = assertThrows(VchefApiException.class, () -> {
+                blockedDateService.createBlockedDateForCurrentChef(overlappingRequest);
+            });
+            
+            assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+            assertTrue(exception.getMessage().contains("Time slot conflicts with an existing blocked date"));
+        }
+    }
+    
+    @Test
+    void updateBlockedDate_ShouldThrowException_WhenModifiedTimeOverlapsWithExistingBlockedDate() {
+        // Arrange
+        try (MockedStatic<SecurityUtils> securityUtils = mockStatic(SecurityUtils.class)) {
+            securityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            
+            // Create first blocked date (the one being updated)
+            ChefBlockedDate firstBlockedDate = new ChefBlockedDate();
+            firstBlockedDate.setBlockId(1L);
+            firstBlockedDate.setChef(testChef);
+            firstBlockedDate.setBlockedDate(LocalDate.of(2023, 7, 16));
+            firstBlockedDate.setStartTime(LocalTime.of(9, 0));
+            firstBlockedDate.setEndTime(LocalTime.of(10, 0));
+            
+            // Create second blocked date (already in the system)
+            ChefBlockedDate secondBlockedDate = new ChefBlockedDate();
+            secondBlockedDate.setBlockId(2L);
+            secondBlockedDate.setChef(testChef);
+            secondBlockedDate.setBlockedDate(LocalDate.of(2023, 7, 16)); // Same date
+            secondBlockedDate.setStartTime(LocalTime.of(11, 0));
+            secondBlockedDate.setEndTime(LocalTime.of(14, 0));
+            
+            // Create update request that would extend the first blocked date to overlap with the second
+            ChefBlockedDateUpdateRequest updateRequest = new ChefBlockedDateUpdateRequest();
+            updateRequest.setBlockId(1L);
+            updateRequest.setBlockedDate(LocalDate.of(2023, 7, 16));
+            updateRequest.setStartTime(LocalTime.of(9, 0));
+            updateRequest.setEndTime(LocalTime.of(12, 0)); // Now extends into second blocked date's time
+            
+            when(blockedDateRepository.findById(1L)).thenReturn(Optional.of(firstBlockedDate));
+            when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
+            when(chefRepository.findByUser(any(User.class))).thenReturn(Optional.of(testChef));
+            
+            // Return both blocked dates when checking for conflicts
+            when(blockedDateRepository.findByChefAndBlockedDateAndIsDeletedFalse(
+                    eq(testChef), eq(LocalDate.of(2023, 7, 16))))
+                    .thenReturn(List.of(firstBlockedDate, secondBlockedDate));
+            
+            // Act & Assert
+            VchefApiException exception = assertThrows(VchefApiException.class, () -> {
+                blockedDateService.updateBlockedDate(updateRequest);
+            });
+            
+            assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+            assertTrue(exception.getMessage().contains("Time slot conflicts with an existing blocked date"));
+            
+            // Verify that the repository methods were called correctly
+            verify(blockedDateRepository).findById(1L);
+            verify(blockedDateRepository).findByChefAndBlockedDateAndIsDeletedFalse(
+                    eq(testChef), eq(LocalDate.of(2023, 7, 16)));
+        }
+    }
+
+    @Test
+    void createBlockedDateForCurrentChef_ShouldThrowException_WhenCompletelyOverlapsWithExistingBlockedDate() {
+        // Arrange
+        try (MockedStatic<SecurityUtils> securityUtils = mockStatic(SecurityUtils.class)) {
+            securityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            
+            when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
+            when(chefRepository.findByUser(any(User.class))).thenReturn(Optional.of(testChef));
+            
+            // Existing blocked date
+            ChefBlockedDate existingBlockedDate = new ChefBlockedDate();
+            existingBlockedDate.setBlockId(1L);
+            existingBlockedDate.setChef(testChef);
+            existingBlockedDate.setBlockedDate(LocalDate.of(2023, 7, 15));
+            existingBlockedDate.setStartTime(LocalTime.of(10, 0));
+            existingBlockedDate.setEndTime(LocalTime.of(14, 0));
+            
+            // Create a request with exactly the same time as existing blocked date
+            ChefBlockedDateRequest duplicateRequest = new ChefBlockedDateRequest();
+            duplicateRequest.setBlockedDate(LocalDate.of(2023, 7, 15));
+            duplicateRequest.setStartTime(LocalTime.of(10, 0));  // Same as existing
+            duplicateRequest.setEndTime(LocalTime.of(14, 0));    // Same as existing
+            duplicateRequest.setReason("Duplicate event");
+            
+            when(blockedDateRepository.findByChefAndBlockedDateAndIsDeletedFalse(
+                    eq(testChef), eq(LocalDate.of(2023, 7, 15))))
+                    .thenReturn(List.of(existingBlockedDate));
+
+            // Act & Assert
+            VchefApiException exception = assertThrows(VchefApiException.class, () -> {
+                blockedDateService.createBlockedDateForCurrentChef(duplicateRequest);
+            });
+            
+            assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+            assertTrue(exception.getMessage().contains("Time slot conflicts with an existing blocked date"));
+            
+            // Verify repository was called with correct parameters
+            verify(blockedDateRepository).findByChefAndBlockedDateAndIsDeletedFalse(
+                    eq(testChef), eq(LocalDate.of(2023, 7, 15)));
+        }
+    }
 }
