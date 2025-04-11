@@ -16,6 +16,9 @@ import java.util.List;
 public interface BookingRepository extends JpaRepository<Booking, Long> {
     Page<Booking> findByCustomerIdAndIsDeletedFalse(Long customerId, Pageable pageable);
     Page<Booking> findByChefIdAndIsDeletedFalse(Long chefId, Pageable pageable);
+    Page<Booking> findByChefIdAndStatusNotInAndIsDeletedFalse(Long chefId, List<String> statusList, Pageable pageable);
+
+
     List<Booking> findByStatusInAndCreatedAtBefore(List<String> statuses, LocalDateTime before);
 
 

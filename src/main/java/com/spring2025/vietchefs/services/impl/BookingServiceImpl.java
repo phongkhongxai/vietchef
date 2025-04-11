@@ -108,9 +108,9 @@ public class BookingServiceImpl implements BookingService {
 
         // create Pageable instance
         Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
-
-        Page<Booking> bookings = bookingRepository.findByChefIdAndIsDeletedFalse(chef.getId(),pageable);
-
+        List<String> excludedStatuses = List.of("PENDING", "OVERDUE");
+        Page<Booking> bookings = bookingRepository.findByChefIdAndStatusNotInAndIsDeletedFalse(chef.getId(), excludedStatuses, pageable);
+ 
         // get content for page object
         List<Booking> listOfBookings = bookings.getContent();
 
@@ -866,7 +866,7 @@ public class BookingServiceImpl implements BookingService {
         CustomerTransaction transaction = new CustomerTransaction();
         transaction.setWallet(wallet);
         transaction.setBooking(booking);
-        transaction.setTransactionType("DEPOSIT");
+        transaction.setTransactionType("INITIAL_PAYMENT");
         transaction.setAmount(depositAmount);
         transaction.setStatus("COMPLETED");
         transaction.setDescription("Deposit for Long-Term Booking #" + booking.getId() +

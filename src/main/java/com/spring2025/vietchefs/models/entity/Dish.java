@@ -29,12 +29,12 @@ public class Dish {
     private String cuisineType;
 
     @Column(nullable = false)
-    private String serviceType;
+    private String serviceType;//phục vụ tại nhà
     @Column(nullable = false)
-    private BigDecimal cookTime; // Thời gian nấu trung bình phut
+    private BigDecimal cookTime; // Thời gian nấu trung bình phut từ 5p đến 45p
 
     @Column(nullable = false)
-    private BigDecimal basePrice; // Giá cơ bản cho mỗi người
+    private BigDecimal basePrice; // Giá cơ bản cho mỗi người từ 0 đến 5 thôi
 
     private String imageUrl;
     private LocalTime preparationTime;
@@ -48,5 +48,5 @@ public class Dish {
 
     @ManyToOne
     @JoinColumn(name = "food_type_id", nullable = false)
-    private FoodType foodType;
+    private FoodType foodType; // dựa trên foodType đã tạo
 }
