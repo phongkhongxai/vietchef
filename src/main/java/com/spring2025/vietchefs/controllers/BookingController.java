@@ -1,5 +1,6 @@
 package com.spring2025.vietchefs.controllers;
 
+import com.spring2025.vietchefs.models.entity.BookingDetail;
 import com.spring2025.vietchefs.models.payload.dto.BookingDetailDto;
 import com.spring2025.vietchefs.models.payload.dto.BookingRequestDto;
 import com.spring2025.vietchefs.models.payload.dto.BookingResponseDto;
@@ -24,6 +25,7 @@ import java.util.List;
 public class BookingController {
     @Autowired
     private BookingService bookingService;
+
     @Autowired
     private UserService userService;
     @Autowired
@@ -53,6 +55,28 @@ public class BookingController {
             @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir){
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
         return bookingService.getBookingsByChefId(bto.getId(),pageNo, pageSize, sortBy, sortDir);
+    }
+    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @GetMapping("/booking-details/chefs")
+    public BookingDetailsResponse getBookingDetailOfChef(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
+            @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
+            @RequestParam(value = "sortBy", defaultValue = AppConstants.DEFAULT_SORT_BY, required = false) String sortBy,
+            @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir){
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        return bookingDetailService.getBookingDetailsByChef(bto.getChefId(),pageNo, pageSize, sortBy, sortDir);
+    }
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @GetMapping("/booking-details/user")
+    public BookingDetailsResponse getBookingDetailOfUser(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
+            @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
+            @RequestParam(value = "sortBy", defaultValue = AppConstants.DEFAULT_SORT_BY, required = false) String sortBy,
+            @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir){
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        return bookingDetailService.getBookingDetailsByCustomer(bto.getId(),pageNo, pageSize, sortBy, sortDir);
     }
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_ADMIN') or hasRole('ROLE_CHEF')")

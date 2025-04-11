@@ -38,12 +38,13 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     @Autowired
     private BookingRepository bookingRepository;
     @Autowired
+    private UserRepository userRepository;
+    @Autowired
     private BookingDetailItemRepository bookingDetailItemRepository;
     @Autowired
     private ChefTransactionRepository chefTransactionRepository;
     @Autowired
     private PaymentCycleService paymentCycleService;
-
     @Autowired
     private ChefRepository chefRepository;
     @Autowired
@@ -137,6 +138,60 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         BookingDetail bookingDetail = bookingDetailRepository.findById(id)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "BookingDetail not found"));
         return modelMapper.map(bookingDetail, BookingDetailDto.class);
+    }
+
+    @Override
+    public BookingDetailsResponse getBookingDetailsByChef(Long chefId, int pageNo, int pageSize, String sortBy, String sortDir) {
+        Chef chef = chefRepository.findById(chefId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"Chef not found with id: "+ chefId));
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+
+        // create Pageable instance
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+
+        Page<BookingDetail> bookingDetails = bookingDetailRepository.findByChefIdAndNotDeleted(chef.getId(),pageable);
+
+        // get content for page object
+        List<BookingDetail> listOfBds = bookingDetails.getContent();
+
+        List<BookingDetailDto> content = listOfBds.stream().map(bt -> modelMapper.map(bt, BookingDetailDto.class)).collect(Collectors.toList());
+
+        BookingDetailsResponse templatesResponse = new BookingDetailsResponse();
+        templatesResponse.setContent(content);
+        templatesResponse.setPageNo(bookingDetails.getNumber());
+        templatesResponse.setPageSize(bookingDetails.getSize());
+        templatesResponse.setTotalElements(bookingDetails.getTotalElements());
+        templatesResponse.setTotalPages(bookingDetails.getTotalPages());
+        templatesResponse.setLast(bookingDetails.isLast());
+        return templatesResponse;
+    }
+
+    @Override
+    public BookingDetailsResponse getBookingDetailsByCustomer(Long customerId, int pageNo, int pageSize, String sortBy, String sortDir) {
+        User customer = userRepository.findById(customerId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"Customer not found with id: "+ customerId));
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+
+        // create Pageable instance
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+
+        Page<BookingDetail> bookingDetails = bookingDetailRepository.findByCustomerIdAndNotDeleted(customer.getId(),pageable);
+
+        // get content for page object
+        List<BookingDetail> listOfBds = bookingDetails.getContent();
+
+        List<BookingDetailDto> content = listOfBds.stream().map(bt -> modelMapper.map(bt, BookingDetailDto.class)).collect(Collectors.toList());
+
+        BookingDetailsResponse templatesResponse = new BookingDetailsResponse();
+        templatesResponse.setContent(content);
+        templatesResponse.setPageNo(bookingDetails.getNumber());
+        templatesResponse.setPageSize(bookingDetails.getSize());
+        templatesResponse.setTotalElements(bookingDetails.getTotalElements());
+        templatesResponse.setTotalPages(bookingDetails.getTotalPages());
+        templatesResponse.setLast(bookingDetails.isLast());
+        return templatesResponse;
     }
 
     @Override
