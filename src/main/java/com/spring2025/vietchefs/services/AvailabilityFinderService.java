@@ -63,39 +63,7 @@ public interface AvailabilityFinderService {
             LocalTime startTime, 
             LocalTime endTime);
     
-    /**
-     * Tìm các khung giờ trống cho chef với tính toán thời gian nấu
-     * 
-     * @param chefId ID của chef
-     * @param date Ngày cần tìm khung giờ trống
-     * @param menuId ID của menu (có thể null)
-     * @param dishIds Danh sách ID của các món ăn
-     * @param guestCount Số lượng khách
-     * @param maxDishesPerMeal Số lượng món ăn tối đa trong bữa ăn
-     * @return Danh sách các khung giờ trống đã điều chỉnh theo thời gian nấu
-     */
-    List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithCookingTime(
-            Long chefId,
-            LocalDate date,
-            Long menuId,
-            List<Long> dishIds,
-            int guestCount,
-            int maxDishesPerMeal);
     
-    /**
-     * Tìm các khung giờ trống cho chef hiện tại với tính toán thời gian nấu
-     * 
-     * @param date Ngày cần tìm khung giờ trống
-     * @param menuId ID của menu (có thể null)
-     * @param dishIds Danh sách ID của các món ăn
-     * @param guestCount Số lượng khách
-     * @return Danh sách các khung giờ trống đã điều chỉnh theo thời gian nấu
-     */
-    List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithCookingTimeForCurrentChef(
-            LocalDate date,
-            Long menuId,
-            List<Long> dishIds,
-            int guestCount);
     
     /**
      * Tìm các khung giờ trống cho chef với tính toán thời gian nấu, thời gian di chuyển và thời gian nghỉ giữa các booking
@@ -109,7 +77,7 @@ public interface AvailabilityFinderService {
      * @param maxDishesPerMeal Số lượng món ăn tối đa trong bữa ăn (dùng khi không có menuId và dishIds)
      * @return Danh sách các khung giờ trống đã điều chỉnh theo thời gian nấu, thời gian di chuyển và thời gian nghỉ
      */
-    List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithLocationConstraints(
+    List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithInSingleDate(
             Long chefId,
             LocalDate date,
             String customerLocation,
@@ -117,7 +85,7 @@ public interface AvailabilityFinderService {
             List<Long> dishIds,
             int guestCount,
             int maxDishesPerMeal);
-    List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithLocationConstraints(
+    List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithInMultipleDates(
             Long chefId,
             String customerLocation,
             int guestCount,

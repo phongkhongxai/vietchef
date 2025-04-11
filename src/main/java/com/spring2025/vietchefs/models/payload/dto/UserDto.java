@@ -20,5 +20,6 @@ public class UserDto {
     private String phone;
     private String username;
     private Long roleId;
+    private Long chefId;
     private String avatarUrl;
 }
