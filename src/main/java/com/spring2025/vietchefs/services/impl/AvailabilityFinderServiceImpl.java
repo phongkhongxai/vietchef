@@ -28,8 +28,10 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -202,112 +204,91 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
             cookTimeHours = calculateService.calculateMaxCookTime(chefId, maxDishesPerMeal, guestCount);
         }
         
-        // Sử dụng minDuration null để lấy tất cả các khung giờ trống cơ bản
-        List<AvailableTimeSlotResponse> availableSlots = findAvailableTimeSlots(chef, date, date);
+        // Tính tổng thời gian chuẩn bị (giờ)
+        int totalPrepMinutes = (int)(cookTimeHours.floatValue() * 60) + (int)(travelTimeHours.floatValue() * 60);
         
-        // Lấy danh sách các booking hiện có của chef vào ngày đó
-        List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking_ChefAndSessionDateAndIsDeletedFalse(chef, date);
-        List<BookingDetail> activeBookings = bookingDetails.stream()
-                .filter(detail -> {
-                    Booking booking = detail.getBooking();
-                    return !booking.getIsDeleted() && 
-                           !List.of("CANCELED", "OVERDUE", "REJECTED").contains(booking.getStatus()) &&
-                           !detail.getIsDeleted() && 
-                           !List.of("CANCELED", "OVERDUE", "REJECTED").contains(detail.getStatus());
-                })
-                .sorted(Comparator.comparing(BookingDetail::getStartTime))
-                .collect(Collectors.toList());
+        // Sử dụng minDuration null để lấy tất cả các khung giờ trống cơ bản
+        // Các slots này đã loại bỏ các booking time
+        List<AvailableTimeSlotResponse> availableSlots = findAvailableTimeSlots(chef, date, date);
         
         // Kết quả cuối cùng
         List<AvailableTimeSlotResponse> adjustedSlots = new ArrayList<>();
         
-        // Kiểm tra từng khung giờ trống với các booking hiện có
+        // Kiểm tra từng khung giờ trống và áp dụng thời gian chuẩn bị
         for (AvailableTimeSlotResponse slot : availableSlots) {
-            boolean isSlotValid = true;
-            LocalTime earliestStartTime = null;
+            // Cần điều chỉnh thời gian bắt đầu để tính đến thời gian nấu ăn và di chuyển
+            LocalTime adjustedStartTime = slot.getStartTime().plusMinutes(totalPrepMinutes);
             
-            for (BookingDetail booking : activeBookings) {
-                // Thời gian kết thúc của booking hiện tại
-                LocalTime existingBookingEndTime = booking.getStartTime(); // startTime là thời gian khách bắt đầu ăn
+            // Nếu thời gian bắt đầu điều chỉnh vẫn trước thời gian kết thúc slot
+            if (adjustedStartTime.isBefore(slot.getEndTime())) {
+                AvailableTimeSlotResponse adjustedSlot = new AvailableTimeSlotResponse();
+                adjustedSlot.setChefId(slot.getChefId());
+                adjustedSlot.setChefName(slot.getChefName());
+                adjustedSlot.setDate(slot.getDate());
+                adjustedSlot.setStartTime(adjustedStartTime); 
+                adjustedSlot.setEndTime(slot.getEndTime());
+                adjustedSlot.setDurationMinutes((int) Duration.between(adjustedStartTime, slot.getEndTime()).toMinutes());
+                adjustedSlot.setNote("Adjusted for " + 
+                        travelTimeHours.setScale(2, RoundingMode.HALF_UP).toString() + " hours travel time and " +
+                        cookTimeHours.setScale(2, RoundingMode.HALF_UP).toString() + " hours cooking time");
                 
-                // Kiểm tra nếu khung giờ trống hiện tại nằm sau booking hiện có
-                if (slot.getStartTime().isAfter(existingBookingEndTime) || 
-                    slot.getStartTime().equals(existingBookingEndTime)) {
-                    
-                    // Tính thời gian khả dụng sớm nhất sau booking hiện có
-                    // = Thời gian kết thúc của booking + 30 phút nghỉ + thời gian di chuyển + thời gian nấu
-                    LocalTime availableAfterExisting = existingBookingEndTime
-                            .plusMinutes(30) // Thêm 30 phút nghỉ bắt buộc
-                            .plusSeconds((int)(travelTimeHours.doubleValue() * 3600)) // Thêm thời gian di chuyển
-                            .plusSeconds((int)(cookTimeHours.doubleValue() * 3600)); // Thêm thời gian nấu
-                    
-                    // Cập nhật thời gian sớm nhất có thể bắt đầu
-                    if (earliestStartTime == null || availableAfterExisting.isAfter(earliestStartTime)) {
-                        earliestStartTime = availableAfterExisting;
-                    }
-                }
-                
-                // Kiểm tra nếu khung giờ trống hiện tại trùng với booking hiện có
-                if (slot.getStartTime().isBefore(existingBookingEndTime) && 
-                    slot.getEndTime().isAfter(existingBookingEndTime.minusMinutes(30))) {
-                    isSlotValid = false;
-                    break;
+                // Chỉ thêm slot nếu thời lượng hợp lệ (ít nhất 30 phút)
+                if (adjustedSlot.getDurationMinutes() >= 30) {
+                    adjustedSlots.add(adjustedSlot);
                 }
             }
-            
-            // Nếu khung giờ hợp lệ và có thời gian sớm nhất được tính toán
-            if (isSlotValid && earliestStartTime != null) {
-                // Nếu thời gian sớm nhất nằm trong khung giờ trống
-                if (earliestStartTime.isBefore(slot.getEndTime())) {
-                    
-                    AvailableTimeSlotResponse adjustedSlot = new AvailableTimeSlotResponse();
-                    adjustedSlot.setChefId(slot.getChefId());
-                    adjustedSlot.setChefName(slot.getChefName());
-                    adjustedSlot.setDate(slot.getDate());
-                    adjustedSlot.setStartTime(earliestStartTime);
-                    adjustedSlot.setEndTime(slot.getEndTime());
-                    adjustedSlot.setDurationMinutes((int) Duration.between(earliestStartTime, slot.getEndTime()).toMinutes());
-                    adjustedSlot.setNote("Adjusted for 30min break, " +
-                            travelTimeHours.setScale(2, RoundingMode.HALF_UP).toString() + " hours travel time and " +
-                            cookTimeHours.setScale(2, RoundingMode.HALF_UP).toString() + " hours cooking time");
-                    
-                    // Only add slots where start time is before end time and duration is positive
-                    if (!adjustedSlot.getStartTime().isAfter(adjustedSlot.getEndTime()) && 
-                            adjustedSlot.getDurationMinutes() > 0) {
-                        adjustedSlots.add(adjustedSlot);
-                    }
-                }
-            }
-            // Nếu không có booking trước đó nhưng khung giờ vẫn hợp lệ
-            else if (isSlotValid && earliestStartTime == null) {
-                // Cần cộng thêm thời gian nấu vào thời gian bắt đầu
-                LocalTime adjustedStartTime = slot.getStartTime()
-                        .plusSeconds((int)(cookTimeHours.doubleValue() * 3600)); // Thêm thời gian nấu
-                
-                if (adjustedStartTime.isBefore(slot.getEndTime())) {
-                    
-                    AvailableTimeSlotResponse adjustedSlot = new AvailableTimeSlotResponse();
-                    adjustedSlot.setChefId(slot.getChefId());
-                    adjustedSlot.setChefName(slot.getChefName());
-                    adjustedSlot.setDate(slot.getDate());
-                    adjustedSlot.setStartTime(adjustedStartTime);
-                    adjustedSlot.setEndTime(slot.getEndTime());
-                    adjustedSlot.setDurationMinutes((int) Duration.between(adjustedStartTime, slot.getEndTime()).toMinutes());
-                    adjustedSlot.setNote("Adjusted for " + cookTimeHours.setScale(2,RoundingMode.HALF_UP).toString() + " hours cooking time");
-                    
-                    // Only add slots where start time is before end time and duration is positive
-                    if (!adjustedSlot.getStartTime().isAfter(adjustedSlot.getEndTime()) && 
-                            adjustedSlot.getDurationMinutes() > 0) {
-                        adjustedSlots.add(adjustedSlot);
-                    }
-                }
-            }
+            // Nếu thời gian bắt đầu điều chỉnh sau thời gian kết thúc, bỏ qua slot này
         }
         
         // Sắp xếp kết quả theo thời gian bắt đầu
         Collections.sort(adjustedSlots, Comparator.comparing(AvailableTimeSlotResponse::getStartTime));
         
-        return filterValidTimeSlots(adjustedSlots);
+        // Debug current slots before filtering
+        System.out.println("DEBUG: Before final filtering, found " + adjustedSlots.size() + " slots");
+        for (AvailableTimeSlotResponse slot : adjustedSlots) {
+            System.out.println("DEBUG: Pre-filter slot: " + slot.getStartTime() + " to " + slot.getEndTime());
+        }
+        
+        // Final sanity check - ensure each slot is valid and within a schedule
+        List<AvailableTimeSlotResponse> finalSlots = adjustedSlots.stream()
+                .filter(slot -> {
+                    Chef slotChef = chefRepository.findById(slot.getChefId()).orElse(null);
+                    if (slotChef == null) {
+                        System.out.println("DEBUG: Filtered out slot - chef not found");
+                        return false;
+                    }
+                    
+                    // Get all schedules for this day
+                    int dayOfWeek = (date.getDayOfWeek().getValue() - 1);
+                    List<ChefSchedule> schedules = scheduleRepository.findByChefAndDayOfWeekAndIsDeletedFalse(slotChef, dayOfWeek);
+                    
+                    // For debugging, print all schedules
+                    System.out.println("DEBUG: Found " + schedules.size() + " schedules for dayOfWeek " + dayOfWeek);
+                    for (ChefSchedule schedule : schedules) {
+                        System.out.println("DEBUG: Schedule: " + schedule.getStartTime() + " to " + schedule.getEndTime());
+                    }
+                    
+                    // Check if slot fits entirely within a single schedule
+                    for (ChefSchedule schedule : schedules) {
+                        boolean slotStartsInSchedule = !slot.getStartTime().isBefore(schedule.getStartTime());
+                        boolean slotEndsInSchedule = !slot.getEndTime().isAfter(schedule.getEndTime());
+                        boolean isValid = slotStartsInSchedule && slotEndsInSchedule;
+                        
+                        if (isValid) {
+                            System.out.println("DEBUG: Slot " + slot.getStartTime() + "-" + slot.getEndTime() + 
+                                              " is valid within schedule " + schedule.getStartTime() + "-" + schedule.getEndTime());
+                            return true;
+                        }
+                    }
+                    
+                    System.out.println("DEBUG: Filtered out slot " + slot.getStartTime() + "-" + slot.getEndTime() + 
+                                      " - not within any schedule");
+                    return false;
+                })
+                .collect(Collectors.toList());
+        
+        System.out.println("DEBUG: After final filtering, returning " + finalSlots.size() + " slots");
+        return finalSlots;
     }
 
     @Override
@@ -347,6 +328,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
             List<Long> dishIds = request.getDishIds();
             Long menuId = request.getMenuId();
 
+            // Tính thời gian nấu ăn (giờ)
             BigDecimal cookTimeHours;
             if (menuId != null) {
                 cookTimeHours = calculateService.calculateTotalCookTimeFromMenu(menuId, dishIds, guestCount);
@@ -355,96 +337,91 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
             } else {
                 cookTimeHours = calculateService.calculateMaxCookTime(chefId, maxDishesPerMeal, guestCount);
             }
+            
+            // Tính tổng thời gian chuẩn bị (phút)
+            int totalPrepMinutes = (int)(cookTimeHours.floatValue() * 60) + (int)(travelTimeHours.floatValue() * 60);
 
+            // Lấy các slots đã loại bỏ bookings
             List<AvailableTimeSlotResponse> availableSlots = findAvailableTimeSlots(chef, date, date);
-
-            List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking_ChefAndSessionDateAndIsDeletedFalse(chef, date);
-            List<BookingDetail> activeBookings = bookingDetails.stream()
-                    .filter(detail -> {
-                        Booking booking = detail.getBooking();
-                        return !booking.getIsDeleted() &&
-                                !List.of("CANCELED", "OVERDUE", "REJECTED").contains(booking.getStatus()) &&
-                                !detail.getIsDeleted() &&
-                                !List.of("CANCELED", "OVERDUE", "REJECTED").contains(detail.getStatus());
-                    })
-                    .sorted(Comparator.comparing(BookingDetail::getStartTime))
-                    .collect(Collectors.toList());
-
+            
+            // Kiểm tra từng khung giờ trống và áp dụng thời gian chuẩn bị
             for (AvailableTimeSlotResponse slot : availableSlots) {
-                boolean isSlotValid = true;
-                LocalTime earliestStartTime = null;
-
-                for (BookingDetail booking : activeBookings) {
-                    LocalTime existingBookingEndTime = booking.getStartTime();
-
-                    if (slot.getStartTime().isAfter(existingBookingEndTime) ||
-                            slot.getStartTime().equals(existingBookingEndTime)) {
-
-                        LocalTime availableAfterExisting = existingBookingEndTime
-                                .plusMinutes(30)
-                                .plusSeconds((int) (travelTimeHours.doubleValue() * 3600))
-                                .plusSeconds((int) (cookTimeHours.doubleValue() * 3600));
-
-                        if (earliestStartTime == null || availableAfterExisting.isAfter(earliestStartTime)) {
-                            earliestStartTime = availableAfterExisting;
-                        }
-                    }
-
-                    if (slot.getStartTime().isBefore(existingBookingEndTime) &&
-                            slot.getEndTime().isAfter(existingBookingEndTime.minusMinutes(30))) {
-                        isSlotValid = false;
-                        break;
+                // Điều chỉnh thời gian bắt đầu dựa trên thời gian chuẩn bị
+                LocalTime adjustedStartTime = slot.getStartTime().plusMinutes(totalPrepMinutes);
+                
+                // Nếu thời gian bắt đầu điều chỉnh vẫn trước thời gian kết thúc slot
+                if (adjustedStartTime.isBefore(slot.getEndTime())) {
+                    AvailableTimeSlotResponse adjustedSlot = new AvailableTimeSlotResponse();
+                    adjustedSlot.setChefId(slot.getChefId());
+                    adjustedSlot.setChefName(slot.getChefName());
+                    adjustedSlot.setDate(slot.getDate());
+                    adjustedSlot.setStartTime(adjustedStartTime);
+                    adjustedSlot.setEndTime(slot.getEndTime());
+                    adjustedSlot.setDurationMinutes((int) Duration.between(adjustedStartTime, slot.getEndTime()).toMinutes());
+                    adjustedSlot.setNote("Adjusted for " + 
+                            travelTimeHours.setScale(2, RoundingMode.HALF_UP).toString() + " hours travel time and " +
+                            cookTimeHours.setScale(2, RoundingMode.HALF_UP).toString() + " hours cooking time");
+                    
+                    // Chỉ thêm slot nếu thời lượng hợp lệ (ít nhất 30 phút)
+                    if (adjustedSlot.getDurationMinutes() >= 30) {
+                        allAdjustedSlots.add(adjustedSlot);
                     }
                 }
-
-                if (isSlotValid && earliestStartTime != null) {
-                    if (earliestStartTime.isBefore(slot.getEndTime())) {
-                        AvailableTimeSlotResponse adjustedSlot = new AvailableTimeSlotResponse();
-                        adjustedSlot.setChefId(slot.getChefId());
-                        adjustedSlot.setChefName(slot.getChefName());
-                        adjustedSlot.setDate(slot.getDate());
-                        adjustedSlot.setStartTime(earliestStartTime);
-                        adjustedSlot.setEndTime(slot.getEndTime());
-                        adjustedSlot.setDurationMinutes((int) Duration.between(earliestStartTime, slot.getEndTime()).toMinutes());
-                        adjustedSlot.setNote("Adjusted for 30min break, " +
-                                travelTimeHours.setScale(2,RoundingMode.HALF_UP) + " hours travel time and " +
-                                cookTimeHours.setScale(2,RoundingMode.HALF_UP) + " hours cooking time");
-
-                        // Only add slots where start time is before end time and duration is positive
-                        if (!adjustedSlot.getStartTime().isAfter(adjustedSlot.getEndTime()) && 
-                                adjustedSlot.getDurationMinutes() > 0) {
-                            allAdjustedSlots.add(adjustedSlot);
-                        }
-                    }
-                } else if (isSlotValid && earliestStartTime == null) {
-                    LocalTime adjustedStartTime = slot.getStartTime()
-                            .plusSeconds((int) (cookTimeHours.doubleValue() * 3600));
-
-                    if (adjustedStartTime.isBefore(slot.getEndTime())) {
-                        AvailableTimeSlotResponse adjustedSlot = new AvailableTimeSlotResponse();
-                        adjustedSlot.setChefId(slot.getChefId());
-                        adjustedSlot.setChefName(slot.getChefName());
-                        adjustedSlot.setDate(slot.getDate());
-                        adjustedSlot.setStartTime(adjustedStartTime);
-                        adjustedSlot.setEndTime(slot.getEndTime());
-                        adjustedSlot.setDurationMinutes((int) Duration.between(adjustedStartTime, slot.getEndTime()).toMinutes());
-                        adjustedSlot.setNote("Adjusted for " + cookTimeHours.setScale(2,RoundingMode.HALF_UP) + " hours cooking time");
-
-                        // Only add slots where start time is before end time and duration is positive
-                        if (!adjustedSlot.getStartTime().isAfter(adjustedSlot.getEndTime()) && 
-                                adjustedSlot.getDurationMinutes() > 0) {
-                            allAdjustedSlots.add(adjustedSlot);
-                        }
-                    }
-                }
+                // Nếu thời gian điều chỉnh vượt quá thời gian kết thúc, bỏ qua slot này
             }
         }
 
+        // Sắp xếp slot theo ngày và thời gian bắt đầu
         Collections.sort(allAdjustedSlots, Comparator
                 .comparing(AvailableTimeSlotResponse::getDate)
                 .thenComparing(AvailableTimeSlotResponse::getStartTime));
 
-        return filterValidTimeSlots(allAdjustedSlots);
+        // Debug current slots before filtering
+        System.out.println("DEBUG: Before final filtering, found " + allAdjustedSlots.size() + " slots");
+        for (AvailableTimeSlotResponse slot : allAdjustedSlots) {
+            System.out.println("DEBUG: Pre-filter slot: " + slot.getDate() + " " + slot.getStartTime() + " to " + slot.getEndTime());
+        }
+        
+        // Final sanity check - ensure each slot is valid and within a schedule
+        List<AvailableTimeSlotResponse> finalSlots = allAdjustedSlots.stream()
+                .filter(slot -> {
+                    Chef slotChef = chefRepository.findById(slot.getChefId()).orElse(null);
+                    if (slotChef == null) {
+                        System.out.println("DEBUG: Filtered out slot - chef not found");
+                        return false;
+                    }
+                    
+                    // Get all schedules for this day
+                    int dayOfWeek = (slot.getDate().getDayOfWeek().getValue() - 1);
+                    List<ChefSchedule> schedules = scheduleRepository.findByChefAndDayOfWeekAndIsDeletedFalse(slotChef, dayOfWeek);
+                    
+                    // For debugging, print all schedules
+                    System.out.println("DEBUG: Found " + schedules.size() + " schedules for dayOfWeek " + dayOfWeek);
+                    for (ChefSchedule schedule : schedules) {
+                        System.out.println("DEBUG: Schedule: " + schedule.getStartTime() + " to " + schedule.getEndTime());
+                    }
+                    
+                    // Check if slot fits entirely within a single schedule
+                    for (ChefSchedule schedule : schedules) {
+                        boolean slotStartsInSchedule = !slot.getStartTime().isBefore(schedule.getStartTime());
+                        boolean slotEndsInSchedule = !slot.getEndTime().isAfter(schedule.getEndTime());
+                        boolean isValid = slotStartsInSchedule && slotEndsInSchedule;
+                        
+                        if (isValid) {
+                            System.out.println("DEBUG: Slot " + slot.getStartTime() + "-" + slot.getEndTime() + 
+                                              " is valid within schedule " + schedule.getStartTime() + "-" + schedule.getEndTime());
+                            return true;
+                        }
+                    }
+                    
+                    System.out.println("DEBUG: Filtered out slot " + slot.getStartTime() + "-" + slot.getEndTime() + 
+                                      " - not within any schedule");
+                    return false;
+                })
+                .collect(Collectors.toList());
+        
+        System.out.println("DEBUG: After final filtering, returning " + finalSlots.size() + " slots");
+        return finalSlots;
     }
 
     /**
@@ -468,7 +445,8 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         // Duyệt qua từng ngày trong khoảng
         while (!currentDate.isAfter(endDate)) {
             // Lấy lịch làm việc của chef vào ngày hiện tại
-            int dayOfWeek = currentDate.getDayOfWeek().getValue() % 7;
+            // Chuyển đổi dayOfWeek từ 1-7 (Monday-Sunday) sang 0-6 (Monday-Sunday)
+            int dayOfWeek = (currentDate.getDayOfWeek().getValue() - 1);
             List<ChefSchedule> schedules = scheduleRepository.findByChefAndDayOfWeekAndIsDeletedFalse(chef, dayOfWeek);
             
             // Nếu không có lịch làm việc vào ngày này, bỏ qua
@@ -504,156 +482,124 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
     /**
      * Tìm các khung giờ trống trong một lịch làm việc cụ thể
      */
-    private List<AvailableTimeSlotResponse> findAvailableSlotsInSchedule(
-            Chef chef, 
-            LocalDate date, 
-            ChefSchedule schedule, 
-            List<ChefBlockedDate> blockedDates, 
-            int prepTimeMinutes,
-            int cleanupTimeMinutes) {
+    public List<AvailableTimeSlotResponse> findAvailableSlotsInSchedule(
+            Chef chef, LocalDate date, ChefSchedule schedule, 
+            List<ChefBlockedDate> blockedDates, int prepTimeMinutes, int cleanupTimeMinutes) {
         
         List<AvailableTimeSlotResponse> availableSlots = new ArrayList<>();
         
-        // Thời gian bắt đầu và kết thúc của lịch làm việc
+        // Get start and end times from schedule
         LocalTime scheduleStart = schedule.getStartTime();
         LocalTime scheduleEnd = schedule.getEndTime();
         
-        // Danh sách các khoảng thời gian không khả dụng (bị chặn hoặc đã có booking)
-        List<TimeRange> unavailableRanges = new ArrayList<>();
+        // Check if schedule time is blocked
+        boolean isBlocked = blockedDates.stream()
+                .anyMatch(blockedDate -> 
+                    hasTimeOverlap(scheduleStart, scheduleEnd, 
+                                 blockedDate.getStartTime(), blockedDate.getEndTime()));
         
-        // Thêm các khoảng thời gian bị chặn
-        for (ChefBlockedDate blockedDate : blockedDates) {
-            // Nếu thời gian bị chặn nằm trong lịch làm việc
-            if (hasTimeOverlap(scheduleStart, scheduleEnd, 
-                    blockedDate.getStartTime(), blockedDate.getEndTime())) {
-                
-                // Thêm vào danh sách không khả dụng
-                unavailableRanges.add(new TimeRange(
-                        blockedDate.getStartTime(), 
-                        blockedDate.getEndTime()));
-            }
+        if (isBlocked) {
+            return availableSlots;
         }
         
-        // Lấy danh sách các BookingDetail của chef trong ngày này
-        List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking_ChefAndSessionDateAndIsDeletedFalse(chef, date);
+        // Get all bookings for this date
+        List<BookingDetail> bookings = bookingDetailRepository.findByBooking_ChefAndSessionDateAndIsDeletedFalse(chef, date);
         
-        // Lọc ra các booking còn active
-        List<BookingDetail> activeBookings = bookingDetails.stream()
+        // Filter to only consider active bookings that overlap with this schedule's time range
+        List<BookingDetail> activeBookings = bookings.stream()
                 .filter(detail -> {
-                    // Booking vẫn còn active
+                    if (detail == null) return false;
+                    
                     Booking booking = detail.getBooking();
-                    return !booking.getIsDeleted() &&
+                    if (booking == null) return false;
+                    
+                    // Check if booking is active
+                    boolean isActive = !booking.getIsDeleted() && 
                            !List.of("CANCELED", "OVERDUE", "REJECTED").contains(booking.getStatus()) &&
                            !detail.getIsDeleted() && 
                            !List.of("CANCELED", "OVERDUE", "REJECTED").contains(detail.getStatus());
+                    
+                    if (!isActive) return false;
+                    
+                    // Check if booking overlaps with this schedule time range
+                    LocalTime bookingStart = detail.getTimeBeginTravel();
+                    LocalTime bookingEnd = detail.getStartTime();
+                    
+                    // Check if the booking time range and schedule time range overlap
+                    // A booking overlaps with the schedule if:
+                    // 1. The booking starts within the schedule time range, or
+                    // 2. The booking ends within the schedule time range, or
+                    // 3. The booking spans the entire schedule time range
+                    return (bookingStart.compareTo(scheduleStart) >= 0 && bookingStart.compareTo(scheduleEnd) < 0) || // Booking starts in schedule 
+                           (bookingEnd.compareTo(scheduleStart) > 0 && bookingEnd.compareTo(scheduleEnd) <= 0) ||     // Booking ends in schedule
+                           (bookingStart.compareTo(scheduleStart) <= 0 && bookingEnd.compareTo(scheduleEnd) >= 0);    // Booking spans entire schedule
                 })
+                .sorted(Comparator.comparing(BookingDetail::getTimeBeginTravel))
                 .collect(Collectors.toList());
         
-        // Thêm các khoảng thời gian đã có booking, bao gồm cả 1 giờ trước đó cho việc di chuyển
-        for (BookingDetail booking : activeBookings) {
-            // Lấy thời gian bắt đầu nấu và thời gian kết thúc dịch vụ
-            LocalTime bookingStartTime = booking.getStartTime();
-            LocalTime bookingTravelTime = booking.getTimeBeginTravel();
-            
-            // Skip if required fields are null
-            if (bookingStartTime == null || bookingTravelTime == null) {
-                continue;
-            }
-            
-            // Thêm vào danh sách không khả dụng
-            // Phạm vi không khả dụng: từ thời gian bắt đầu di chuyển đến thời gian kết thúc dịch vụ
-            if (hasTimeOverlap(scheduleStart, scheduleEnd, bookingTravelTime, bookingStartTime)) {
-                unavailableRanges.add(new TimeRange(bookingTravelTime, bookingStartTime));
-            }
-        }
-        
-        // Nếu không có thông tin chi tiết về bookings, sử dụng phương pháp đơn giản hơn
-        if (activeBookings.isEmpty() && bookingConflictService.hasBookingConflict(chef, date, scheduleStart, scheduleEnd)) {
-            // TODO: Improve this to get exact booking conflict times
-            // For now, we'll use a simplified approach - checking every 30 minute interval
-            LocalTime current = scheduleStart;
-            while (current.isBefore(scheduleEnd)) {
-                LocalTime slotEnd = current.plusMinutes(30); // Check for 30-min slots
-                if (slotEnd.isAfter(scheduleEnd)) {
-                    break;
-                }
-                
-                // Kiểm tra xung đột với booking
-                if (bookingConflictService.hasBookingConflict(chef, date, current, slotEnd)) {
-                    // Sử dụng slotEnd cho thời gian bắt đầu của booking, nhưng thêm 1 giờ cho việc di chuyển
-                    LocalTime bookingStartTime = slotEnd;
-                    LocalTime travelStartTime = bookingStartTime.minusHours(1);
-                    
-                    // Thêm vào danh sách không khả dụng với buffer trước 1 giờ
-                    if (travelStartTime.isAfter(current)) {
-                        unavailableRanges.add(new TimeRange(travelStartTime, bookingStartTime));
-                    } else {
-                        unavailableRanges.add(new TimeRange(current, bookingStartTime));
-                    }
-                }
-                
-                current = current.plusMinutes(30); // Kiểm tra mỗi 30 phút
-            }
-        }
-        
-        // Sắp xếp các khoảng thời gian không khả dụng theo thời gian bắt đầu
-        Collections.sort(unavailableRanges, Comparator.comparing(TimeRange::getStart));
-        
-        // Hợp nhất các khoảng thời gian không khả dụng chồng chéo
-        List<TimeRange> mergedUnavailableRanges = mergeOverlappingRanges(unavailableRanges);
-        
-        // Tìm các khoảng thời gian trống giữa các khoảng không khả dụng
-        List<TimeRange> availableRanges = findAvailableRanges(
-                scheduleStart, scheduleEnd, mergedUnavailableRanges);
-        
-        // Chuyển đổi các khoảng thời gian trống thành các khoảng đặt hàng có thể
-        for (TimeRange availableRange : availableRanges) {
-            LocalTime bookingStart = availableRange.getStart().plusMinutes(prepTimeMinutes);
-            LocalTime bookingEnd = availableRange.getEnd().minusMinutes(cleanupTimeMinutes);
-            
-            // Kiểm tra nếu thời gian kết thúc vẫn sau thời gian bắt đầu
-            if (bookingEnd.isBefore(bookingStart) || bookingEnd.equals(bookingStart)) {
-                continue; // Bỏ qua khoảng thời gian không hợp lệ
-            }
-            
-            // Kiểm tra nếu có booking tiếp theo, thêm 1 giờ cho việc di chuyển
-            LocalTime adjustedBookingEnd = bookingEnd;
-            
-            // Tìm booking gần nhất sau khoảng thời gian này
-            Optional<LocalTime> nextBookingStartTravel = findNextBookingTravelTime(activeBookings, bookingEnd);
-            if (nextBookingStartTravel.isPresent()) {
-                // Điều chỉnh thời gian kết thúc để đảm bảo có 1 giờ di chuyển trước booking tiếp theo
-                LocalTime requiredEndTime = nextBookingStartTravel.get();
-                if (requiredEndTime.isBefore(bookingEnd) || 
-                        Duration.between(bookingEnd, requiredEndTime).toMinutes() < 60) {
-                    // Điều chỉnh thời gian kết thúc đến 1 giờ trước thời gian di chuyển của booking tiếp theo
-                    adjustedBookingEnd = requiredEndTime.minusHours(1);
-                    
-                    // Nếu thời gian kết thúc điều chỉnh sớm hơn thời gian bắt đầu, bỏ qua khoảng thời gian này
-                    if (adjustedBookingEnd.isBefore(bookingStart) || 
-                            adjustedBookingEnd.equals(bookingStart)) {
-                        continue;
-                    }
-                }
-            }
-            
-            // Tính thời lượng của khoảng thời gian này
-            int durationMinutes = (int) Duration.between(bookingStart, adjustedBookingEnd).toMinutes();
-            
-            // Tạo response
-            AvailableTimeSlotResponse slot = AvailableTimeSlotResponse.builder()
-                    .chefId(chef.getId())
-                    .chefName(chef.getUser().getFullName())
-                    .date(date)
-                    .startTime(bookingStart)
-                    .endTime(adjustedBookingEnd)
-                    .durationMinutes(durationMinutes)
-                    .note("Available slot includes " + prepTimeMinutes + " min prep time and " + 
-                            cleanupTimeMinutes + " min cleanup time" + 
-                            (adjustedBookingEnd != bookingEnd ? " with 1 hour travel buffer before next booking" : ""))
-                    .build();
-            
+        // Nếu không có booking nào, trả về một slot cho toàn bộ lịch làm việc
+        if (activeBookings.isEmpty()) {
+            AvailableTimeSlotResponse slot = new AvailableTimeSlotResponse();
+            slot.setChefId(chef.getId());
+            slot.setChefName(chef.getUser().getFullName());
+            slot.setDate(date);
+            slot.setStartTime(scheduleStart);
+            slot.setEndTime(scheduleEnd);
+            slot.setDurationMinutes((int) Duration.between(scheduleStart, scheduleEnd).toMinutes());
             availableSlots.add(slot);
+            return availableSlots;
+        }
+        
+        // Thời gian hiện tại bắt đầu từ thời gian bắt đầu lịch làm việc
+        LocalTime currentTime = scheduleStart;
+        
+        // Process each booking
+        for (BookingDetail booking : activeBookings) {
+            // Thời gian bắt đầu booking là thời gian bắt đầu di chuyển
+            LocalTime bookingStartTime = booking.getTimeBeginTravel();
+            
+            // If there's a gap between current time and booking start, it's a potential slot
+            if (currentTime.isBefore(bookingStartTime)) {
+                // Tạo slot từ currentTime đến bookingStartTime
+                AvailableTimeSlotResponse slot = new AvailableTimeSlotResponse();
+                slot.setChefId(chef.getId());
+                slot.setChefName(chef.getUser().getFullName());
+                slot.setDate(date);
+                slot.setStartTime(currentTime);
+                slot.setEndTime(bookingStartTime);
+                slot.setDurationMinutes((int) Duration.between(currentTime, bookingStartTime).toMinutes());
+                
+                // Chỉ thêm slot nếu thời lượng hợp lệ (ít nhất 30 phút)
+                if (slot.getDurationMinutes() >= 30) {
+                    availableSlots.add(slot);
+                }
+            }
+            
+            // Move current time to after this booking 
+            // Thời gian kết thúc booking là startTime (thời điểm khách bắt đầu ăn)
+            // Cộng thêm 30 phút làm thời gian nghỉ
+            currentTime = booking.getStartTime().plusMinutes(30);
+            
+            // If current time is now beyond the schedule's end time, we're done with this schedule
+            if (currentTime.isAfter(scheduleEnd)) {
+                break;
+            }
+        }
+        
+        // Check for one last slot after the last booking
+        if (currentTime.isBefore(scheduleEnd)) {
+            AvailableTimeSlotResponse slot = new AvailableTimeSlotResponse();
+            slot.setChefId(chef.getId());
+            slot.setChefName(chef.getUser().getFullName());
+            slot.setDate(date);
+            slot.setStartTime(currentTime);
+            slot.setEndTime(scheduleEnd);
+            slot.setDurationMinutes((int) Duration.between(currentTime, scheduleEnd).toMinutes());
+            
+            // Chỉ thêm slot nếu thời lượng hợp lệ (ít nhất 30 phút)
+            if (slot.getDurationMinutes() >= 30) {
+                availableSlots.add(slot);
+            }
         }
         
         return availableSlots;
@@ -749,7 +695,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
      * Kiểm tra xem một khung giờ có nằm trong lịch làm việc của chef hay không
      */
     private boolean isWithinChefSchedule(Chef chef, LocalDate date, LocalTime startTime, LocalTime endTime) {
-        int dayOfWeek = date.getDayOfWeek().getValue() % 7;
+        int dayOfWeek = (date.getDayOfWeek().getValue() - 1);
         List<ChefSchedule> schedules = scheduleRepository.findByChefAndDayOfWeekAndIsDeletedFalse(chef, dayOfWeek);
         
         for (ChefSchedule schedule : schedules) {
@@ -831,12 +777,33 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
      * Lọc các khung giờ không hợp lệ (thời gian bắt đầu sau thời gian kết thúc)
      */
     private List<AvailableTimeSlotResponse> filterValidTimeSlots(List<AvailableTimeSlotResponse> slots) {
-        return slots.stream()
+        // First filter out slots with invalid time ranges
+        List<AvailableTimeSlotResponse> validTimeSlots = slots.stream()
                 .filter(slot -> {
                     if (slot.getStartTime() == null || slot.getEndTime() == null) {
                         return false;
                     }
                     return !slot.getStartTime().isAfter(slot.getEndTime()) && slot.getDurationMinutes() > 0;
+                })
+                .collect(Collectors.toList());
+        
+        // Now filter to ensure slots are within chef's schedules
+        return validTimeSlots.stream()
+                .filter(slot -> {
+                    // Skip slots without chef information
+                    if (slot.getChefId() == null) {
+                        return false;
+                    }
+                    
+                    // Find the chef
+                    Chef chef = chefRepository.findById(slot.getChefId())
+                            .orElse(null);
+                    if (chef == null) {
+                        return false;
+                    }
+                    
+                    // Check if the slot is within chef's schedules
+                    return isWithinChefSchedule(chef, slot.getDate(), slot.getStartTime(), slot.getEndTime());
                 })
                 .collect(Collectors.toList());
     }
