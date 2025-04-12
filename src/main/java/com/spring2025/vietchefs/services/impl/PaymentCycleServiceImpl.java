@@ -38,7 +38,7 @@ public class PaymentCycleServiceImpl implements PaymentCycleService {
         int numOfCycles = getNumOfCycles(booking);
 
         int detailsPerCycle = (int) Math.ceil((double) details.size() / numOfCycles);
-        LocalDate firstPaymentDate = booking.getCreatedAt().toLocalDate().plusDays(1);
+        //LocalDate firstPaymentDate = booking.getCreatedAt().toLocalDate().plusDays(1);
 
         for (int i = 0; i < numOfCycles; i++) {
             int startIdx = i * detailsPerCycle;
@@ -174,18 +174,6 @@ public class PaymentCycleServiceImpl implements PaymentCycleService {
 
     private int getNumOfCycles(Booking booking) {
         int durationDays = booking.getBookingPackage().getDurationDays();
-        int numOfCycles;
-
-        // 🔹 Xác định số kỳ thanh toán dựa trên thời gian của package
-        if (durationDays <= 7) {
-            numOfCycles = 1; // Thanh toán 1 lần
-        } else if (durationDays <= 14) {
-            numOfCycles = 2; // Thanh toán 2 lần
-        } else if (durationDays <= 30) {
-            numOfCycles = 3; // Thanh toán mỗi 10 ngày
-        } else {
-            numOfCycles = durationDays / 15; // Mỗi 15 ngày 1 lần thanh toán
-        }
-        return numOfCycles;
+        return (int) Math.ceil((double) durationDays / 5.0);
     }
 }
