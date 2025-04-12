@@ -210,6 +210,7 @@ public class AuthServiceImpl implements AuthService {
                 return AuthenticationResponse.builder()
                         .accessToken(accessToken)
                         .refreshToken(refreshToken)
+                        .fullName(user.getFullName())
                         .build();
             } else {
                 throw new VchefApiException(HttpStatus.BAD_REQUEST, "Invalid refresh token");
