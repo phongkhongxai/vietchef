@@ -110,7 +110,7 @@ public class BookingServiceImpl implements BookingService {
         Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
         List<String> excludedStatuses = List.of("PENDING", "OVERDUE");
         Page<Booking> bookings = bookingRepository.findByChefIdAndStatusNotInAndIsDeletedFalse(chef.getId(), excludedStatuses, pageable);
- 
+
         // get content for page object
         List<Booking> listOfBookings = bookings.getContent();
 
@@ -715,22 +715,30 @@ public class BookingServiceImpl implements BookingService {
         // 5. Kiểm tra số dư có đủ không
         BigDecimal amountDue = paymentCycle.getAmountDue();
         BigDecimal depositPaid = booking.getDepositPaid(); // Số tiền đặt cọc
-        BigDecimal remainingAmount = amountDue; // Số tiền thực tế cần thanh toán
+        BigDecimal remainingAmount = amountDue;
 
         if (depositPaid.compareTo(BigDecimal.ZERO) > 0) {
-                booking.setDepositPaid(BigDecimal.ZERO);
-                remainingAmount = amountDue.subtract(depositPaid);
+                remainingAmount = amountDue.add(depositPaid);
         }
         // 6. Trừ tiền trong ví
-        if (remainingAmount.compareTo(BigDecimal.ZERO) > 0) {
-            if (wallet.getBalance().compareTo(remainingAmount) < 0) {
-                throw new VchefApiException(HttpStatus.BAD_REQUEST, "Insufficient balance in wallet.");
+        if("PENDING_FIRST_CYCLE".equalsIgnoreCase(booking.getStatus())){
+            if (remainingAmount.compareTo(BigDecimal.ZERO) > 0) {
+                if (wallet.getBalance().compareTo(remainingAmount) < 0) {
+                    throw new VchefApiException(HttpStatus.BAD_REQUEST, "Insufficient balance in wallet.");
+                }
+                // Trừ tiền trong ví
+                wallet.setBalance(wallet.getBalance().subtract(remainingAmount));
+                walletRepository.save(wallet);
             }
-            // Trừ tiền trong ví
-            wallet.setBalance(wallet.getBalance().subtract(remainingAmount));
-            walletRepository.save(wallet);
+        }else{
+            if(paymentCycle.getAmountDue().compareTo(BigDecimal.ZERO) > 0){
+                if (wallet.getBalance().compareTo(paymentCycle.getAmountDue()) < 0) {
+                    throw new VchefApiException(HttpStatus.BAD_REQUEST, "Insufficient balance in wallet.");
+                }
+                wallet.setBalance(wallet.getBalance().subtract(paymentCycle.getAmountDue()));
+                walletRepository.save(wallet);
+            }
         }
-
         // 7. Cập nhật trạng thái của PaymentCycle → "PAID"
         paymentCycle.setStatus("PAID");
         paymentCycleRepository.save(paymentCycle);
@@ -764,14 +772,28 @@ public class BookingServiceImpl implements BookingService {
                 .wallet(wallet)
                 .booking(booking)
                 .transactionType("PAYMENT")
-                .amount(remainingAmount)
+                .amount(paymentCycle.getAmountDue())
                 .status("COMPLETED")
                 .isDeleted(false)
                 .description("Payment for PaymentCycle #" + paymentCycle.getId())
                 .build();
         customerTransactionRepository.save(transaction);
+        if ("PAID_FIRST_CYCLE".equalsIgnoreCase(booking.getStatus())){
+            CustomerTransaction transaction1 = CustomerTransaction.builder()
+                    .wallet(wallet)
+                    .booking(booking)
+                    .transactionType("INITIAL_PAYMENT")
+                    .amount(booking.getDepositPaid())
+                    .status("COMPLETED")
+                    .isDeleted(false)
+                    .description("Deposit for Long-Term Booking #" + booking.getId() +
+                            " with " + booking.getChef().getUser().getFullName() + " Chef.")
+                    .build();
+            customerTransactionRepository.save(transaction);
+        }
+        NotificationRequest chefNotification;
         if(booking.getStatus().equalsIgnoreCase("PAID_FIRST_CYCLE")){
-            NotificationRequest chefNotification = NotificationRequest.builder()
+            chefNotification = NotificationRequest.builder()
                     .userId(booking.getChef().getUser().getId())
                     .title("New Booking Requires Confirmation")
                     .body("A customer has completed a payment for Booking #" + booking.getBookingType() +
@@ -779,9 +801,8 @@ public class BookingServiceImpl implements BookingService {
                     .bookingId(booking.getId())
                     .screen("ChefBookingManagementScreen")
                     .build();
-            notificationService.sendPushNotification(chefNotification);
         }else{
-            NotificationRequest chefNotification = NotificationRequest.builder()
+            chefNotification = NotificationRequest.builder()
                     .userId(booking.getChef().getUser().getId())
                     .title("Customer Paid for Upcoming Sessions")
                     .body("Customer has paid for Payment Cycle #" + paymentCycle.getCycleOrder() +
@@ -790,8 +811,8 @@ public class BookingServiceImpl implements BookingService {
                     .screen("ChefBookingManagementScreen")
                     .build();
 
-            notificationService.sendPushNotification(chefNotification);
         }
+        notificationService.sendPushNotification(chefNotification);
         // 11. Trả về PaymentCycleResponse sau khi thanh toán
         return PaymentCycleResponse.builder()
                 .id(paymentCycle.getId())
@@ -833,10 +854,10 @@ public class BookingServiceImpl implements BookingService {
                     .message("Cannot deposit. The first session has already started or is today.")
                     .build();
         }
-
+        BigDecimal depositAmount = booking.getTotalPrice().multiply(BigDecimal.valueOf(0.05));
         if (!firstSession.isAfter(now.plusDays(2))) {
             booking.setStatus("PENDING_FIRST_CYCLE");
-            booking.setDepositPaid(BigDecimal.valueOf(0));
+            booking.setDepositPaid(depositAmount);
             bookingRepository.save(booking);
             return ApiResponse.<BookingResponseDto>builder()
                     .success(false)
@@ -848,7 +869,6 @@ public class BookingServiceImpl implements BookingService {
         Wallet wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for customer."));
 
-        BigDecimal depositAmount = booking.getTotalPrice().multiply(BigDecimal.valueOf(0.05));
         if (wallet.getBalance().compareTo(depositAmount) < 0) {
             return ApiResponse.<BookingResponseDto>builder()
                     .success(false)
@@ -889,8 +909,6 @@ public class BookingServiceImpl implements BookingService {
                 .screen("ChefBookingManagementScreen")
                 .build();
         notificationService.sendPushNotification(chefNotification);
-
-
 
 
         return ApiResponse.<BookingResponseDto>builder()
@@ -938,18 +956,16 @@ public class BookingServiceImpl implements BookingService {
 
                 Wallet customerWallet = transactions.get(0).getWallet();
                 BigDecimal refundAmount = transactions.get(0).getAmount();
-
                 // Tạo giao dịch hoàn tiền (REFUND)
                 CustomerTransaction refundTransaction = CustomerTransaction.builder()
                         .wallet(customerWallet)
                         .booking(booking)
                         .transactionType("REFUND")
                         .amount(refundAmount)
-                        .description("Refund for canceled booking")
+                        .description("Refund for canceled booking.")
                         .status("COMPLETED")
                         .isDeleted(false)
                         .build();
-
                 customerTransactionRepository.save(refundTransaction);
 
                 customerWallet.setBalance(customerWallet.getBalance().add(refundAmount));

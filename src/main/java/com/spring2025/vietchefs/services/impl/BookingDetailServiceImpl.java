@@ -60,6 +60,8 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     @Autowired
     private AvailabilityFinderService availabilityFinderService;
     @Autowired
+    private CustomerTransactionRepository customerTransactionRepository;
+    @Autowired
     private ModelMapper modelMapper;
     @Override
     public BookingDetail createBookingDetail(Booking booking, BookingDetailRequestDto dto) {
@@ -416,7 +418,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         bookingDetail = bookingDetailRepository.save(bookingDetail);
         if(booking.getBookingType().equalsIgnoreCase("SINGLE")){
             booking.setStatus("COMPLETED");
-            bookingRepository.save(booking);
+            booking = bookingRepository.save(booking);
         }else {
             boolean allDetailsCompleted = booking.getBookingDetails()
                     .stream()
@@ -424,11 +426,33 @@ public class BookingDetailServiceImpl implements BookingDetailService {
 
             if (allDetailsCompleted) {
                 booking.setStatus("COMPLETED");
-                bookingRepository.save(booking);
+                if(booking.getDepositPaid().compareTo(BigDecimal.ZERO) >0){
+                    Wallet walletCus = walletRepository.findByUserId(userId)
+                            .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Customer's wallet not found"));
+                    walletCus.setBalance(walletCus.getBalance().add(booking.getDepositPaid()));
+                    walletRepository.save(walletCus);
+                    booking.setDepositPaid(BigDecimal.ZERO);
+                    booking =bookingRepository.save(booking);
+                    CustomerTransaction refundTransaction = CustomerTransaction.builder()
+                            .wallet(walletCus)
+                            .booking(booking)
+                            .transactionType("REFUND")
+                            .amount(booking.getDepositPaid())
+                            .description("Refund for completed booking with Chef "+booking.getChef().getUser().getFullName()+".")
+                            .status("COMPLETED")
+                            .isDeleted(false)
+                            .build();
+                    customerTransactionRepository.save(refundTransaction);
+                    NotificationRequest notification = NotificationRequest.builder()
+                            .userId(booking.getChef().getUser().getId())
+                            .title("Booking Completed")
+                            .body("Refund deposit paid for completed Booking with Chef "+ booking.getChef().getUser().getFullName()+".")
+                            .screen("Wallet")
+                            .build();
+                    notificationService.sendPushNotification(notification);
+                }
             }
         }
-
-
         // 2. Update wallet balance
         Chef chef = booking.getChef();
         BigDecimal amountToTransfer = bookingDetail.getTotalChefFeePrice();
@@ -438,12 +462,11 @@ public class BookingDetailServiceImpl implements BookingDetailService {
 
         wallet.setBalance(wallet.getBalance().add(amountToTransfer));
         walletRepository.save(wallet);
-
         // 3. Create transaction
         ChefTransaction transaction = new ChefTransaction();
         transaction.setWallet(wallet);
         transaction.setBookingDetail(bookingDetail);
-        transaction.setTransactionType("CREDIT"); // or use enum
+        transaction.setTransactionType("CREDIT");
         transaction.setAmount(amountToTransfer);
         transaction.setStatus("COMPLETED");
         transaction.setDescription("Payment for completed bookingDetail #" + bookingDetail.getId());
@@ -462,7 +485,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         return modelMapper.map(bookingDetail, BookingDetailDto.class);
     }
 
-    @Scheduled(cron = "0 10 13 * * ?") // Mỗi ngày vào lúc nửa đêm 12h01
+    @Scheduled(cron = "0 1 0 * * ?") // Mỗi ngày vào lúc nửa đêm 12h01
     public void updateBookingDetailsStatus() {
         LocalDate currentDate = LocalDate.now();
         List<BookingDetail> bookingDetails = bookingDetailRepository.findBySessionDateAndStatus(currentDate, "LOCKED");
