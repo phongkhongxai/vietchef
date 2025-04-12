@@ -38,9 +38,7 @@ import java.util.stream.Collectors;
 public class AvailabilityFinderServiceImpl implements AvailabilityFinderService {
 
     // Các hằng số cho việc tìm kiếm khung giờ
-    private static final LocalTime DEFAULT_MIN_WORK_HOUR = LocalTime.of(8, 0);
-    private static final LocalTime DEFAULT_MAX_WORK_HOUR = LocalTime.of(22, 0);
-    private static final int DEFAULT_MIN_SLOT_DURATION_MINUTES = 120; // 2 giờ
+    // private static final int DEFAULT_MIN_SLOT_DURATION_MINUTES = 120; // 2 giờ
     private static final int DEFAULT_PREP_TIME_MINUTES = 0; // 0 phút
     private static final int DEFAULT_CLEANUP_TIME_MINUTES = 0; // 0 phút
     private static final int MAX_DAYS_TO_SEARCH = 60; // Giới hạn tìm kiếm 60 ngày
@@ -606,92 +604,6 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
     }
     
     /**
-     * Tìm thời gian bắt đầu di chuyển cho booking tiếp theo
-     * 
-     * @param bookings Danh sách các booking
-     * @param afterTime Thời gian sau đó
-     * @return Thời gian bắt đầu di chuyển của booking tiếp theo
-     */
-    private Optional<LocalTime> findNextBookingTravelTime(List<BookingDetail> bookings, LocalTime afterTime) {
-        return bookings.stream()
-                .filter(b -> b.getTimeBeginTravel() != null && b.getTimeBeginTravel().isAfter(afterTime))
-                .map(BookingDetail::getTimeBeginTravel)
-                .min(LocalTime::compareTo);
-    }
-    
-    /**
-     * Tìm các khoảng thời gian trống giữa các khoảng không khả dụng
-     */
-    private List<TimeRange> findAvailableRanges(
-            LocalTime scheduleStart, 
-            LocalTime scheduleEnd, 
-            List<TimeRange> unavailableRanges) {
-        
-        List<TimeRange> availableRanges = new ArrayList<>();
-        
-        // Nếu không có khoảng thời gian không khả dụng, toàn bộ lịch làm việc là khả dụng
-        if (unavailableRanges.isEmpty()) {
-            availableRanges.add(new TimeRange(scheduleStart, scheduleEnd));
-            return availableRanges;
-        }
-        
-        // Kiểm tra trước khoảng không khả dụng đầu tiên
-        if (scheduleStart.isBefore(unavailableRanges.get(0).getStart())) {
-            LocalTime availableEnd = unavailableRanges.get(0).getStart();
-            availableRanges.add(new TimeRange(scheduleStart, availableEnd));
-        }
-        
-        // Kiểm tra giữa các khoảng không khả dụng
-        for (int i = 0; i < unavailableRanges.size() - 1; i++) {
-            LocalTime availableStart = unavailableRanges.get(i).getEnd();
-            LocalTime availableEnd = unavailableRanges.get(i + 1).getStart();
-            
-            availableRanges.add(new TimeRange(availableStart, availableEnd));
-        }
-        
-        // Kiểm tra sau khoảng không khả dụng cuối cùng
-        if (unavailableRanges.get(unavailableRanges.size() - 1).getEnd().isBefore(scheduleEnd)) {
-            LocalTime availableStart = unavailableRanges.get(unavailableRanges.size() - 1).getEnd();
-            availableRanges.add(new TimeRange(availableStart, scheduleEnd));
-        }
-        
-        return availableRanges;
-    }
-    
-    /**
-     * Hợp nhất các khoảng thời gian chồng chéo
-     */
-    private List<TimeRange> mergeOverlappingRanges(List<TimeRange> ranges) {
-        if (ranges.isEmpty()) {
-            return ranges;
-        }
-        
-        List<TimeRange> mergedRanges = new ArrayList<>();
-        TimeRange current = ranges.get(0);
-        
-        for (int i = 1; i < ranges.size(); i++) {
-            TimeRange next = ranges.get(i);
-            
-            // Nếu hai khoảng chồng chéo, hợp nhất chúng
-            if (hasTimeOverlap(current.getStart(), current.getEnd(), next.getStart(), next.getEnd())) {
-                current = new TimeRange(
-                        current.getStart().isBefore(next.getStart()) ? current.getStart() : next.getStart(),
-                        current.getEnd().isAfter(next.getEnd()) ? current.getEnd() : next.getEnd()
-                );
-            } else {
-                // Nếu không chồng chéo, thêm khoảng hiện tại vào kết quả và di chuyển đến khoảng tiếp theo
-                mergedRanges.add(current);
-                current = next;
-            }
-        }
-        
-        // Thêm khoảng cuối cùng
-        mergedRanges.add(current);
-        
-        return mergedRanges;
-    }
-    
-    /**
      * Kiểm tra xem một khung giờ có nằm trong lịch làm việc của chef hay không
      */
     private boolean isWithinChefSchedule(Chef chef, LocalDate date, LocalTime startTime, LocalTime endTime) {
@@ -817,70 +729,5 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User not found with id: " + userId));
         return chefRepository.findByUser(user)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef profile not found for user id: " + userId));
-    }
-    
-    /**
-     * Điều chỉnh các khung giờ trống dựa trên thời gian nấu
-     * 
-     * @param availableSlots Danh sách khung giờ trống
-     * @param cookTimeHours Thời gian nấu (giờ)
-     * @return Danh sách khung giờ trống đã điều chỉnh
-     */
-    private List<AvailableTimeSlotResponse> adjustTimeSlotsByCookingTime(
-            List<AvailableTimeSlotResponse> availableSlots, BigDecimal cookTimeHours) {
-        
-        List<AvailableTimeSlotResponse> adjustedSlots = new ArrayList<>();
-        
-        // Chuyển thời gian nấu từ giờ sang phút
-        int cookTimeMinutes = cookTimeHours.multiply(BigDecimal.valueOf(60)).intValue();
-        
-        for (AvailableTimeSlotResponse slot : availableSlots) {
-            // Thời gian bắt đầu mới = thời gian bắt đầu cũ + thời gian nấu
-            LocalTime newStartTime = slot.getStartTime().plusMinutes(cookTimeMinutes);
-            
-            // Nếu thời gian bắt đầu mới vẫn trước thời gian kết thúc và vẫn có đủ thời gian tối thiểu
-            if (newStartTime.isBefore(slot.getEndTime()) && 
-                    Duration.between(newStartTime, slot.getEndTime()).toMinutes() >= DEFAULT_MIN_SLOT_DURATION_MINUTES) {
-                
-                // Tạo khung giờ mới đã điều chỉnh
-                AvailableTimeSlotResponse adjustedSlot = new AvailableTimeSlotResponse();
-                adjustedSlot.setChefId(slot.getChefId());
-                adjustedSlot.setChefName(slot.getChefName());
-                adjustedSlot.setDate(slot.getDate());
-                adjustedSlot.setStartTime(newStartTime);
-                adjustedSlot.setEndTime(slot.getEndTime());
-                adjustedSlot.setDurationMinutes((int) Duration.between(newStartTime, slot.getEndTime()).toMinutes());
-                adjustedSlot.setNote("Cooking starts at " + slot.getStartTime() + ", service begins at " + newStartTime);
-                
-                // Only add slots where start time is before end time and duration is positive
-                if (!adjustedSlot.getStartTime().isAfter(adjustedSlot.getEndTime()) && 
-                        adjustedSlot.getDurationMinutes() > 0) {
-                    adjustedSlots.add(adjustedSlot);
-                }
-            }
-        }
-        
-        return adjustedSlots;
-    }
-    
-    /**
-     * Class đại diện cho một khoảng thời gian
-     */
-    private static class TimeRange {
-        private final LocalTime start;
-        private final LocalTime end;
-        
-        public TimeRange(LocalTime start, LocalTime end) {
-            this.start = start;
-            this.end = end;
-        }
-        
-        public LocalTime getStart() {
-            return start;
-        }
-        
-        public LocalTime getEnd() {
-            return end;
-        }
     }
 } 
