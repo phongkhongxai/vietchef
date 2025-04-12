@@ -12,4 +12,8 @@ import java.math.BigDecimal;
 public class DistanceResponse {
     private BigDecimal distanceKm; // Khoảng cách (km)
     private BigDecimal durationHours; // Thời gian di chuyển (giờ)
+
+    public DistanceResponse(BigDecimal durationHours) {
+        this.durationHours = durationHours;
+     }
 }
