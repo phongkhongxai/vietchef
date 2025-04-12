@@ -231,7 +231,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                 LocalTime existingBookingEndTime = booking.getStartTime(); // startTime là thời gian khách bắt đầu ăn
                 
                 // Kiểm tra nếu khung giờ trống hiện tại nằm sau booking hiện có
-                if (slot.getStartTime().isAfter(existingBookingEndTime) || 
+                if ((existingBookingEndTime.isAfter(slot.getStartTime()) && existingBookingEndTime.isBefore(slot.getEndTime())) ||
                     slot.getStartTime().equals(existingBookingEndTime)) {
                     
                     // Tính thời gian khả dụng sớm nhất sau booking hiện có
@@ -377,7 +377,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                 for (BookingDetail booking : activeBookings) {
                     LocalTime existingBookingEndTime = booking.getStartTime();
 
-                    if (slot.getStartTime().isAfter(existingBookingEndTime) ||
+                    if ((existingBookingEndTime.isAfter(slot.getStartTime()) && existingBookingEndTime.isBefore(slot.getEndTime())) ||
                             slot.getStartTime().equals(existingBookingEndTime)) {
 
                         LocalTime availableAfterExisting = existingBookingEndTime
