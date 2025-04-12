@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -223,12 +224,21 @@ public class BookingServiceImpl implements BookingService {
         booking = bookingRepository.save(booking);
 
         List<BookingDetail> bookingDetailList = new ArrayList<>();
-
-        // Tạo các BookingDetail
+        List<String> overlapMessages = new ArrayList<>();
         for (BookingDetailRequestDto detailDto : dto.getBookingDetails()) {
-            BookingDetail detail = bookingDetailService.createBookingDetail(booking, detailDto);
-            bookingDetailList.add(detail);
-            totalPrice = totalPrice.add(detail.getTotalPrice());
+            // Kiểm tra trùng lịch cho từng ngày
+            if (isOverlappingWithExistingBookings(chef, detailDto.getSessionDate(), detailDto.getTimeBeginTravel(), detailDto.getStartTime())) {
+                String overlapMessage = "Chef đã có lịch trong khoảng thời gian này cho ngày " + detailDto.getSessionDate() + ". Vui lòng chọn khung giờ khác.";
+                overlapMessages.add(overlapMessage);
+            } else {
+                BookingDetail detail = bookingDetailService.createBookingDetail(booking, detailDto);
+                bookingDetailList.add(detail);
+                totalPrice = totalPrice.add(detail.getTotalPrice());
+            }
+        }
+
+        if (!overlapMessages.isEmpty()) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, String.join("\n", overlapMessages));
         }
 
         booking.setTotalPrice(totalPrice);
@@ -250,6 +260,36 @@ public class BookingServiceImpl implements BookingService {
         // Chuyển Booking sang DTO để trả về
         return modelMapper.map(booking, BookingResponseDto.class);
     }
+    private boolean isOverlappingWithExistingBookings(Chef chef, LocalDate sessionDate, LocalTime timeBeginTravel, LocalTime startTime) {
+        // Lấy toàn bộ bookingDetails của chef trong ngày đó
+        List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking_ChefAndSessionDateAndIsDeletedFalse(chef, sessionDate);
+        List<BookingDetail> activeBookings = bookingDetails.stream()
+                .filter(detail -> {
+                    Booking booking = detail.getBooking();
+                    return !booking.getIsDeleted() &&
+                            !List.of("CANCELED", "OVERDUE").contains(booking.getStatus()) &&
+                            !detail.getIsDeleted() &&
+                            !List.of("CANCELED", "OVERDUE").contains(detail.getStatus());
+                })
+                .sorted(Comparator.comparing(BookingDetail::getStartTime))
+                .collect(Collectors.toList());
+
+        // Tính khoảng thời gian cần kiểm tra (cho phép lố 10 phút)
+        LocalTime checkStart = timeBeginTravel.minusSeconds(10);
+        LocalTime checkEnd = startTime.plusMinutes(10);
+
+        for (BookingDetail detail : activeBookings) {
+            LocalTime existingStart = detail.getTimeBeginTravel();
+            LocalTime existingEnd = detail.getStartTime();
+
+            boolean isOverlap = !(checkEnd.isBefore(existingStart) || checkStart.isAfter(existingEnd));
+            if (isOverlap) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     @Override
     public ReviewSingleBookingResponse calculateFinalPriceForSingleBooking(BookingPriceRequestDto dto) {
@@ -261,7 +301,9 @@ public class BookingServiceImpl implements BookingService {
 
         BookingDetailPriceRequestDto detailDto = dto.getBookingDetail();
         BigDecimal totalCookTime = BigDecimal.ZERO;
-
+        if (!detailDto.getSessionDate().isAfter(LocalDate.now())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST,"SessionDate should be in the future.");
+        }
             if (detailDto.getMenuId() != null || (detailDto.getExtraDishIds() != null && !detailDto.getExtraDishIds().isEmpty())) {
                 Set<Long> uniqueDishIds = new HashSet<>();
 
@@ -350,6 +392,11 @@ public class BookingServiceImpl implements BookingService {
             throw new VchefApiException(HttpStatus.BAD_REQUEST,
                     "The number of booking details must match the package duration of " + bookingPackage.getDurationDays() + " days.");
         }
+        if(dto.getGuestCount() > bookingPackage.getMaxGuestCountPerMeal()){
+            throw new VchefApiException(HttpStatus.BAD_REQUEST,
+                    "The number of guests can not bigger than " + bookingPackage.getMaxGuestCountPerMeal() + ".");
+        }
+
         // 🔹 Tính phí di chuyển
         DistanceFeeResponse travelFeeResponse = calculateService.calculateTravelFee(chef.getAddress(), dto.getLocation());
         if(travelFeeResponse.getDistanceKm().compareTo(BigDecimal.valueOf(50))>0){
@@ -362,7 +409,15 @@ public class BookingServiceImpl implements BookingService {
 
         for (BookingDetailPriceLTRequest detailDto : dto.getBookingDetails()) {
             BigDecimal totalCookTime = BigDecimal.ZERO;
-
+            if (!detailDto.getSessionDate().isAfter(LocalDate.now())) {
+                throw new VchefApiException(HttpStatus.BAD_REQUEST,"SessionDate should be in the future.");
+            }
+            // 🔹 Kiểm tra sessionDate là hôm nay hoặc ngày mai
+            if (detailDto.getSessionDate().isEqual(LocalDate.now()) || detailDto.getSessionDate().isEqual(LocalDate.now().plusDays(1))) {
+                if (Boolean.FALSE.equals(detailDto.getIsDishSelected()) && (detailDto.getDishes() == null || detailDto.getDishes().isEmpty())) {
+                    throw new VchefApiException(HttpStatus.BAD_REQUEST, "SessionDate is today or tomorrow, you must select a menu or dish.");
+                }
+            }
             // 🔹 Kiểm tra xem BookingDetail đã chọn món chưa
             if (Boolean.FALSE.equals(detailDto.getIsDishSelected()) && detailDto.getDishes()==null) {
                 //  Nếu chưa chọn món, lấy tổng thời gian nấu của 3 món lâu nhất của đầu bếp
