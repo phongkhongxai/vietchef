@@ -1168,6 +1168,25 @@ public class BookingServiceImpl implements BookingService {
 
         return modelMapper.map(booking, BookingResponseDto.class);
     }
+
+    @Override
+    public Set<LocalDate> getFullyBookedDates(Long chefId, List<LocalDate> sessionDates) {
+        Chef chef = chefRepository.findById(chefId)
+                .orElseThrow(() ->  new VchefApiException(HttpStatus.NOT_FOUND,"Chef not found"));
+        List<Object[]> results = bookingDetailRepository.countActiveBookingsByChefAndDates(chef, sessionDates);
+
+        Set<LocalDate> fullyBookedDates = new HashSet<>();
+        for (Object[] row : results) {
+            LocalDate date = (LocalDate) row[0];
+            Long count = (Long) row[1];
+
+            if (count >= 4) {
+                fullyBookedDates.add(date);
+            }
+        }
+        return fullyBookedDates;
+    }
+
     //@Scheduled(cron = "0 0 2 * * ?") // Chạy mỗi ngày lúc 02:00 sáng
     @Transactional
     public void markOverdueAndRefundBookings() {
