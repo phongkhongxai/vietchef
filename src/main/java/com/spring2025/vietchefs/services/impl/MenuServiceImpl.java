@@ -110,7 +110,6 @@ public class MenuServiceImpl implements MenuService {
             MenuResponseDto dto = modelMapper.map(meu, MenuResponseDto.class);
             dto.setBeforePrice(calculateMenuPrice(meu, false));
             dto.setAfterPrice(calculateMenuPrice(meu, true));
-
             return dto;
         }).collect(Collectors.toList());
         MenuPagingResponse templatesResponse = new MenuPagingResponse();

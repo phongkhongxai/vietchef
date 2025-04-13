@@ -157,7 +157,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         // get content for page object
         List<BookingDetail> listOfBds = bookingDetails.getContent();
 
-        List<BookingDetailDto> content = listOfBds.stream().map(bt -> modelMapper.map(bt, BookingDetailDto.class)).collect(Collectors.toList());
+        List<BookingDetailResponse> content = listOfBds.stream().map(bt -> modelMapper.map(bt, BookingDetailResponse.class)).collect(Collectors.toList());
 
         BookingDetailsResponse templatesResponse = new BookingDetailsResponse();
         templatesResponse.setContent(content);
@@ -184,7 +184,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         // get content for page object
         List<BookingDetail> listOfBds = bookingDetails.getContent();
 
-        List<BookingDetailDto> content = listOfBds.stream().map(bt -> modelMapper.map(bt, BookingDetailDto.class)).collect(Collectors.toList());
+        List<BookingDetailResponse> content = listOfBds.stream().map(bt -> modelMapper.map(bt, BookingDetailResponse.class)).collect(Collectors.toList());
 
         BookingDetailsResponse templatesResponse = new BookingDetailsResponse();
         templatesResponse.setContent(content);
@@ -211,7 +211,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         // get content for page object
         List<BookingDetail> listOfBds = bookingDetails.getContent();
 
-        List<BookingDetailDto> content = listOfBds.stream().map(bt -> modelMapper.map(bt, BookingDetailDto.class)).collect(Collectors.toList());
+        List<BookingDetailResponse> content = listOfBds.stream().map(bt -> modelMapper.map(bt, BookingDetailResponse.class)).collect(Collectors.toList());
 
         BookingDetailsResponse templatesResponse = new BookingDetailsResponse();
         templatesResponse.setContent(content);
