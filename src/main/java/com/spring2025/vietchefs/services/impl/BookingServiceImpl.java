@@ -406,16 +406,27 @@ public class BookingServiceImpl implements BookingService {
         BigDecimal totalBookingPrice = BigDecimal.ZERO;
         BigDecimal discountAmount = BigDecimal.ZERO;
         List<BookingDetailPriceResponse> detailPriceResponses = new ArrayList<>();
+        List<LocalDate> top5SessionDates = dto.getBookingDetails().stream()
+                .map(BookingDetailPriceLTRequest::getSessionDate)
+                .filter(se -> se.isAfter(LocalDate.now())) //   lọc những ngày trong tương lai
+                .distinct()
+                .sorted()
+                .limit(5)
+                .toList();
 
+        List<LocalDate> invalidDates = new ArrayList<>();
         for (BookingDetailPriceLTRequest detailDto : dto.getBookingDetails()) {
             BigDecimal totalCookTime = BigDecimal.ZERO;
             if (!detailDto.getSessionDate().isAfter(LocalDate.now())) {
                 throw new VchefApiException(HttpStatus.BAD_REQUEST,"SessionDate should be in the future.");
             }
-            // 🔹 Kiểm tra sessionDate là hôm nay hoặc ngày mai
-            if (detailDto.getSessionDate().isEqual(LocalDate.now()) || detailDto.getSessionDate().isEqual(LocalDate.now().plusDays(1))) {
-                if (Boolean.FALSE.equals(detailDto.getIsDishSelected()) && (detailDto.getDishes() == null || detailDto.getDishes().isEmpty())) {
-                    throw new VchefApiException(HttpStatus.BAD_REQUEST, "SessionDate is today or tomorrow, you must select a menu or dish.");
+            boolean isTodayOrTomorrow = detailDto.getSessionDate().isEqual(LocalDate.now())
+                    || detailDto.getSessionDate().isEqual(LocalDate.now().plusDays(1));
+
+            if (isTodayOrTomorrow && top5SessionDates.contains(detailDto.getSessionDate())) {
+                if (Boolean.FALSE.equals(detailDto.getIsDishSelected())
+                        && (detailDto.getDishes() == null || detailDto.getDishes().isEmpty())) {
+                    invalidDates.add(detailDto.getSessionDate());
                 }
             }
             // 🔹 Kiểm tra xem BookingDetail đã chọn món chưa
@@ -464,6 +475,13 @@ public class BookingServiceImpl implements BookingService {
                         totalCookTime = calculateService.calculateTotalCookTime(dishIds, dto.getGuestCount());
                     }
                 }
+            }
+            if (!invalidDates.isEmpty()) {
+                String message = "You must select a dish for the following session dates: " +
+                        invalidDates.stream()
+                                .map(LocalDate::toString)
+                                .collect(Collectors.joining(", "));
+                throw new VchefApiException(HttpStatus.BAD_REQUEST, message);
             }
 
             // 🔹 Tính phí dịch vụ đầu bếp (công nấu ăn)

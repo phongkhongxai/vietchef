@@ -485,7 +485,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         return modelMapper.map(bookingDetail, BookingDetailDto.class);
     }
 
-    @Scheduled(cron = "0 25 5 * * ?") // Mỗi ngày vào lúc nửa đêm 12h01
+    @Scheduled(cron = "0 1 0 * * ?") // Mỗi ngày vào lúc nửa đêm 12h01
     public void updateBookingDetailsStatus() {
         LocalDate currentDate = LocalDate.now();
         List<BookingDetail> bookingDetails = bookingDetailRepository.findBySessionDateAndStatus(currentDate, "LOCKED");
