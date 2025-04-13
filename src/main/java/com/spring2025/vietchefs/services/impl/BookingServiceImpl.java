@@ -1148,10 +1148,13 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
-    public Set<LocalDate> getFullyBookedDates(Long chefId, List<LocalDate> sessionDates) {
+    public Set<LocalDate> getFullyBookedDates(Long chefId) {
         Chef chef = chefRepository.findById(chefId)
-                .orElseThrow(() ->  new VchefApiException(HttpStatus.NOT_FOUND,"Chef not found"));
-        List<Object[]> results = bookingDetailRepository.countActiveBookingsByChefAndDates(chef, sessionDates);
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found"));
+
+        LocalDate today = LocalDate.now();
+
+        List<Object[]> results = bookingDetailRepository.countFutureBookingsByChef(chef, today);
 
         Set<LocalDate> fullyBookedDates = new HashSet<>();
         for (Object[] row : results) {
@@ -1164,6 +1167,8 @@ public class BookingServiceImpl implements BookingService {
         }
         return fullyBookedDates;
     }
+
+
 
     //@Scheduled(cron = "0 0 2 * * ?") // Chạy mỗi ngày lúc 02:00 sáng
     @Transactional
