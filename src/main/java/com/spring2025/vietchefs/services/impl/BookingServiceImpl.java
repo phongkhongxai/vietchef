@@ -81,15 +81,7 @@ public class BookingServiceImpl implements BookingService {
         // get content for page object
         List<Booking> listOfBookings = bookings.getContent();
 
-        List<BookingResponseDto> content = listOfBookings.stream().map(bt -> {
-            BookingResponseDto dto = modelMapper.map(bt, BookingResponseDto.class);
-
-            // Chỉ set bookingDetails khi bookingType là "single"
-            if (!"single".equalsIgnoreCase(bt.getBookingType())) {
-                dto.setBookingDetails(null);
-            }
-            return dto;
-        }).collect(Collectors.toList());
+        List<BookingResponseDto> content = listOfBookings.stream().map(bt -> modelMapper.map(bt, BookingResponseDto.class)).collect(Collectors.toList());
         BookingsResponse templatesResponse = new BookingsResponse();
         templatesResponse.setContent(content);
         templatesResponse.setPageNo(bookings.getNumber());
@@ -115,15 +107,7 @@ public class BookingServiceImpl implements BookingService {
         // get content for page object
         List<Booking> listOfBookings = bookings.getContent();
 
-        List<BookingResponseDto> content = listOfBookings.stream().map(bt -> {
-            BookingResponseDto dto = modelMapper.map(bt, BookingResponseDto.class);
-
-            // Chỉ set bookingDetails khi bookingType là "single"
-            if (!"single".equalsIgnoreCase(bt.getBookingType())) {
-                dto.setBookingDetails(null);
-            }
-            return dto;
-        }).collect(Collectors.toList());
+        List<BookingResponseDto> content = listOfBookings.stream().map(bt -> modelMapper.map(bt, BookingResponseDto.class)).collect(Collectors.toList());
         BookingsResponse templatesResponse = new BookingsResponse();
         templatesResponse.setContent(content);
         templatesResponse.setPageNo(bookings.getNumber());
@@ -140,13 +124,7 @@ public class BookingServiceImpl implements BookingService {
         if (booking.isEmpty()){
             throw new VchefApiException(HttpStatus.NOT_FOUND, "Booking not found with id: "+ id);
         }
-        BookingResponseDto dto = modelMapper.map(booking, BookingResponseDto.class);
-
-        if (!"single".equalsIgnoreCase(booking.get().getBookingType())) {
-            dto.setBookingDetails(null);
-        }
-
-        return dto;
+        return modelMapper.map(booking, BookingResponseDto.class);
     }
 
     @Override
