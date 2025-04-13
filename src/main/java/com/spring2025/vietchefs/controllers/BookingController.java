@@ -246,9 +246,8 @@ public class BookingController {
     }
     @GetMapping("/unavailable-dates")
     public ResponseEntity<Set<LocalDate>> getUnavailableDates(
-            @RequestParam List<LocalDate> dates,
             @RequestParam Long chefId) {
-        Set<LocalDate> unavailableDates = bookingService.getFullyBookedDates(chefId, dates);
+        Set<LocalDate> unavailableDates = bookingService.getFullyBookedDates(chefId);
         return ResponseEntity.ok(unavailableDates);
     }
 

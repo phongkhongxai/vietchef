@@ -26,7 +26,7 @@ public interface BookingService {
     ApiResponse<BookingResponseDto> depositBooking(Long bookingId, Long userId);
     BookingResponseDto cancelSingleBooking(Long bookingId);
     BookingResponseDto cancelLongTermBooking(Long bookingId);
-    Set<LocalDate> getFullyBookedDates(Long chefId, List<LocalDate> sessionDates);
+    Set<LocalDate> getFullyBookedDates(Long chefId);
 
 
 }
