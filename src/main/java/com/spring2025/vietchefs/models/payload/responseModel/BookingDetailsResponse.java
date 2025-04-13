@@ -14,7 +14,7 @@ import java.util.List;
 @Getter
 @Setter
 public class BookingDetailsResponse {
-    private List<BookingDetailDto> content;
+    private List<BookingDetailResponse> content;
     private int pageNo;
     private int pageSize;
     private long totalElements;
