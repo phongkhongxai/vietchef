@@ -7,7 +7,9 @@ import com.spring2025.vietchefs.models.payload.requestModel.BookingPriceRequestD
 import com.spring2025.vietchefs.models.payload.responseModel.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 public interface BookingService {
     BookingsResponse getBookingsByCustomerId(Long customerId, int pageNo, int pageSize, String sortBy, String sortDir);
@@ -24,6 +26,7 @@ public interface BookingService {
     ApiResponse<BookingResponseDto> depositBooking(Long bookingId, Long userId);
     BookingResponseDto cancelSingleBooking(Long bookingId);
     BookingResponseDto cancelLongTermBooking(Long bookingId);
+    Set<LocalDate> getFullyBookedDates(Long chefId, List<LocalDate> sessionDates);
 
 
 }

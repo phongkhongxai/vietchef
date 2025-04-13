@@ -49,4 +49,17 @@ public interface BookingDetailRepository extends JpaRepository<BookingDetail, Lo
             Pageable pageable
     );
 
+    @Query("SELECT bd.sessionDate, COUNT(bd) " +
+            "FROM BookingDetail bd " +
+            "WHERE bd.booking.chef = :chef " +
+            "AND bd.sessionDate IN :dates " +
+            "AND bd.isDeleted = false " +
+            "AND bd.status NOT IN ('CANCELED', 'OVERDUE', 'REJECTED') " +
+            "AND bd.booking.status NOT IN ('CANCELED', 'OVERDUE', 'REJECTED') " +
+            "AND bd.booking.isDeleted = false " +
+            "GROUP BY bd.sessionDate")
+    List<Object[]> countActiveBookingsByChefAndDates(@Param("chef") Chef chef, @Param("dates") List<LocalDate> dates);
+
+
+
 }

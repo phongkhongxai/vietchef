@@ -18,7 +18,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/v1/bookings")
@@ -242,6 +244,14 @@ public class BookingController {
         BookingDetailDto bookingDetail = bookingDetailService.confirmBookingCompletionByCustomer(bookingDetailId, userDto.getId());
         return new ResponseEntity<>(bookingDetail, HttpStatus.OK);
     }
+    @GetMapping("/unavailable-dates")
+    public ResponseEntity<Set<LocalDate>> getUnavailableDates(
+            @RequestParam List<LocalDate> dates,
+            @RequestParam Long chefId) {
+        Set<LocalDate> unavailableDates = bookingService.getFullyBookedDates(chefId, dates);
+        return ResponseEntity.ok(unavailableDates);
+    }
+
 
 
 
