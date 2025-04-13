@@ -124,13 +124,7 @@ public class BookingServiceImpl implements BookingService {
         if (booking.isEmpty()){
             throw new VchefApiException(HttpStatus.NOT_FOUND, "Booking not found with id: "+ id);
         }
-        BookingResponseDto dto = modelMapper.map(booking, BookingResponseDto.class);
-
-        if (!"single".equalsIgnoreCase(booking.get().getBookingType())) {
-            dto.setBookingDetails(null);
-        }
-
-        return dto;
+        return modelMapper.map(booking, BookingResponseDto.class);
     }
 
     @Override
