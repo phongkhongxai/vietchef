@@ -41,14 +41,20 @@ public class JwtTokenProvider {
 
         Date currentDate = new Date();
         Date expirationDate = new Date(currentDate.getTime() + expiration);
-        return Jwts.builder()
+        JwtBuilder builder = Jwts.builder()
                 .setSubject(username)
                 .setIssuedAt(currentDate)
                 .setExpiration(expirationDate)
                 .claim("userId", userId)
-                .claim("roleName", role )
-                .signWith(SignatureAlgorithm.HS384 ,key())
+                .claim("roleName", role);
+        if ("ROLE_CHEF".equals(role) && user.getChef() != null) {
+            builder.claim("chefId", user.getChef().getId());
+        }
+
+        return builder
+                .signWith(SignatureAlgorithm.HS384, key())
                 .compact();
+
     }
 
     private Key key() {
