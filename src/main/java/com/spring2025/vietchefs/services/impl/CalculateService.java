@@ -101,6 +101,9 @@ public class CalculateService {
 
             // Lấy thời gian nấu tổng của menu
             totalCookTime = menu.getTotalCookTime();  // Giả sử Menu có trường totalCookTime
+            BigDecimal multiplier = getCookTimeMultiplier(guestCount);
+            totalCookTime = totalCookTime.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
+
         }
 
         // Kiểm tra và tính thêm thời gian nấu cho các món không có trong menu
