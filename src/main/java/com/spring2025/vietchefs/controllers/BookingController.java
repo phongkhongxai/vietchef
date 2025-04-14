@@ -109,12 +109,28 @@ public class BookingController {
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CUSTOMER')")
     @PostMapping("/{bookingId}/deposit")
-    public ResponseEntity<?> depositBooking(@AuthenticationPrincipal UserDetails userDetails, @PathVariable Long bookingId) {
-        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
-        ApiResponse<BookingResponseDto> bookingResponseDto = bookingService.depositBooking(bookingId, bto.getId());
-        return new ResponseEntity<>(bookingResponseDto, HttpStatus.OK);
+    public ResponseEntity<ApiResponse<BookingResponseDto>> depositBooking(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long bookingId) {
 
+        UserDto user = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(), userDetails.getUsername());
+        ApiResponse<BookingResponseDto> response = bookingService.depositBooking(bookingId, user.getId());
+
+        if (!response.isSuccess()) {
+            if (response.getData() != null) {
+                // Lỗi nhưng vẫn trả về dữ liệu → dùng 200 OK
+                return ResponseEntity.ok(response);
+            } else {
+                // Lỗi và không có dữ liệu → trả về 400 Bad Request
+                return ResponseEntity.badRequest().body(response);
+            }
+        }
+
+        // Thành công → 200 OK
+        return ResponseEntity.ok(response);
     }
+
+
 
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CHEF')")

@@ -3,6 +3,7 @@ package com.spring2025.vietchefs.controllers;
 import com.spring2025.vietchefs.models.payload.dto.DishDto;
 import com.spring2025.vietchefs.models.payload.requestModel.MenuRequestDto;
 import com.spring2025.vietchefs.models.payload.requestModel.MenuUpdateDto;
+import com.spring2025.vietchefs.models.payload.responseModel.ApiResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.DishesResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.MenuPagingResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.MenuResponseDto;
@@ -14,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/menus")
@@ -60,6 +63,19 @@ public class MenuController {
         String msg = menuService.deleteMenu(menuId);
         return new ResponseEntity<>(msg, HttpStatus.NO_CONTENT);
 
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PostMapping("/{menuId}/validate")
+    public ResponseEntity<ApiResponse<Void>> validateMenu(
+            @PathVariable Long menuId,
+            @RequestBody List<Long> allowedDishIds) {
+
+        ApiResponse<Void> response = menuService.validateMenuStillValid(menuId, allowedDishIds);
+
+        if (!response.isSuccess()) {
+            return ResponseEntity.badRequest().body(response);
+        }
+        return ResponseEntity.ok(response);
     }
 
 

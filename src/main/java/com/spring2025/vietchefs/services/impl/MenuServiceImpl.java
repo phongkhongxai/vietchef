@@ -9,6 +9,7 @@ import com.spring2025.vietchefs.models.payload.dto.DishDto;
 import com.spring2025.vietchefs.models.payload.requestModel.MenuItemRequestDto;
 import com.spring2025.vietchefs.models.payload.requestModel.MenuRequestDto;
 import com.spring2025.vietchefs.models.payload.requestModel.MenuUpdateDto;
+import com.spring2025.vietchefs.models.payload.responseModel.ApiResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.DishesResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.MenuPagingResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.MenuResponseDto;
@@ -237,6 +238,36 @@ public class MenuServiceImpl implements MenuService {
         return "Deleted menu successfully";
     }
 
+    @Override
+    public ApiResponse<Void> validateMenuStillValid(Long menuId, List<Long> allowedItemNames) {
+        Menu menu = menuRepository.findById(menuId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Menu not found with ID: " + menuId));
+
+        if (menu.getIsDeleted()) {
+            return ApiResponse.<Void>builder()
+                    .success(false)
+                    .message("Menu đã bị xóa.")
+                    .build();
+        }
+
+        List<Long> currentDishIds = menu.getMenuItems().stream()
+                .map(menuItem -> menuItem.getDish().getId())
+                .toList();
+
+        boolean allContained = currentDishIds.stream().allMatch(allowedItemNames::contains);
+
+        if (!allContained) {
+            return ApiResponse.<Void>builder()
+                    .success(false)
+                    .message("Menu đã bị thay đổi món ăn so với ban đầu.")
+                    .build();
+        }
+
+        return ApiResponse.<Void>builder()
+                .success(true)
+                .message("Menu hợp lệ.")
+                .build();
+    }
 
 
 }

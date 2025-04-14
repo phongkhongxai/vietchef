@@ -13,6 +13,7 @@ import com.spring2025.vietchefs.models.payload.responseModel.*;
 import com.spring2025.vietchefs.repositories.*;
 import com.spring2025.vietchefs.services.AvailabilityFinderService;
 import com.spring2025.vietchefs.services.BookingDetailService;
+import com.spring2025.vietchefs.services.ChefService;
 import com.spring2025.vietchefs.services.PaymentCycleService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -68,6 +69,8 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     private ImageService imageService;
     @Autowired
     private CustomerTransactionRepository customerTransactionRepository;
+    @Autowired
+    private ChefService chefService;
     @Autowired
     private ModelMapper modelMapper;
     @Override
@@ -432,6 +435,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                     .screen("BookingDetail")
                     .build();
             notificationService.sendPushNotification(notification);
+            chefService.updateReputation(chef, 1);
 
         }else {
             throw new VchefApiException(HttpStatus.BAD_REQUEST,
