@@ -7,21 +7,24 @@ import com.spring2025.vietchefs.models.payload.dto.BookingDetailItemRequestDto;
 import com.spring2025.vietchefs.models.payload.dto.BookingDetailRequestDto;
 import com.spring2025.vietchefs.models.payload.requestModel.BookingDetailUpdateDto;
 import com.spring2025.vietchefs.models.payload.requestModel.BookingDetailUpdateRequest;
+import com.spring2025.vietchefs.models.payload.responseModel.BookingDetailResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.BookingDetailsResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.ReviewBookingDetailResponse;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
 
 public interface BookingDetailService {
     BookingDetail createBookingDetail(Booking booking, BookingDetailRequestDto dto);
-    BookingDetailDto getBookingDetailById(Long id);
+    BookingDetailResponse getBookingDetailById(Long id);
     BookingDetailsResponse getBookingDetailsByChef(Long chefId,int pageNo, int pageSize, String sortBy, String sortDir);
     BookingDetailsResponse getBookingDetailsByCustomer(Long customerId,int pageNo, int pageSize, String sortBy, String sortDir);
     BookingDetailsResponse getBookingDetailByBooking(Long bookingId,int pageNo, int pageSize, String sortBy, String sortDir);
     ReviewBookingDetailResponse calculateUpdatedBookingDetail(Long bookingDetailId, BookingDetailUpdateDto dto);
     BookingDetailDto updateBookingDetail(Long bookingDetailId, BookingDetailUpdateRequest bookingDetailUpdateRequest);
-    BookingDetailDto updateStatusBookingDetailWatingCompleted(Long bookingDetailId,Long userId);
+    BookingDetailDto updateStatusBookingDetailWatingCompleted(Long bookingDetailId,Long userId,List<MultipartFile> files);
     BookingDetailDto confirmBookingCompletionByCustomer(Long bookingDetailId,Long userId );
 
 

@@ -2,6 +2,7 @@ package com.spring2025.vietchefs.models.payload.responseModel;
 
 import com.spring2025.vietchefs.models.payload.dto.BookingDetailItemDto;
 import com.spring2025.vietchefs.models.payload.dto.BookingResponseDto;
+import com.spring2025.vietchefs.models.payload.dto.ImageDto;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -37,4 +38,5 @@ public class BookingDetailResponse {
     private Boolean isUpdated;
     private Long menuId;
     private List<BookingDetailItemDto> dishes;
+    private List<ImageDto> images;
 }

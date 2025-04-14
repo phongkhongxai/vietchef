@@ -33,7 +33,9 @@ public interface BookingDetailRepository extends JpaRepository<BookingDetail, Lo
      */
     @Query("SELECT bd FROM BookingDetail bd WHERE bd.booking.chef = :chef AND bd.sessionDate = :sessionDate AND bd.isDeleted = false")
     List<BookingDetail> findByBooking_ChefAndSessionDateAndIsDeletedFalse(@Param("chef") Chef chef, @Param("sessionDate") LocalDate sessionDate);
-    List<BookingDetail> findBySessionDateAndStatus(LocalDate sessionDate, String status);
+    List<BookingDetail> findBySessionDateAndStatusAndIsDeletedFalse(LocalDate sessionDate, String status);
+    List<BookingDetail> findAllByStatusAndIsDeletedFalse(String status);
+
     @Query("SELECT bd FROM BookingDetail bd " +
             "WHERE bd.booking.chef.id = :chefId " +
             "AND bd.isDeleted = false")
