@@ -62,4 +62,18 @@ public class ChefController {
             @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir){
         return chefService.getAllChefsNearBy(customerLat,customerLng,distance,pageNo, pageSize, sortBy, sortDir);
     }
+//    @PostMapping("/reputation/recharge")
+//    public ResponseEntity<?> rechargeReputation(@RequestBody RechargeDto dto) {
+//
+//        // Kiểm tra thanh toán thành công
+//        if (paymentService.verify(dto.getPaymentToken())) {
+//            chef.setReputationPoints(70);
+//            chef.setStatus("ACTIVE");
+//            chefRepository.save(chef);
+//            return ResponseEntity.ok("Phục hồi thành công!");
+//        }
+//
+//        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Thanh toán thất bại!");
+//    }
+
 }
