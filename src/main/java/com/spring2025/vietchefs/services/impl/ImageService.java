@@ -1,14 +1,8 @@
 package com.spring2025.vietchefs.services.impl;
 
-import com.spring2025.vietchefs.models.entity.Dish;
-import com.spring2025.vietchefs.models.entity.Image;
-import com.spring2025.vietchefs.models.entity.Review;
-import com.spring2025.vietchefs.models.entity.User;
+import com.spring2025.vietchefs.models.entity.*;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
-import com.spring2025.vietchefs.repositories.DishRepository;
-import com.spring2025.vietchefs.repositories.ImageRepository;
-import com.spring2025.vietchefs.repositories.ReviewRepository;
-import com.spring2025.vietchefs.repositories.UserRepository;
+import com.spring2025.vietchefs.repositories.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -28,6 +22,8 @@ public class ImageService {
     private DishRepository dishRepository;
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private BookingDetailRepository bookingDetailRepository;
     @Autowired
     private ReviewRepository reviewRepository;
 
@@ -86,8 +82,26 @@ public class ImageService {
                         .entityId(entityId)
                         .build();
                 image = imageRepository.save(image1);
-            } else {
+            }
+            else {
                 throw new VchefApiException(HttpStatus.NOT_FOUND, "Review not found");
+            }
+        }else if ("BOOKING_DETAIL".equals(entityType)) {
+            Optional<BookingDetail> detailOptional = bookingDetailRepository.findById(entityId);
+            if (detailOptional.isPresent()) {
+                BookingDetail bookingDetail = detailOptional.get();
+                // Nếu BookingDetail có thuộc tính imageUrl thì lưu
+//                    bookingDetail.setImageUrl(imageUrl);
+//                    bookingDetailRepository.save(bookingDetail);
+
+                Image image1 = Image.builder()
+                        .imageUrl(imageUrl)
+                        .entityType(entityType)
+                        .entityId(entityId)
+                        .build();
+                image = imageRepository.save(image1);
+            } else {
+                throw new VchefApiException(HttpStatus.NOT_FOUND, "BookingDetail not found");
             }
         }
         return image.getImageUrl();
