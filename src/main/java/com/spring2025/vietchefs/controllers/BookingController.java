@@ -12,11 +12,13 @@ import com.spring2025.vietchefs.utils.AppConstants;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -192,7 +194,7 @@ public class BookingController {
 
     @GetMapping("/booking-details/{bookingDetailId}")
     public ResponseEntity<?> getBookingDetailByid(@PathVariable Long bookingDetailId) {
-        BookingDetailDto bl = bookingDetailService.getBookingDetailById(bookingDetailId);
+        BookingDetailResponse bl = bookingDetailService.getBookingDetailById(bookingDetailId);
         return new ResponseEntity<>(bl, HttpStatus.OK);
     }
 
@@ -230,10 +232,10 @@ public class BookingController {
     }
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CHEF')")
-    @PutMapping("/booking-details/{bookingDetailId}/complete-chef")
-    public ResponseEntity<?> updateWaitingCustomer(@AuthenticationPrincipal UserDetails userDetails,@PathVariable Long bookingDetailId) {
+    @PutMapping(value = "/booking-details/{bookingDetailId}/complete-chef", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> updateWaitingCustomer(@AuthenticationPrincipal UserDetails userDetails, @PathVariable Long bookingDetailId, @RequestParam("files") List<MultipartFile> files) {
         UserDto userDto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(), userDetails.getUsername());
-        BookingDetailDto bookingDetail = bookingDetailService.updateStatusBookingDetailWatingCompleted(bookingDetailId, userDto.getId());
+        BookingDetailDto bookingDetail = bookingDetailService.updateStatusBookingDetailWatingCompleted(bookingDetailId, userDto.getId(), files);
         return new ResponseEntity<>(bookingDetail, HttpStatus.OK);
     }
     @SecurityRequirement(name = "Bearer Authentication")

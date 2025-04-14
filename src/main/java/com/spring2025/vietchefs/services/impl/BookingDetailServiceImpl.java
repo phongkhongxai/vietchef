@@ -5,7 +5,7 @@ import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.dto.BookingDetailDto;
 import com.spring2025.vietchefs.models.payload.dto.BookingDetailItemRequestDto;
 import com.spring2025.vietchefs.models.payload.dto.BookingDetailRequestDto;
-import com.spring2025.vietchefs.models.payload.dto.DishDto;
+import com.spring2025.vietchefs.models.payload.dto.ImageDto;
 import com.spring2025.vietchefs.models.payload.requestModel.BookingDetailUpdateDto;
 import com.spring2025.vietchefs.models.payload.requestModel.BookingDetailUpdateRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.NotificationRequest;
@@ -24,10 +24,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -59,6 +62,10 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     private NotificationService notificationService;
     @Autowired
     private AvailabilityFinderService availabilityFinderService;
+    @Autowired
+    private ImageRepository imageRepository;
+    @Autowired
+    private ImageService imageService;
     @Autowired
     private CustomerTransactionRepository customerTransactionRepository;
     @Autowired
@@ -136,10 +143,16 @@ public class BookingDetailServiceImpl implements BookingDetailService {
 
 
     @Override
-    public BookingDetailDto getBookingDetailById(Long id) {
+    public BookingDetailResponse getBookingDetailById(Long id) {
         BookingDetail bookingDetail = bookingDetailRepository.findById(id)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "BookingDetail not found"));
-        return modelMapper.map(bookingDetail, BookingDetailDto.class);
+        BookingDetailResponse dto = modelMapper.map(bookingDetail, BookingDetailResponse.class);
+        List<Image> images = imageService.getImagesByEntity("BOOKING_DETAIL", bookingDetail.getId());
+        List<ImageDto> imageDtos = images.stream()
+                .map(image -> modelMapper.map(image, ImageDto.class))
+                .collect(Collectors.toList());
+        dto.setImages(imageDtos);
+        return dto;
     }
 
     @Override
@@ -157,7 +170,17 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         // get content for page object
         List<BookingDetail> listOfBds = bookingDetails.getContent();
 
-        List<BookingDetailResponse> content = listOfBds.stream().map(bt -> modelMapper.map(bt, BookingDetailResponse.class)).collect(Collectors.toList());
+        List<BookingDetailResponse> content = listOfBds.stream().map(bd -> {
+            BookingDetailResponse dto = modelMapper.map(bd, BookingDetailResponse.class);
+            List<Image> images = imageService.getImagesByEntity("BOOKING_DETAIL", bd.getId());
+            List<ImageDto> imageDtos = images.stream()
+                    .map(img -> modelMapper.map(img, ImageDto.class))
+                    .collect(Collectors.toList());
+            dto.setImages(imageDtos);
+            return dto;
+        }).collect(Collectors.toList());
+
+
 
         BookingDetailsResponse templatesResponse = new BookingDetailsResponse();
         templatesResponse.setContent(content);
@@ -184,7 +207,15 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         // get content for page object
         List<BookingDetail> listOfBds = bookingDetails.getContent();
 
-        List<BookingDetailResponse> content = listOfBds.stream().map(bt -> modelMapper.map(bt, BookingDetailResponse.class)).collect(Collectors.toList());
+        List<BookingDetailResponse> content = listOfBds.stream().map(bd -> {
+            BookingDetailResponse dto = modelMapper.map(bd, BookingDetailResponse.class);
+            List<Image> images = imageService.getImagesByEntity("BOOKING_DETAIL", bd.getId());
+            List<ImageDto> imageDtos = images.stream()
+                    .map(img -> modelMapper.map(img, ImageDto.class))
+                    .collect(Collectors.toList());
+            dto.setImages(imageDtos);
+            return dto;
+        }).collect(Collectors.toList());
 
         BookingDetailsResponse templatesResponse = new BookingDetailsResponse();
         templatesResponse.setContent(content);
@@ -365,7 +396,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     }
 
     @Override
-    public BookingDetailDto updateStatusBookingDetailWatingCompleted(Long bookingDetailId, Long userId) {
+    public BookingDetailDto updateStatusBookingDetailWatingCompleted(Long bookingDetailId, Long userId,List<MultipartFile> files) {
         Chef chef = chefRepository.findByUserId(userId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found"));
         LocalTime completedTime = LocalTime.now();
@@ -375,9 +406,22 @@ public class BookingDetailServiceImpl implements BookingDetailService {
             throw new VchefApiException(HttpStatus.BAD_REQUEST,
                     "Cannot change this status because you not in this booking.");
         }
+        if (files == null || files.isEmpty()) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Phải upload ít nhất 1 ảnh.");
+        }
+        if (files.size() > 2) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chỉ được upload tối đa 2 ảnh.");
+        }
         if (bookingDetail.getStatus().equalsIgnoreCase("IN_PROGRESS")
                 && !completedTime.isBefore(bookingDetail.getTimeBeginCook())
-                && !completedTime.isAfter(bookingDetail.getStartTime())) {
+                ) {
+            for (MultipartFile file : files) {
+                try {
+                    imageService.uploadImage(file, bookingDetail.getId(), "BOOKING_DETAIL");
+                } catch (IOException e) {
+                    throw new VchefApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi khi upload ảnh: " + e.getMessage());
+                }
+            }
             bookingDetail.setStatus("WAITING_FOR_CONFIRMATION");
             bookingDetail = bookingDetailRepository.save(bookingDetail);
             NotificationRequest notification = NotificationRequest.builder()
@@ -488,7 +532,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     @Scheduled(cron = "0 1 0 * * ?") // Mỗi ngày vào lúc nửa đêm 12h01
     public void updateBookingDetailsStatus() {
         LocalDate currentDate = LocalDate.now();
-        List<BookingDetail> bookingDetails = bookingDetailRepository.findBySessionDateAndStatus(currentDate, "LOCKED");
+        List<BookingDetail> bookingDetails = bookingDetailRepository.findBySessionDateAndStatusAndIsDeletedFalse(currentDate, "LOCKED");
 
         for (BookingDetail bookingDetail : bookingDetails) {
             bookingDetail.setStatus("IN_PROGRESS");
@@ -517,5 +561,86 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                     .build();
             notificationService.sendPushNotification(customerNotification);
         }
+    }
+
+    @Scheduled(cron = "0 0 * * * *") // chạy mỗi giờ
+    @Transactional
+    public void autoCompleteBookings() {
+        LocalDateTime now = LocalDateTime.now();
+
+        List<BookingDetail> pendingDetails = bookingDetailRepository
+                .findAllByStatusAndIsDeletedFalse("WAITING_FOR_CONFIRMATION");
+
+        for (BookingDetail detail : pendingDetails) {
+            LocalDateTime sessionDateTime = LocalDateTime.of(detail.getSessionDate(), detail.getStartTime());
+
+            if (sessionDateTime.plusHours(12).isBefore(now)) {
+                try {
+                    completeBookingDetail(detail);
+                } catch (Exception e) {
+                    System.out.println(e.getMessage());
+                }
+            }
+        }
+    }
+
+    private void completeBookingDetail(BookingDetail detail) {
+        Booking booking = detail.getBooking();
+
+        detail.setStatus("COMPLETED");
+        detail = bookingDetailRepository.save(detail);
+
+        // Nếu là SINGLE -> set booking hoàn thành
+        if ("SINGLE".equalsIgnoreCase(booking.getBookingType())) {
+            booking.setStatus("COMPLETED");
+            bookingRepository.save(booking);
+        } else {
+            boolean allCompleted = booking.getBookingDetails()
+                    .stream()
+                    .allMatch(d -> "COMPLETED".equalsIgnoreCase(d.getStatus()));
+            if (allCompleted) {
+                booking.setStatus("COMPLETED");
+                // Hoàn trả cọc nếu có
+                if (booking.getDepositPaid().compareTo(BigDecimal.ZERO) > 0) {
+                    Wallet cusWallet = walletRepository.findByUserId(booking.getCustomer().getId())
+                            .orElseThrow(() -> new RuntimeException("Customer wallet not found"));
+
+                    cusWallet.setBalance(cusWallet.getBalance().add(booking.getDepositPaid()));
+                    walletRepository.save(cusWallet);
+
+                    booking.setDepositPaid(BigDecimal.ZERO);
+                    bookingRepository.save(booking);
+                }
+            }
+        }
+
+        // Chuyển tiền cho chef
+        Chef chef = booking.getChef();
+        BigDecimal amount = detail.getTotalChefFeePrice();
+
+        Wallet chefWallet = walletRepository.findByUserId(chef.getUser().getId())
+                .orElseThrow(() -> new RuntimeException("Chef wallet not found"));
+
+        chefWallet.setBalance(chefWallet.getBalance().add(amount));
+        walletRepository.save(chefWallet);
+
+        ChefTransaction transaction = new ChefTransaction();
+        transaction.setWallet(chefWallet);
+        transaction.setBookingDetail(detail);
+        transaction.setTransactionType("CREDIT");
+        transaction.setAmount(amount);
+        transaction.setStatus("COMPLETED");
+        transaction.setDescription("Auto payment for completed bookingDetail #" + detail.getId());
+
+        chefTransactionRepository.save(transaction);
+
+        notificationService.sendPushNotification(NotificationRequest.builder()
+                .userId(chef.getUser().getId())
+                .title("Booking Auto Completed")
+                .body("System has auto-confirmed the completion and sent payment.")
+                .screen("ChefEarningsScreen")
+                .bookingId(booking.getId())
+                .build()
+        );
     }
 }
