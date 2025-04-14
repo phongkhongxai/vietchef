@@ -9,6 +9,7 @@ import com.spring2025.vietchefs.models.payload.responseModel.*;
 import com.spring2025.vietchefs.repositories.*;
 import com.spring2025.vietchefs.services.BookingDetailService;
 import com.spring2025.vietchefs.services.BookingService;
+import com.spring2025.vietchefs.services.ChefService;
 import com.spring2025.vietchefs.services.PaymentCycleService;
 import jakarta.transaction.Transactional;
 import org.modelmapper.ModelMapper;
@@ -63,6 +64,8 @@ public class BookingServiceImpl implements BookingService {
     private CustomerTransactionRepository customerTransactionRepository;
     @Autowired
     private NotificationService notificationService;
+    @Autowired
+    private ChefService chefService;
     @Autowired
     private ModelMapper modelMapper;
 
@@ -134,7 +137,9 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Customer not found"));
         Chef chef = chefRepository.findById(dto.getChefId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found"));
-
+        if (chef.getReputationPoints() < 60 && chef.getStatus().equalsIgnoreCase("LOCKED")) {
+            throw new VchefApiException(HttpStatus.FORBIDDEN, "Chef không đủ uy tín để nhận booking dài hạn.");
+        }
         Booking booking = new Booking();
         booking.setCustomer(customer);
         booking.setChef(chef);
@@ -177,6 +182,9 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found"));
         Package selectedPackage = packageRepository.findById(dto.getPackageId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Package not found"));
+        if (chef.getReputationPoints() < 80) {
+            throw new VchefApiException(HttpStatus.FORBIDDEN, "Chef không đủ uy tín để nhận booking dài hạn.");
+        }
 
         // Kiểm tra xem đầu bếp có hỗ trợ package này không
         if (!chef.getPackages().contains(selectedPackage)) {
@@ -273,7 +281,9 @@ public class BookingServiceImpl implements BookingService {
     public ReviewSingleBookingResponse calculateFinalPriceForSingleBooking(BookingPriceRequestDto dto) {
         Chef chef = chefRepository.findById(dto.getChefId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found"));
-
+        if (chef.getReputationPoints() < 60 || chef.getStatus().equalsIgnoreCase("LOCKED")) {
+            throw new VchefApiException(HttpStatus.FORBIDDEN, "Chef không đủ uy tín để nhận booking dài hạn.");
+        }
         BigDecimal totalBookingPrice = BigDecimal.ZERO;
         ReviewSingleBookingResponse reviewSingleBookingResponse = new ReviewSingleBookingResponse();
 
@@ -363,6 +373,9 @@ public class BookingServiceImpl implements BookingService {
     public ReviewLongTermBookingResponse calculateFinalPriceForLongTermBooking(BookingLTPriceRequestDto dto) {
         Chef chef = chefRepository.findById(dto.getChefId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found"));
+        if (chef.getReputationPoints() < 80) {
+            throw new VchefApiException(HttpStatus.FORBIDDEN, "Chef không đủ uy tín để nhận booking dài hạn.");
+        }
 
         Package bookingPackage = packageRepository.findById(dto.getPackageId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Package not found"));
@@ -611,6 +624,7 @@ public class BookingServiceImpl implements BookingService {
                         .description("Refund for rejected Booking #" + booking.getId())
                         .build();
                 customerTransactionRepository.save(refundTransaction);
+                chefService.updateReputation(chef,-1);
 
                 // 7. Cập nhật trạng thái Booking thành REJECTED
                 booking.setStatus("REJECTED");

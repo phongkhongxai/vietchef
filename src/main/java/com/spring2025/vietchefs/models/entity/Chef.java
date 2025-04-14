@@ -66,4 +66,6 @@ public class Chef {
 
     @Column(nullable = true)
     private Double longitude;
+    @Column(nullable = false)
+    private Integer reputationPoints = 100;
 }

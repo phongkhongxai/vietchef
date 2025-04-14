@@ -80,6 +80,17 @@ public class ChefServiceImpl implements ChefService {
     }
 
     @Override
+    public void updateReputation(Chef chef, int delta) {
+        int updated = chef.getReputationPoints() + delta;
+        updated = Math.max(0, Math.min(100, updated));
+        chef.setReputationPoints(updated);
+        if (updated < 60) {
+            chef.setStatus("LOCKED");
+        }
+        chefRepository.save(chef);
+    }
+
+    @Override
     public ChefResponseDto getChefById(Long id) {
         Optional<Chef> chef = chefRepository.findById(id);
         if(chef.isEmpty()){
@@ -102,6 +113,7 @@ public class ChefServiceImpl implements ChefService {
         // Đặt trạng thái chờ duyệt (PENDING)
         Chef chef = new Chef();
         chef.setUser(user);
+        chef.setYearsOfExperience(requestDto.getYearsOfExperience());
         chef.setBio(requestDto.getBio());
         chef.setDescription(requestDto.getDescription());
         chef.setAddress(requestDto.getAddress());

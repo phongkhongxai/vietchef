@@ -23,4 +23,5 @@ public class ChefDto {
     private BigDecimal price;
     private Integer maxServingSize;
     private String status;
+    private Integer reputationPoints;
 }
