@@ -1,5 +1,6 @@
 package com.spring2025.vietchefs.services;
 
+import com.spring2025.vietchefs.models.entity.Chef;
 import com.spring2025.vietchefs.models.payload.dto.ChefDto;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefRequestDto;
 import com.spring2025.vietchefs.models.payload.responseModel.ChefResponseDto;
@@ -9,6 +10,7 @@ import java.util.List;
 
 public interface ChefService {
     ChefDto createChef (ChefDto chefDto);
+    void updateReputation(Chef chef, int delta);
     ChefResponseDto getChefById(Long id);
     ChefResponseDto registerChefRequest(Long userId, ChefRequestDto requestDto); // Đăng ký làm đầu bếp (Chờ duyệt)
     ChefResponseDto approveChef(Long chefId); // Admin duyệt Chef
