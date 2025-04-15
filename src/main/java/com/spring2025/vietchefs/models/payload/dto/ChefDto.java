@@ -14,7 +14,6 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class ChefDto {
     private Long id;
-    private Long userId;
     private UserDto user;
     private String bio;
     private String description;
