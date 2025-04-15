@@ -49,7 +49,7 @@ public class ChefServiceImpl implements ChefService {
 
     @Override
     public ChefDto createChef(ChefDto chefDto) {
-        User user = userRepository.findById(chefDto.getUserId())
+        User user = userRepository.findById(chefDto.getUser().getId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"User not found"));
 
         // Kiểm tra role của User, chỉ cho phép nếu role là "chef"

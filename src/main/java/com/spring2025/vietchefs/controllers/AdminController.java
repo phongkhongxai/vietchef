@@ -31,7 +31,7 @@ public class AdminController {
     public ResponseEntity<?> createChefUserEX(@Valid @RequestBody SignupDto signupDto) {
         UserDto bt = userService.saveChefUser(signupDto);
         ChefDto chefDto = new ChefDto();
-        chefDto.setUserId(bt.getId());
+        chefDto.setUser(bt);
         chefDto.setBio("Hello world");
         chefDto.setPrice(BigDecimal.valueOf(20));
         chefDto.setDescription("Bonjour");

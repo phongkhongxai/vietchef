@@ -1,18 +1,24 @@
 package com.spring2025.vietchefs.services.impl;
 
-import com.spring2025.vietchefs.models.entity.BookingDetail;
-import com.spring2025.vietchefs.models.entity.Chef;
-import com.spring2025.vietchefs.models.entity.Report;
-import com.spring2025.vietchefs.models.entity.User;
+import com.spring2025.vietchefs.models.entity.*;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.dto.ReportDto;
 import com.spring2025.vietchefs.models.payload.requestModel.ReportRequest;
+import com.spring2025.vietchefs.models.payload.responseModel.DishResponseDto;
+import com.spring2025.vietchefs.models.payload.responseModel.ReportsResponse;
 import com.spring2025.vietchefs.repositories.*;
 import com.spring2025.vietchefs.services.ReportService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class ReportServiceImpl implements ReportService{
@@ -65,4 +71,60 @@ public class ReportServiceImpl implements ReportService{
         return modelMapper.map(report, ReportDto.class);
 
     }
+
+    @Override
+    public ReportsResponse getAllReports(int pageNo, int pageSize, String sortBy, String sortDir) {
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name())
+                ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+        Page<Report> reportsPage = reportRepository.findAllNotDeleted(pageable);
+
+        List<Report> listOfDishes = reportsPage.getContent();
+
+        List<ReportDto> content = listOfDishes.stream().map(bt -> modelMapper.map(bt, ReportDto.class)).collect(Collectors.toList());
+
+        ReportsResponse response = new ReportsResponse();
+        response.setContent(content);
+        response.setPageNo(reportsPage.getNumber());
+        response.setPageSize(reportsPage.getSize());
+        response.setTotalElements(reportsPage.getTotalElements());
+        response.setTotalPages(reportsPage.getTotalPages());
+        response.setLast(reportsPage.isLast());
+
+        return response;
+    }
+
+    @Override
+    public ReportDto getReportById(Long id) {
+        Report report = reportRepository.findById(id)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Report not found with id: "+id));
+
+        return modelMapper.map(report, ReportDto.class);
+    }
+
+    @Override
+    public ReportDto updateReportStatus(Long id, String status) {
+        Report report = reportRepository.findById(id)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Report not found with id: "+id));
+
+        report.setStatus(status.toUpperCase());
+        reportRepository.save(report);
+
+        return modelMapper.map(report, ReportDto.class);
+    }
+
+    @Override
+    public String deleteReport(Long id) {
+        Report report = reportRepository.findById(id)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Không tìm thấy báo cáo"));
+
+        report.setIsDeleted(true);
+        reportRepository.save(report);
+
+        return "Deleted report successfully.";
+    }
+
+
 }
