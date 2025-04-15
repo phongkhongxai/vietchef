@@ -89,6 +89,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         detail.setIsDeleted(false);
         detail.setTotalCookTime(dto.getTotalCookTime().divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP));
         detail.setIsUpdated(dto.getIsUpdated());
+        detail.setChefBringIngredients(dto.getChefBringIngredients());
         detail.setTimeBeginCook(dto.getTimeBeginCook());
         detail.setTimeBeginTravel(dto.getTimeBeginTravel());
         detail.setTotalChefFeePrice(dto.getTotalChefFeePrice());
@@ -339,6 +340,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         reviewResponse.setDiscountAmout(discountAmountDetail);
         reviewResponse.setTotalPrice(totalPrice);
         reviewResponse.setMenuId(dto.getMenuId());
+        reviewResponse.setChefBringIngredients(dto.getChefBringIngredients());
         reviewResponse.setTimeBeginTravel(timeTravelResponse.getTimeBeginTravel());
         reviewResponse.setTimeBeginCook(timeTravelResponse.getTimeBeginCook());
 
@@ -375,6 +377,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
 
         bookingDetail.getDishes().addAll(newDishes);
         bookingDetail.setMenuId(bookingDetailUpdateRequest.getMenuId());
+        bookingDetail.setChefBringIngredients(bookingDetailUpdateRequest.getChefBringIngredients());
         bookingDetail.setArrivalFee(bookingDetailUpdateRequest.getArrivalFee());
         bookingDetail.setChefCookingFee(bookingDetailUpdateRequest.getChefCookingFee());
         bookingDetail.setPriceOfDishes(bookingDetailUpdateRequest.getPriceOfDishes());
@@ -461,15 +464,23 @@ public class BookingDetailServiceImpl implements BookingDetailService {
             throw new VchefApiException(HttpStatus.BAD_REQUEST,
                     "Cannot complete this booking. Current status: " + bookingDetail.getStatus());
         }
-
         bookingDetail.setStatus("COMPLETED");
         bookingDetail = bookingDetailRepository.save(bookingDetail);
         if(booking.getBookingType().equalsIgnoreCase("SINGLE")){
             booking.setStatus("COMPLETED");
             booking = bookingRepository.save(booking);
+            NotificationRequest notification = NotificationRequest.builder()
+                    .userId(booking.getCustomer().getId())
+                    .title("Booking Completed")
+                    .body("Completed Booking Single with Chef "+ booking.getChef().getUser().getFullName()+".")
+                    .bookingId(booking.getId())
+                    .screen("Booking")
+                    .build();
+            notificationService.sendPushNotification(notification);
         }else {
-            boolean allDetailsCompleted = booking.getBookingDetails()
-                    .stream()
+            List<BookingDetail> refreshedDetails = bookingDetailRepository.findByBookingId(booking.getId());
+            boolean allDetailsCompleted = refreshedDetails.stream()
+                    .filter(detail -> !"CANCELED".equalsIgnoreCase(detail.getStatus()))
                     .allMatch(detail -> "COMPLETED".equalsIgnoreCase(detail.getStatus()));
 
             if (allDetailsCompleted) {
@@ -479,8 +490,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                             .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Customer's wallet not found"));
                     walletCus.setBalance(walletCus.getBalance().add(booking.getDepositPaid()));
                     walletRepository.save(walletCus);
-                    booking.setDepositPaid(BigDecimal.ZERO);
-                    booking =bookingRepository.save(booking);
+
                     CustomerTransaction refundTransaction = CustomerTransaction.builder()
                             .wallet(walletCus)
                             .booking(booking)
@@ -491,14 +501,17 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                             .isDeleted(false)
                             .build();
                     customerTransactionRepository.save(refundTransaction);
+                    booking.setDepositPaid(BigDecimal.ZERO);
                     NotificationRequest notification = NotificationRequest.builder()
-                            .userId(booking.getChef().getUser().getId())
+                            .userId(booking.getCustomer().getId())
                             .title("Booking Completed")
                             .body("Refund deposit paid for completed Booking with Chef "+ booking.getChef().getUser().getFullName()+".")
                             .screen("Wallet")
                             .build();
                     notificationService.sendPushNotification(notification);
                 }
+                booking =bookingRepository.save(booking);
+
             }
         }
         // 2. Update wallet balance
@@ -518,7 +531,6 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         transaction.setAmount(amountToTransfer);
         transaction.setStatus("COMPLETED");
         transaction.setDescription("Payment for completed bookingDetail #" + bookingDetail.getId());
-
         chefTransactionRepository.save(transaction);
         NotificationRequest notification = NotificationRequest.builder()
                 .userId(booking.getChef().getUser().getId())
@@ -536,7 +548,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     @Scheduled(cron = "0 1 0 * * ?") // Mỗi ngày vào lúc nửa đêm 12h01
     public void updateBookingDetailsStatus() {
         LocalDate currentDate = LocalDate.now();
-        List<BookingDetail> bookingDetails = bookingDetailRepository.findBySessionDateAndStatusAndIsDeletedFalse(currentDate, "LOCKED");
+        List<BookingDetail> bookingDetails = bookingDetailRepository.findBySessionDateAndStatusAndIsDeletedFalse(currentDate, "SCHEDULED_COMPLETE");
 
         for (BookingDetail bookingDetail : bookingDetails) {
             bookingDetail.setStatus("IN_PROGRESS");
@@ -598,12 +610,24 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         if ("SINGLE".equalsIgnoreCase(booking.getBookingType())) {
             booking.setStatus("COMPLETED");
             bookingRepository.save(booking);
+            NotificationRequest notification = NotificationRequest.builder()
+                    .userId(booking.getCustomer().getId())
+                    .title("Booking Completed")
+                    .body("Completed Booking Single with Chef "+ booking.getChef().getUser().getFullName()+".")
+                    .bookingId(booking.getId())
+                    .screen("Booking")
+                    .build();
+            notificationService.sendPushNotification(notification);
         } else {
-            boolean allCompleted = booking.getBookingDetails()
-                    .stream()
+            // LOAD lại danh sách từ DB
+            List<BookingDetail> refreshedDetails = bookingDetailRepository.findByBookingId(booking.getId());
+            boolean allCompleted = refreshedDetails.stream()
+                    .filter(d -> !"CANCELED".equalsIgnoreCase(d.getStatus()))
                     .allMatch(d -> "COMPLETED".equalsIgnoreCase(d.getStatus()));
+
             if (allCompleted) {
                 booking.setStatus("COMPLETED");
+
                 // Hoàn trả cọc nếu có
                 if (booking.getDepositPaid().compareTo(BigDecimal.ZERO) > 0) {
                     Wallet cusWallet = walletRepository.findByUserId(booking.getCustomer().getId())
@@ -612,9 +636,27 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                     cusWallet.setBalance(cusWallet.getBalance().add(booking.getDepositPaid()));
                     walletRepository.save(cusWallet);
 
+                    // Tạo transaction hoàn cọc
+                    CustomerTransaction refundTransaction = CustomerTransaction.builder()
+                            .wallet(cusWallet)
+                            .booking(booking)
+                            .transactionType("REFUND")
+                            .amount(booking.getDepositPaid())
+                            .description("Auto refund for completed booking with Chef " + booking.getChef().getUser().getFullName())
+                            .status("COMPLETED")
+                            .isDeleted(false)
+                            .build();
+                    NotificationRequest notification = NotificationRequest.builder()
+                            .userId(booking.getCustomer().getId())
+                            .title("Booking Completed")
+                            .body("Refund deposit paid for completed Booking with Chef "+ booking.getChef().getUser().getFullName()+".")
+                            .screen("Wallet")
+                            .build();
+                    notificationService.sendPushNotification(notification);
+                    customerTransactionRepository.save(refundTransaction);
                     booking.setDepositPaid(BigDecimal.ZERO);
-                    bookingRepository.save(booking);
                 }
+                bookingRepository.save(booking);
             }
         }
 
@@ -640,7 +682,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
 
         notificationService.sendPushNotification(NotificationRequest.builder()
                 .userId(chef.getUser().getId())
-                .title("Booking Auto Completed")
+                .title("Booking Completed")
                 .body("System has auto-confirmed the completion and sent payment.")
                 .screen("ChefEarningsScreen")
                 .bookingId(booking.getId())

@@ -62,7 +62,6 @@ public class PaymentCycleServiceImpl implements PaymentCycleService {
             paymentCycle.setEndDate(endDate);
             LocalDate calculatedDueDate = startDate.minusDays(2);
             LocalDate today = LocalDate.now();
-
             if (calculatedDueDate.isBefore(today)) {
                 calculatedDueDate = today;
             }
@@ -111,26 +110,18 @@ public class PaymentCycleServiceImpl implements PaymentCycleService {
     public PaymentCycleResponseDto cancelPaymentCycle(Long paymentCycleId) {
         PaymentCycle cycle = paymentCycleRepository.findById(paymentCycleId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Payment cycle not found"));
-
         if ("PAID".equalsIgnoreCase(cycle.getStatus())) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel a payment cycle that has already been PAID.");
         }
-
         if (!cycle.getDueDate().isAfter(LocalDate.now())) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel a payment cycle that has already started.");
         }
         if(cycle.getCycleOrder()==1){
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel the first payment cycle.");
         }
-
-        cycle.setStatus("CANCELED");
-        paymentCycleRepository.save(cycle);
-
         Booking booking = cycle.getBooking();
         BigDecimal refundAmount = cycle.getAmountDue();
 
-        // Cập nhật totalPrice của booking (giảm đi số tiền bị hủy)
-        booking.setTotalPrice(booking.getTotalPrice().subtract(refundAmount));
 
         List<PaymentCycle> futureCycles = paymentCycleRepository.findByBookingId(booking.getId())
                 .stream()
@@ -139,7 +130,6 @@ public class PaymentCycleServiceImpl implements PaymentCycleService {
         // Nếu có futureCycles, lấy ngày kết thúc của cycle cuối cùng
         LocalDate endDateLastCycle = futureCycles.isEmpty() ? cycle.getEndDate() :
                 futureCycles.stream().max(Comparator.comparing(PaymentCycle::getEndDate)).get().getEndDate();
-
         // Tính tổng số tiền bị hủy từ các kỳ thanh toán trong tương lai
         BigDecimal totalFutureRefund = futureCycles.stream()
                 .map(PaymentCycle::getAmountDue)
@@ -150,10 +140,22 @@ public class PaymentCycleServiceImpl implements PaymentCycleService {
             futureCycle.setStatus("CANCELED");
             paymentCycleRepository.save(futureCycle);
         }
-        booking.setTotalPrice(booking.getTotalPrice().subtract(totalFutureRefund));
-        booking.setStatus("CONFIRM_PAID");
+        boolean hasCompletedDetail = bookingDetailRepository.findByBookingId(booking.getId())
+                .stream()
+                .filter(detail -> !"CANCELED".equalsIgnoreCase(detail.getStatus()))
+                .anyMatch(detail ->
+                        !detail.getSessionDate().isBefore(cycle.getStartDate()) &&
+                                !detail.getSessionDate().isAfter(cycle.getEndDate()) &&
+                                "COMPLETED".equalsIgnoreCase(detail.getStatus())
+                );
+        if (hasCompletedDetail) {
+            booking.setStatus("COMPLETED");
+        } else {
+            booking.setStatus("CONFIRMED_PAID");
+        }
+        refundAmount = refundAmount.add(totalFutureRefund);
+        booking.setTotalPrice(booking.getTotalPrice().subtract(refundAmount));
         bookingRepository.save(booking);
-
         // Lọc danh sách BookingDetail có sessionDate nằm trong khoảng từ startDate đến endDate
         List<BookingDetail> bookingDetails = bookingDetailRepository.findByBookingId(booking.getId())
                 .stream()
@@ -168,6 +170,8 @@ public class PaymentCycleServiceImpl implements PaymentCycleService {
                 bookingDetailRepository.save(detail);
             }
         }
+        cycle.setStatus("CANCELED");
+        paymentCycleRepository.save(cycle);
 
         return modelMapper.map(cycle, PaymentCycleResponseDto.class);
     }

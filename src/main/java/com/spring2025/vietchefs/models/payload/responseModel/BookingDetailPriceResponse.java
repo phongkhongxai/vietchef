@@ -29,6 +29,7 @@ public class BookingDetailPriceResponse {
     private String location;
     private Boolean isUpdated;
     private Long menuId;
+    private Boolean chefBringIngredients;
     private List<BookingDetailItemRequestDto> dishes;
 
 }

@@ -361,6 +361,7 @@ public class BookingServiceImpl implements BookingService {
             BigDecimal price4 = calculateService.calculateFinalPrice(price1, price2, price3);
 
             totalBookingPrice = totalBookingPrice.add(price4);
+            reviewSingleBookingResponse.setChefBringIngredients(detailDto.getChefBringIngredients());
             reviewSingleBookingResponse.setTotalChefFeePrice(totalChefFeePrice);
             reviewSingleBookingResponse.setTotalPrice(totalBookingPrice);
             reviewSingleBookingResponse.setTimeBeginTravel(ttp.getTimeBeginTravel());
@@ -502,6 +503,7 @@ public class BookingServiceImpl implements BookingService {
             BookingDetailPriceResponse detailResponse = new BookingDetailPriceResponse();
             detailResponse.setTotalCookTime(totalCookTime.multiply(BigDecimal.valueOf(60)));
             detailResponse.setMenuId(detailDto.getMenuId());
+            detailResponse.setChefBringIngredients(detailDto.getChefBringIngredients());
             detailResponse.setSessionDate(detailDto.getSessionDate());
             detailResponse.setDiscountAmout(discountAmountDetail);
             detailResponse.setTotalPrice(sessionTotalPrice);
@@ -1069,94 +1071,93 @@ public class BookingServiceImpl implements BookingService {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "This is not a long-term booking");
         }
 
+        String status = booking.getStatus();
+        if (!List.of("PENDING", "PENDING_FIRST_CYCLE", "CONFIRMED", "DEPOSITED").contains(status.toUpperCase())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "This booking status cannot be canceled");
+        }
         List<PaymentCycle> paymentCycles = paymentCycleRepository.findByBookingId(bookingId);
         if (paymentCycles.isEmpty()) {
             throw new VchefApiException(HttpStatus.NOT_FOUND, "No payment cycles found for this booking");
         }
-        // Kiểm tra xem có kỳ nào đã thanh toán không
         boolean hasPaidCycle = paymentCycles.stream()
                 .anyMatch(cycle -> "PAID".equalsIgnoreCase(cycle.getStatus()));
-
         if (hasPaidCycle) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST,
-                    "Cannot cancel full booking because some payment cycles are already PAID. Consider canceling individual cycles.");
+                    "Cannot cancel booking because some payment cycles are already PAID. Consider canceling individual cycles.");
         }
-
-        // Nếu booking là CONFIRMED, chỉ cho phép hủy
-        if (!"CONFIRMED".equalsIgnoreCase(booking.getStatus()) ) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST,
-                    "Cannot cancel paid booking.");
-        }
-
-        // Hủy tất cả các kỳ thanh toán (nếu chưa có kỳ nào PAID)
         for (PaymentCycle cycle : paymentCycles) {
-                cycle.setStatus("CANCELED");
-                paymentCycleRepository.save(cycle);
+            cycle.setStatus("CANCELED");
+            paymentCycleRepository.save(cycle);
         }
-        // Cập nhật trạng thái của BookingDetail
         List<BookingDetail> bookingDetails = bookingDetailRepository.findByBookingId(bookingId);
         for (BookingDetail detail : bookingDetails) {
             detail.setStatus("CANCELED");
             bookingDetailRepository.save(detail);
         }
 
-        if ("DEPOSITED".equalsIgnoreCase(booking.getStatus())) {
-            List<CustomerTransaction>  depositTransactions = customerTransactionRepository
-                    .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(booking.getId(), "DEPOSIT","COMPLETED");
+        // Hoàn tiền nếu là CONFIRMED hoặc DEPOSITED
+        if (status.equals("CONFIRMED") || status.equals("DEPOSITED")) {
+            List<CustomerTransaction> depositTransactions = customerTransactionRepository
+                    .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(bookingId, "INITIAL_PAYMENT", "COMPLETED");
 
             if (!depositTransactions.isEmpty()) {
-                boolean hasRefund = customerTransactionRepository.existsByBookingIdAndTransactionType(bookingId, "REFUND");
+                boolean hasRefund = customerTransactionRepository
+                        .existsByBookingIdAndTransactionType(bookingId, "REFUND");
+
                 if (hasRefund) {
                     throw new VchefApiException(HttpStatus.BAD_REQUEST, "Booking has already been refunded");
                 }
 
-                Wallet customerWallet = depositTransactions.get(0).getWallet();
-                BigDecimal refundAmount = depositTransactions.get(0).getAmount();
+                CustomerTransaction depositTransaction = depositTransactions.get(0);
+                Wallet customerWallet = depositTransaction.getWallet();
+                BigDecimal refundAmount = depositTransaction.getAmount();
 
-                // Tạo giao dịch hoàn tiền (REFUND)
+                // Tạo giao dịch hoàn tiền
                 CustomerTransaction refundTransaction = CustomerTransaction.builder()
                         .wallet(customerWallet)
                         .booking(booking)
                         .transactionType("REFUND")
                         .amount(refundAmount)
-                        .description("Refund for canceled booking")
+                        .description("Refund for canceled long-term booking")
                         .status("COMPLETED")
                         .isDeleted(false)
                         .build();
 
                 customerTransactionRepository.save(refundTransaction);
 
+                // Cộng tiền vào ví
                 customerWallet.setBalance(customerWallet.getBalance().add(refundAmount));
                 walletRepository.save(customerWallet);
 
+                // Gửi thông báo cho customer
+                NotificationRequest customerNotification = NotificationRequest.builder()
+                        .userId(booking.getCustomer().getId())
+                        .title("Refund Successful")
+                        .body("Your deposit for the canceled long-term booking has been refunded.")
+                        .bookingId(booking.getId())
+                        .screen("CustomerWalletScreen")
+                        .build();
+
+                notificationService.sendPushNotification(customerNotification);
             }
+        }
+
+        // Nếu là CONFIRMED thì gửi thông báo cho chef
+        if (status.equals("CONFIRMED")) {
+            NotificationRequest chefNotification = NotificationRequest.builder()
+                    .userId(booking.getChef().getUser().getId())
+                    .title("Long-term Booking Canceled")
+                    .body("The customer has canceled the confirmed long-term booking.")
+                    .bookingId(booking.getId())
+                    .screen("ChefBookingManagementScreen")
+                    .build();
+
+            notificationService.sendPushNotification(chefNotification);
         }
 
         // Cập nhật trạng thái booking
         booking.setStatus("CANCELED");
         bookingRepository.save(booking);
-        if("DEPOSITED".equalsIgnoreCase(booking.getStatus())){
-            NotificationRequest customerNotification = NotificationRequest.builder()
-                    .userId(booking.getCustomer().getId())
-                    .title("Refund Successful")
-                    .body("Your deposit for the canceled long-term booking has been refunded.")
-                    .bookingId(booking.getId())
-                    .screen("CustomerWalletScreen")
-                    .build();
-            notificationService.sendPushNotification(customerNotification);
-        }
-        NotificationRequest chefNotification = NotificationRequest.builder()
-                .userId(booking.getChef().getUser().getId())
-                .title("Long-term Booking Canceled")
-                .body("The customer has canceled the long-term booking that was scheduled.")
-                .bookingId(booking.getId())
-                .screen("ChefBookingManagementScreen")
-                .build();
-
-        notificationService.sendPushNotification(chefNotification);
-
-
-
 
         return modelMapper.map(booking, BookingResponseDto.class);
     }
