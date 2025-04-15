@@ -111,7 +111,7 @@ public class PackageServiceImpl implements PackageService {
         Set<Long> registeredPackageIds = chef.getPackages().stream().map(Package::getId).collect(Collectors.toSet());
 
         List<Package> unregisteredPackages = packageRepository.findAll().stream()
-                .filter(pkg -> !registeredPackageIds.contains(pkg.getId()))
+                .filter(pkg -> !registeredPackageIds.contains(pkg.getId()) && !pkg.getIsDeleted())
                 .toList();
 
         return unregisteredPackages.stream()
@@ -127,7 +127,7 @@ public class PackageServiceImpl implements PackageService {
         Set<Long> registeredPackageIds = chef.getPackages().stream().map(Package::getId).collect(Collectors.toSet());
 
         List<Package> registeredPackages = packageRepository.findAll().stream()
-                .filter(pkg -> registeredPackageIds.contains(pkg.getId()))
+                .filter(pkg -> registeredPackageIds.contains(pkg.getId()) && !pkg.getIsDeleted()) // lọc thêm isDeleted = false
                 .toList();
 
         return registeredPackages.stream()
