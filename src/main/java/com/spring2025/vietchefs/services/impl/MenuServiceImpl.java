@@ -102,7 +102,7 @@ public class MenuServiceImpl implements MenuService {
         // create Pageable instance
         Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
 
-        Page<Menu> menu = menuRepository.findByChef(chef,pageable);
+        Page<Menu> menu = menuRepository.findByChefAndIsDeletedFalse(chef,pageable);
 
         // get content for page object
         List<Menu> listOfMenu = menu.getContent();
@@ -195,8 +195,7 @@ public class MenuServiceImpl implements MenuService {
             List<Long> dishIds = dishes.stream()
                     .map(Dish::getId)
                     .collect(Collectors.toList());
-
-            BigDecimal calculatedTotalCookTime = calculateService.calculateTotalCookTime(dishIds, 4);
+            BigDecimal calculatedTotalCookTime = calculateService.calculateTotalCookTimeFromMenu(menu.getId(),dishIds, 4);
             menu.setTotalCookTime(calculatedTotalCookTime);
         } else {
             menu.setTotalCookTime(menuUpdateDto.getTotalCookTime());

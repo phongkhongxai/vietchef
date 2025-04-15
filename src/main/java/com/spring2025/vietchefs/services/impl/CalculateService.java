@@ -138,7 +138,7 @@ public class CalculateService {
         List<Dish> allDishes = dishRepository.findByChefAndIsDeletedFalse(chef);
 
         // --- Lấy menu có thời gian nấu lâu nhất ---
-        List<Menu> chefMenus = menuRepository.findByChef(chef);
+        List<Menu> chefMenus = menuRepository.findByChefAndIsDeletedFalse(chef);
         Optional<Menu> maxCookTimeMenu = chefMenus.stream()
                 .max(Comparator.comparing(Menu::getTotalCookTime));
 

@@ -549,31 +549,31 @@ public class BookingServiceImpl implements BookingService {
                 if (isSinglePaid) {
                     List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking(booking);
                     for (BookingDetail detail : bookingDetails) {
-                        detail.setStatus("LOCKED");
+                        detail.setStatus("SCHEDULED_COMPLETE");
                         bookingDetailRepository.save(detail);
                     }
                     booking.setStatus("CONFIRMED");
 
                 }
                 if (isLongTermDeposited) {
-                    List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking(booking);
-                    for (BookingDetail detail : bookingDetails) {
-                        if (detail.getIsUpdated()) {
-                            detail.setStatus("LOCKED");
-                            bookingDetailRepository.save(detail);
-                        }
-                    }
+//                    List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking(booking);
+//                    for (BookingDetail detail : bookingDetails) {
+//                        if (detail.getIsUpdated()) {
+//                            detail.setStatus("SCHEDULED_COMPLETE");
+//                            bookingDetailRepository.save(detail);
+//                        }
+//                    }
                     booking.setStatus("CONFIRMED");
 
                 }
                 if (isPaidFirst){
-                    List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking(booking);
-                    for (BookingDetail detail : bookingDetails) {
-                        if (detail.getIsUpdated()) {
-                            detail.setStatus("LOCKED");
-                            bookingDetailRepository.save(detail);
-                        }
-                    }
+//                    List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking(booking);
+//                    for (BookingDetail detail : bookingDetails) {
+//                        if (detail.getIsUpdated()) {
+//                            detail.setStatus("SCHEDULED_COMPLETE");
+//                            bookingDetailRepository.save(detail);
+//                        }
+//                    }
                     booking.setStatus("CONFIRMED_PARTIALLY_PAID");
                 }
                 bookingRepository.save(booking);
@@ -812,7 +812,7 @@ public class BookingServiceImpl implements BookingService {
         for (BookingDetail detail : bookingDetails) {
             if (!detail.getSessionDate().isBefore(paymentCycle.getStartDate()) &&
                     !detail.getSessionDate().isAfter(paymentCycle.getEndDate())) {
-                detail.setStatus("LOCKED");
+                detail.setStatus("SCHEDULED_COMPLETE");
             }
         }
         bookingDetailRepository.saveAll(bookingDetails);
@@ -1004,7 +1004,7 @@ public class BookingServiceImpl implements BookingService {
 
         if ("PENDING".equalsIgnoreCase(booking.getStatus())) {
             booking.setStatus("CANCELED");
-            bookingRepository.save(booking);
+            booking = bookingRepository.save(booking);
             return modelMapper.map(booking, BookingResponseDto.class);
         }
 
@@ -1042,17 +1042,17 @@ public class BookingServiceImpl implements BookingService {
         bookingDetail.setStatus("CANCELED");
         bookingDetailRepository.save(bookingDetail);
         booking.setStatus("CANCELED");
-        bookingRepository.save(booking);
-        NotificationRequest chefNotification = NotificationRequest.builder()
-                .userId(booking.getChef().getUser().getId())
-                .title("Booking Canceled")
-                .body("The customer has canceled their booking for " + bookingDetail.getSessionDate() + ".")
-                .bookingId(booking.getId())
-                .screen("ChefBookingManagementScreen")
-                .build();
-
-        notificationService.sendPushNotification(chefNotification);
-
+        booking = bookingRepository.save(booking);
+        if("CONFIRMED".equalsIgnoreCase(booking.getStatus())){
+            NotificationRequest chefNotification = NotificationRequest.builder()
+                    .userId(booking.getChef().getUser().getId())
+                    .title("Booking Canceled")
+                    .body("The customer has canceled their booking for " + bookingDetail.getSessionDate() + ".")
+                    .bookingId(booking.getId())
+                    .screen("ChefBookingManagementScreen")
+                    .build();
+            notificationService.sendPushNotification(chefNotification);
+        }
 
         // Trả về DTO phản hồi
         return modelMapper.map(booking, BookingResponseDto.class);
