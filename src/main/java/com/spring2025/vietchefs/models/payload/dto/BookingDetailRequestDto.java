@@ -34,5 +34,6 @@ public class BookingDetailRequestDto {
     private BigDecimal totalCookTime;
     private Boolean isUpdated;
     private Long menuId;
+    private Boolean chefBringIngredients;
     private List<BookingDetailItemRequestDto> dishes;
 }

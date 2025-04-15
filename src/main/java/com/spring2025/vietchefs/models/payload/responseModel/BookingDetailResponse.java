@@ -37,6 +37,7 @@ public class BookingDetailResponse {
     private Boolean isServing;
     private Boolean isUpdated;
     private Long menuId;
+    private Boolean chefBringIngredients;
     private List<BookingDetailItemDto> dishes;
     private List<ImageDto> images;
 }

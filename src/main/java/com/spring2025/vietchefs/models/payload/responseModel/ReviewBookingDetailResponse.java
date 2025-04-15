@@ -23,6 +23,7 @@ public class ReviewBookingDetailResponse {
     private BigDecimal totalPrice; // Tổng giá trị cập nhật của `BookingDetail`
     private LocalTime timeBeginTravel; // Giờ bắt đầu di chuyển của đầu bếp
     private Long menuId;
+    private Boolean chefBringIngredients;
     private LocalTime timeBeginCook; // Giờ đầu bếp bắt đầu nấu ăn
     List<BookingDetailItemRequestDto> dishes;
 
