@@ -155,7 +155,7 @@ public class MenuServiceImpl implements MenuService {
         // create Pageable instance
         Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
 
-        Page<Menu> menu = menuRepository.findAll(pageable);
+        Page<Menu> menu = menuRepository.findAllNotDeleted(pageable);
 
         // get content for page object
         List<Menu> listOfMenu = menu.getContent();

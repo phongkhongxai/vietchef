@@ -3,6 +3,7 @@ package com.spring2025.vietchefs.controllers;
 import com.spring2025.vietchefs.models.entity.Report;
 import com.spring2025.vietchefs.models.payload.dto.ReportDto;
 import com.spring2025.vietchefs.models.payload.requestModel.ReportRequest;
+import com.spring2025.vietchefs.models.payload.responseModel.ReportsResponse;
 import com.spring2025.vietchefs.services.ReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -29,5 +30,33 @@ public class ReportController {
     ) {
         ReportDto createdReport = reportService.createReportWithChefNoShow(reporterId, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdReport);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @GetMapping
+    public ResponseEntity<ReportsResponse> getAllReports(
+            @RequestParam(value = "pageNo", defaultValue = "0") int pageNo,
+            @RequestParam(value = "pageSize", defaultValue = "10") int pageSize,
+            @RequestParam(value = "sortBy", defaultValue = "createdAt") String sortBy,
+            @RequestParam(value = "sortDir", defaultValue = "desc") String sortDir
+    ) {
+        return ResponseEntity.ok(reportService.getAllReports(pageNo, pageSize, sortBy, sortDir));
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @GetMapping("/{id}")
+    public ResponseEntity<ReportDto> getReportById(@PathVariable Long id) {
+        return ResponseEntity.ok(reportService.getReportById(id));
+    }
+
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PutMapping("/{id}/status")
+    public ResponseEntity<ReportDto> updateReportStatus(@PathVariable Long id, @RequestParam String status) {
+        return ResponseEntity.ok(reportService.updateReportStatus(id, status));
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<String> deleteReport(@PathVariable Long id) {
+        return ResponseEntity.ok(reportService.deleteReport(id));
     }
 }
