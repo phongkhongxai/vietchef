@@ -63,4 +63,6 @@ public class BookingDetail {
     private Boolean isDeleted = false;
     @Column(nullable = false)
     private Boolean isUpdated = false;
+    @Column(nullable = false)
+    private Boolean chefBringIngredients = true;
 }

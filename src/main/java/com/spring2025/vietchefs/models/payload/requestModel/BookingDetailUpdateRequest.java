@@ -19,6 +19,7 @@ public class BookingDetailUpdateRequest {
     private BigDecimal discountAmout;
     private LocalTime timeBeginCook;
     private LocalTime timeBeginTravel;
+    private Boolean chefBringIngredients;
     private Long menuId;
 
 }
