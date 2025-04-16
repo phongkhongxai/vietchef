@@ -5,6 +5,7 @@ import com.spring2025.vietchefs.models.payload.dto.SignupDto;
 import com.spring2025.vietchefs.models.payload.dto.UserDto;
 import com.spring2025.vietchefs.models.payload.responseModel.UsersResponse;
 import com.spring2025.vietchefs.services.ChefService;
+import com.spring2025.vietchefs.services.PaymentCycleService;
 import com.spring2025.vietchefs.services.UserService;
 import com.spring2025.vietchefs.utils.AppConstants;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -24,6 +25,8 @@ public class AdminController {
     private ChefService chefService;
     @Autowired
     private UserService userService;
+    @Autowired
+    private PaymentCycleService paymentCycleService;
 
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
@@ -40,6 +43,14 @@ public class AdminController {
         ChefDto chefDt = chefService.createChef(chefDto);
         return new ResponseEntity<>(chefDt, HttpStatus.CREATED);
     }
+
+//    @SecurityRequirement(name = "Bearer Authentication")
+//    @PreAuthorize("hasRole('ROLE_ADMIN')")
+//    @PostMapping("/paymentCycles/check")
+//    public ResponseEntity<?> paymentCyclesCheck() {
+//        paymentCycleService.checkOverduePaymentCycles();
+//        return new ResponseEntity<>("Hehe", HttpStatus.OK);
+//    }
 
     @GetMapping
     public UsersResponse getAllUsers(@RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
