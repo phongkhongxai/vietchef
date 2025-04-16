@@ -359,7 +359,6 @@ public class BookingServiceImpl implements BookingService {
 
             // 🔹 Tính tổng giá của BookingDetail
             BigDecimal price4 = calculateService.calculateFinalPrice(price1, price2, price3);
-
             totalBookingPrice = totalBookingPrice.add(price4);
             reviewSingleBookingResponse.setChefBringIngredients(detailDto.getChefBringIngredients());
             reviewSingleBookingResponse.setTotalChefFeePrice(totalChefFeePrice);
@@ -468,27 +467,17 @@ public class BookingServiceImpl implements BookingService {
                     }
                 }
             }
-            if (!invalidDates.isEmpty()) {
-                String message = "You must select a dish for the following session dates: " +
-                        invalidDates.stream()
-                                .map(LocalDate::toString)
-                                .collect(Collectors.joining(", "));
-                throw new VchefApiException(HttpStatus.BAD_REQUEST, message);
-            }
+
 
             // 🔹 Tính phí dịch vụ đầu bếp (công nấu ăn)
             BigDecimal chefCookingFee = calculateService.calculateChefServiceFee(chef.getPrice(), totalCookTime);
-
-
             // 🔹 Tính phí món ăn
             BigDecimal dishPrice = calculateService.calculateDishPrice(detailDto.getMenuId(), dto.getGuestCount(), detailDto.getExtraDishIds());
             BigDecimal totalChefFeePrice = chefCookingFee.add(dishPrice.multiply(BigDecimal.valueOf(0.8))).add(travelFee);
             BigDecimal platformFee = chefCookingFee.multiply(BigDecimal.valueOf(0.25))  // 25% của cookingFee
                     .add(dishPrice.multiply(BigDecimal.valueOf(0.20))); // 20% của dishPrice
-
             // 🔹 Tính tổng giá từng buổi
             BigDecimal sessionTotalPrice = calculateService.calculateFinalPrice(chefCookingFee, dishPrice, travelFee);
-            totalBookingPrice = totalBookingPrice.add(sessionTotalPrice);
             // 🔹 Tính thời gian di chuyển và nấu ăn
             TimeTravelResponse ttp = calculateService.calculateArrivalTime(detailDto.getStartTime(), totalCookTime, travelFeeResponse.getDurationHours());
             BigDecimal discountAmountDetail = BigDecimal.ZERO;
@@ -498,6 +487,7 @@ public class BookingServiceImpl implements BookingService {
                 discountAmount = discountAmount.add(discountAmountDetail);
                 sessionTotalPrice = sessionTotalPrice.subtract(discountAmountDetail);
             }
+            totalBookingPrice = totalBookingPrice.add(sessionTotalPrice);
 
             // 🔹 Tạo response cho từng BookingDetail
             BookingDetailPriceResponse detailResponse = new BookingDetailPriceResponse();
@@ -519,6 +509,13 @@ public class BookingServiceImpl implements BookingService {
             detailResponse.setTotalChefFeePrice(totalChefFeePrice);
             detailResponse.setIsUpdated(detailDto.getIsDishSelected());
             detailPriceResponses.add(detailResponse);
+        }
+        if (!invalidDates.isEmpty()) {
+            String message = "You must select a dish for the following session dates: " +
+                    invalidDates.stream()
+                            .map(LocalDate::toString)
+                            .collect(Collectors.joining(", "));
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, message);
         }
 
         // Tạo response tổng hợp
@@ -787,7 +784,7 @@ public class BookingServiceImpl implements BookingService {
         if (depositPaid.compareTo(BigDecimal.ZERO) > 0) {
                 remainingAmount = amountDue.add(depositPaid);
         }
-        // 6. Trừ tiền trong ví
+
         if("PENDING_FIRST_CYCLE".equalsIgnoreCase(booking.getStatus())){
             if (remainingAmount.compareTo(BigDecimal.ZERO) > 0) {
                 if (wallet.getBalance().compareTo(remainingAmount) < 0) {

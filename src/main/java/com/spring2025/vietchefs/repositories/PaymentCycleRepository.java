@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface PaymentCycleRepository extends JpaRepository<PaymentCycle, Long> {
@@ -16,5 +17,6 @@ public interface PaymentCycleRepository extends JpaRepository<PaymentCycle, Long
     List<PaymentCycle> findByBookingId(@Param("bookingId") Long bookingId);
     List<PaymentCycle>findByBookingOrderByCycleOrderAsc(Booking booking);
     PaymentCycle findByBookingAndCycleOrder(Booking booking, int cycleOrder);
+    List<PaymentCycle> findByDueDateBeforeAndStatus(LocalDate localDate, String status);
 
 }

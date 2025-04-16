@@ -8,4 +8,5 @@ public interface PaymentCycleService {
     void updatePaymentCycles(Booking booking);
     PaymentCycleResponseDto cancelPaymentCycle(Long paymentCycleId);
 
+
 }
