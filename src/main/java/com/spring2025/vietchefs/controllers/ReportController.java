@@ -2,15 +2,19 @@ package com.spring2025.vietchefs.controllers;
 
 import com.spring2025.vietchefs.models.entity.Report;
 import com.spring2025.vietchefs.models.payload.dto.ReportDto;
+import com.spring2025.vietchefs.models.payload.dto.UserDto;
 import com.spring2025.vietchefs.models.payload.requestModel.ReportRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.ReportsResponse;
 import com.spring2025.vietchefs.services.ReportService;
+import com.spring2025.vietchefs.services.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -18,6 +22,8 @@ import org.springframework.web.bind.annotation.*;
 public class ReportController {
     @Autowired
     private ReportService reportService;
+    @Autowired
+    private UserService userService;
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CUSTOMER')")
     @PostMapping
@@ -25,10 +31,11 @@ public class ReportController {
             summary = "Tạo report với reason là CHEF_NO_SHOW "
     )
     public ResponseEntity<ReportDto> createChefNoShowReport(
-            @RequestParam Long reporterId,
+            @AuthenticationPrincipal UserDetails userDetails,
             @RequestBody ReportRequest request
     ) {
-        ReportDto createdReport = reportService.createReportWithChefNoShow(reporterId, request);
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        ReportDto createdReport = reportService.createReportWithChefNoShow(bto.getId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdReport);
     }
     @SecurityRequirement(name = "Bearer Authentication")

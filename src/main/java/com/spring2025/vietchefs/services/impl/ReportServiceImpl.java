@@ -18,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -47,6 +48,12 @@ public class ReportServiceImpl implements ReportService{
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Người bị báo cáo không tồn tại"));
         BookingDetail bookingDetail = bookingDetailRepository.findById(request.getBookingDetailId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Booking detail not found"));
+        if(!Objects.equals(reporter.getId(), bookingDetail.getBooking().getCustomer().getId())){
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "You not in booking.");
+        }
+        if(!Objects.equals(reportedChef.getId(), bookingDetail.getBooking().getChef().getId())){
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef not in booking.");
+        }
         Report report = new Report();
         report.setReportedBy(reporter);
         report.setReportedChef(reportedChef);
@@ -54,20 +61,14 @@ public class ReportServiceImpl implements ReportService{
         report.setReason(request.getReason());
         report.setStatus("PENDING");
         report.setIsDeleted(false);
-        if (request.getReason().equalsIgnoreCase("CHEF_NO_SHOW")) {
+        report.setBookingDetail(bookingDetail);
+        if (bookingDetail.getStatus().equalsIgnoreCase("WAITING_FOR_CONFIRMATION") && request.getReason().equalsIgnoreCase("CHEF_NO_SHOW")){
             bookingDetail.setStatus("LOCKED");
             bookingDetailRepository.save(bookingDetail);
+        }else{
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Current BookingDetail's status not suit for this type report. Complete session to report then.");
         }
-//         else {
-////            if (request.getReviewId() == null) {
-////                throw new VchefApiException(HttpStatus.NOT_FOUND,"Cần cung cấp review cho loại báo cáo này.");
-////            }
-////            Review review = reviewRepository.findById(request.getReviewId())
-////                    .orElseThrow(() -> new NotFoundException("Review không tồn tại"));
-////            report.setReview(review);
-//        }
         report = reportRepository.save(report);
-
         return modelMapper.map(report, ReportDto.class);
 
     }
