@@ -20,4 +20,6 @@ public class BookingSummaryDto {
     private BigDecimal totalPrice;
     private BigDecimal deposidPaid;
     private String bookingType;
+    private String requestDetails;
+    private int guestCount;
 }
