@@ -392,8 +392,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
 
         BigDecimal newTotalPrice = bookingDetailRepository.calculateTotalPriceByBooking(booking.getId());
         booking.setTotalPrice(newTotalPrice);
-        bookingRepository.save(booking);
-
+        booking = bookingRepository.save(booking);
         // Cập nhật lại PaymentCycle
         paymentCycleService.updatePaymentCycles(booking);
 
@@ -438,8 +437,6 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                     .screen("BookingDetail")
                     .build();
             notificationService.sendPushNotification(notification);
-            chefService.updateReputation(chef, 1);
-
         }else {
             throw new VchefApiException(HttpStatus.BAD_REQUEST,
                     "Cannot update status. Current time is not within the allowed time window.");
@@ -540,6 +537,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                 .screen("ChefEarningsScreen")
                 .build();
         notificationService.sendPushNotification(notification);
+        chefService.updateReputation(chef, 1);
 
 
         return modelMapper.map(bookingDetail, BookingDetailDto.class);
@@ -593,6 +591,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
             if (sessionDateTime.plusHours(12).isBefore(now)) {
                 try {
                     completeBookingDetail(detail);
+
                 } catch (Exception e) {
                     System.out.println(e.getMessage());
                 }
@@ -688,5 +687,6 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                 .bookingId(booking.getId())
                 .build()
         );
+        chefService.updateReputation(chef, 1);
     }
 }

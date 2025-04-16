@@ -13,12 +13,14 @@ import jakarta.transaction.Transactional;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -179,5 +181,76 @@ public class PaymentCycleServiceImpl implements PaymentCycleService {
     private int getNumOfCycles(Booking booking) {
         int durationDays = booking.getBookingPackage().getDurationDays();
         return (int) Math.ceil((double) durationDays / 5.0);
+    }
+    @Scheduled(cron = "0 15 0 * * *") // Chạy lúc 00:00 mỗi ngày
+    @Transactional
+    public void checkOverduePaymentCycles() {
+        LocalDate today = LocalDate.now();
+
+        List<PaymentCycle> overdueCycles = paymentCycleRepository.findByDueDateBeforeAndStatus(today, "PENDING");
+
+        for (PaymentCycle cycle : overdueCycles) {
+            // Cập nhật cycle hiện tại thành OVERDUE
+            cycle.setStatus("OVERDUE");
+            paymentCycleRepository.save(cycle);
+
+            Booking booking = cycle.getBooking();
+
+            // Cập nhật BookingDetail của kỳ này nếu chưa bị CANCELED
+            List<BookingDetail> relatedDetails = bookingDetailRepository.findByBookingId(booking.getId()).stream()
+                    .filter(detail ->
+                            !detail.getStatus().equalsIgnoreCase("CANCELED") &&
+                                    !detail.getSessionDate().isBefore(cycle.getStartDate()) &&
+                                    !detail.getSessionDate().isAfter(cycle.getEndDate()))
+                    .toList();
+
+            for (BookingDetail detail : relatedDetails) {
+                detail.setStatus("OVERDUE");
+                bookingDetailRepository.save(detail);
+            }
+
+            // Hủy các kỳ và buổi còn lại (sau kỳ này)
+            List<PaymentCycle> futureCycles = paymentCycleRepository.findByBookingId(booking.getId()).stream()
+                    .filter(c -> c.getCycleOrder() > cycle.getCycleOrder())
+                    .toList();
+
+            for (PaymentCycle futureCycle : futureCycles) {
+                futureCycle.setStatus("CANCELED");
+                paymentCycleRepository.save(futureCycle);
+            }
+
+            List<BookingDetail> futureDetails = bookingDetailRepository.findByBookingId(booking.getId()).stream()
+                    .filter(detail ->
+                            !detail.getStatus().equalsIgnoreCase("CANCELED") &&
+                                    detail.getSessionDate().isAfter(cycle.getEndDate()))
+                    .toList();
+
+            for (BookingDetail futureDetail : futureDetails) {
+                futureDetail.setStatus("CANCELED");
+                bookingDetailRepository.save(futureDetail);
+            }
+
+            // Kiểm tra nếu là kỳ đầu tiên
+            if (cycle.getCycleOrder() == 1) {
+                booking.setStatus("OVERDUE");
+            } else {
+                // Tìm kỳ trước đó
+                Optional<PaymentCycle> previousCycleOpt = paymentCycleRepository.findByBookingId(booking.getId()).stream()
+                        .filter(c -> c.getCycleOrder() == cycle.getCycleOrder() - 1)
+                        .findFirst();
+
+                if (previousCycleOpt.isPresent()) {
+                    PaymentCycle previousCycle = previousCycleOpt.get();
+                    if (previousCycle.getEndDate().isBefore(today) && !booking.getStatus().equalsIgnoreCase("COMPLETED")) {
+                        BigDecimal newTotalPrice = bookingDetailRepository.calculateTotalPriceByBooking(booking.getId());
+                        booking.setTotalPrice(newTotalPrice);
+                        booking.setStatus("COMPLETED");
+                    }
+                }
+            }
+            bookingRepository.save(booking);
+        }
+
+        System.out.println("✅ Checked and updated overdue payment cycles at " + today);
     }
 }

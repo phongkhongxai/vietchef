@@ -286,7 +286,7 @@ public class CalculateService {
     }
 
     public BigDecimal calculateFinalPrice(BigDecimal price1, BigDecimal price2, BigDecimal price3) {
-        BigDecimal price1Final = price1.multiply(BigDecimal.valueOf(1.25));// Cộng thêm 20% phí nền tảng
+        BigDecimal price1Final = price1.multiply(BigDecimal.valueOf(1.25));// Cộng thêm 25% phí nền tảng
         return price1Final.add(price2).add(price3);
     }
 
