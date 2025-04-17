@@ -107,105 +107,110 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
-    @Override
-    public AuthenticationResponse authenticateWithGoogle(String idToken) throws Exception {
-        // Xác thực idToken từ Firebase
-        FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
-        String uid = decodedToken.getUid();
-        String email = decodedToken.getEmail();
+//    @Override
+//    public AuthenticationResponse authenticateWithGoogle(String idToken) throws Exception {
+//        // Xác thực idToken từ Firebase
+//        FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
+//        String uid = decodedToken.getUid();
+//        String email = decodedToken.getEmail();
+//
+//        if (email == null || uid == null) {
+//            throw new Exception("Email or UID from Google is missing.");
+//        }
+//        // Nếu user đã tồn tại theo uid, dùng lại user
+//        User user = userRepository.findByUid(uid).orElse(null);
+//        if (user == null) {
+//            // Nếu email đã tồn tại nhưng không cùng uid, báo lỗi (tránh bị override người khác)
+//            if (userRepository.existsByEmail(email)) {
+//                throw new VchefApiException(HttpStatus.BAD_REQUEST, "Email already exists with another account!");
+//            }
+//
+//            // Lấy role mặc định cho người dùng Google
+//            Role userRole = roleRepository.findByRoleName("ROLE_CUSTOMER")
+//                    .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Default role not found."));
+//
+//            // Tạo user mới từ thông tin Google
+//            user = User.builder()
+//                    .uid(uid)
+//                    .email(email)
+//                    .fullName(decodedToken.getName() != null ? decodedToken.getName() : "Unknown")
+//                    .avatarUrl(decodedToken.getPicture())
+//                    .username(generateUniqueUsername(email))
+//                    .emailVerified(true)
+//                    .role(userRole)
+//                    .dob(LocalDate.now())
+//                    .phone("default")
+//                    .gender("default")
+//                    .password(passwordEncoder.encode(UUID.randomUUID().toString())) // Mật khẩu ngẫu nhiên
+//                    .build();
+//
+//            userRepository.save(user);
+//        }
+//        // Tạo token cho user
+//        Authentication authentication = new UsernamePasswordAuthenticationToken(user.getEmail(), null);
+//        String accessToken = jwtTokenProvider.generateAccessToken(authentication, user);
+//        String refreshToken = jwtTokenProvider.generateRefreshToken(authentication, user);
+//
+//        revokeRefreshToken(accessToken);
+//        RefreshToken savedRefreshToken = saveUserRefreshToken(refreshToken);
+//
+//        revokeAllUserAccessTokens(user);
+//        saveUserAccessToken(user, accessToken, savedRefreshToken);
+//        return AuthenticationResponse.builder()
+//                .accessToken(accessToken)
+//                .refreshToken(refreshToken)
+//                .fullName(user.getFullName())
+//                .build();
+//    }
 
-        if (email == null || uid == null) {
-            throw new Exception("Email or UID from Google is missing.");
-        }
-        // Nếu user đã tồn tại theo uid, dùng lại user
-        User user = userRepository.findByUid(uid).orElse(null);
-        if (user == null) {
-            // Nếu email đã tồn tại nhưng không cùng uid, báo lỗi (tránh bị override người khác)
-            if (userRepository.existsByEmail(email)) {
-                throw new VchefApiException(HttpStatus.BAD_REQUEST, "Email already exists with another account!");
-            }
-
-            // Lấy role mặc định cho người dùng Google
-            Role userRole = roleRepository.findByRoleName("ROLE_CUSTOMER")
-                    .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Default role not found."));
-
-            // Tạo user mới từ thông tin Google
-            user = User.builder()
-                    .uid(uid)
-                    .email(email)
-                    .fullName(decodedToken.getName() != null ? decodedToken.getName() : "Unknown")
-                    .avatarUrl(decodedToken.getPicture())
-                    .username(generateUniqueUsername(email))
-                    .emailVerified(true)
-                    .role(userRole)
-                    .dob(LocalDate.now())
-                    .phone("default")
-                    .gender("default")
-                    .password(passwordEncoder.encode(UUID.randomUUID().toString())) // Mật khẩu ngẫu nhiên
-                    .build();
-
-            userRepository.save(user);
-        }
-        // Tạo token cho user
-        Authentication authentication = new UsernamePasswordAuthenticationToken(user.getEmail(), null);
-        String accessToken = jwtTokenProvider.generateAccessToken(authentication, user);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(authentication, user);
-
-        return AuthenticationResponse.builder()
-                .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .fullName(user.getFullName())
-                .build();
-    }
-
-    @Override
-    public AuthenticationResponse authenticateWithFacebook(String accessToken) throws Exception {
-        FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(accessToken);
-        String uid = decodedToken.getUid();
-        String email = decodedToken.getEmail();
-
-        if (email == null || uid == null) {
-            throw new Exception("Email or UID from Facebook is missing.");
-        }
-        // Nếu user đã tồn tại theo uid, dùng lại user
-        User user = userRepository.findByUid(uid).orElse(null);
-        if (user == null) {
-            // Nếu email đã tồn tại nhưng không cùng uid, báo lỗi (tránh bị override người khác)
-            if (userRepository.existsByEmail(email)) {
-                throw new VchefApiException(HttpStatus.BAD_REQUEST, "Email already exists with another account!");
-            }
-            Role userRole = roleRepository.findByRoleName("ROLE_CUSTOMER")
-                    .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Default role not found."));
-
-            // Tạo user mới từ thông tin Facebook
-            user = User.builder()
-                    .uid(uid)
-                    .email(email)
-                    .fullName(decodedToken.getName() != null ? decodedToken.getName() : "Unknown")
-                    .avatarUrl(decodedToken.getPicture())
-                    .username(generateUniqueUsername(email))
-                    .emailVerified(true)
-                    .role(userRole)
-                    .dob(LocalDate.now())
-                    .phone("default")
-                    .gender("default")
-                    .password(passwordEncoder.encode(UUID.randomUUID().toString())) // Mật khẩu ngẫu nhiên
-                    .build();
-
-            userRepository.save(user);
-        }
-
-        // Tạo token cho user
-        Authentication authentication = new UsernamePasswordAuthenticationToken(user.getEmail(), null);
-        String accessTokenGenerated = jwtTokenProvider.generateAccessToken(authentication, user);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(authentication, user);
-
-        return AuthenticationResponse.builder()
-                .accessToken(accessTokenGenerated)
-                .refreshToken(refreshToken)
-                .fullName(user.getFullName())
-                .build();
-    }
+//    @Override
+//    public AuthenticationResponse authenticateWithFacebook(String accessToken) throws Exception {
+//        FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(accessToken);
+//        String uid = decodedToken.getUid();
+//        String email = decodedToken.getEmail();
+//
+//        if (email == null || uid == null) {
+//            throw new Exception("Email or UID from Facebook is missing.");
+//        }
+//        // Nếu user đã tồn tại theo uid, dùng lại user
+//        User user = userRepository.findByUid(uid).orElse(null);
+//        if (user == null) {
+//            // Nếu email đã tồn tại nhưng không cùng uid, báo lỗi (tránh bị override người khác)
+//            if (userRepository.existsByEmail(email)) {
+//                throw new VchefApiException(HttpStatus.BAD_REQUEST, "Email already exists with another account!");
+//            }
+//            Role userRole = roleRepository.findByRoleName("ROLE_CUSTOMER")
+//                    .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Default role not found."));
+//
+//            // Tạo user mới từ thông tin Facebook
+//            user = User.builder()
+//                    .uid(uid)
+//                    .email(email)
+//                    .fullName(decodedToken.getName() != null ? decodedToken.getName() : "Unknown")
+//                    .avatarUrl(decodedToken.getPicture())
+//                    .username(generateUniqueUsername(email))
+//                    .emailVerified(true)
+//                    .role(userRole)
+//                    .dob(LocalDate.now())
+//                    .phone("default")
+//                    .gender("default")
+//                    .password(passwordEncoder.encode(UUID.randomUUID().toString())) // Mật khẩu ngẫu nhiên
+//                    .build();
+//
+//            userRepository.save(user);
+//        }
+//
+//        // Tạo token cho user
+//        Authentication authentication = new UsernamePasswordAuthenticationToken(user.getEmail(), null);
+//        String accessTokenGenerated = jwtTokenProvider.generateAccessToken(authentication, user);
+//        String refreshToken = jwtTokenProvider.generateRefreshToken(authentication, user);
+//
+//        return AuthenticationResponse.builder()
+//                .accessToken(accessTokenGenerated)
+//                .refreshToken(refreshToken)
+//                .fullName(user.getFullName())
+//                .build();
+//    }
 
     @Override
     public AuthenticationResponse authenticateWithOAuth2(String provider, Map<String, Object> userData) throws Exception {
@@ -260,6 +265,12 @@ public class AuthServiceImpl implements AuthService {
         Authentication authentication = new UsernamePasswordAuthenticationToken(user.getEmail(), null);
         String accessToken = jwtTokenProvider.generateAccessToken(authentication, user);
         String refreshToken = jwtTokenProvider.generateRefreshToken(authentication, user);
+
+        revokeRefreshToken(accessToken);
+        RefreshToken savedRefreshToken = saveUserRefreshToken(refreshToken);
+
+        revokeAllUserAccessTokens(user);
+        saveUserAccessToken(user, accessToken, savedRefreshToken);
 
         return AuthenticationResponse.builder()
                 .accessToken(accessToken)
