@@ -1,21 +1,32 @@
 package com.spring2025.vietchefs.controllers;
 
 
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
+import com.google.firebase.auth.FirebaseToken;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.spring2025.vietchefs.models.payload.dto.LoginDto;
 import com.spring2025.vietchefs.models.payload.dto.SignupDto;
 import com.spring2025.vietchefs.models.payload.requestModel.NewPasswordRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.AuthenticationResponse;
 import com.spring2025.vietchefs.services.AuthService;
+import com.spring2025.vietchefs.services.impl.FacebookOAuth2Service;
+import com.spring2025.vietchefs.services.impl.GoogleOAuth2Service;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -74,28 +85,93 @@ public class AuthController {
         return new ResponseEntity<>(response, HttpStatus.OK);
 
     }
-    @PostMapping("/google-login")
-    public ResponseEntity<?> loginWithGoogle(@RequestParam String idToken) {
-        try {
-            AuthenticationResponse token = authService.authenticateWithGoogle(idToken);
-            return ResponseEntity.ok(token);
-        } catch (Exception e) {
-            return ResponseEntity
-                    .status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message: " +e.getMessage(), "Authentication failed: Invalid Firebase token"));
-        }
+//    @PostMapping("/google-login")
+//    public ResponseEntity<?> loginWithGoogle(@RequestParam String idToken) {
+//        try {
+//            AuthenticationResponse token = authService.authenticateWithGoogle(idToken);
+//            return ResponseEntity.ok(token);
+//        } catch (Exception e) {
+//            return ResponseEntity
+//                    .status(HttpStatus.UNAUTHORIZED)
+//                    .body(Map.of("message: " +e.getMessage(), "Authentication failed: Invalid Firebase token"));
+//        }
+//    }
+//
+//    @PostMapping("/facebook-login")
+//    public ResponseEntity<?> loginWithFb(@RequestParam String idToken) {
+//        try {
+//            AuthenticationResponse token = authService.authenticateWithFacebook(idToken);
+//            return ResponseEntity.ok(token);
+//        } catch (Exception e) {
+//            return ResponseEntity
+//                    .status(HttpStatus.UNAUTHORIZED)
+//                    .body(Map.of("message: " +e.getMessage(), "Authentication failed: Invalid Firebase token"));
+//        }
+//    }
+
+    @Autowired
+    private GoogleOAuth2Service googleOAuth2Service;
+    @Autowired
+    private FacebookOAuth2Service facebookOAuth2Service;
+
+    @GetMapping("/google/callback")
+    public ResponseEntity<?> handleGoogleCallback(@RequestParam("code") String code) throws Exception {
+        Map<String, Object> userInfo = googleOAuth2Service.getUserInfoFromCode(code);
+        return ResponseEntity.ok(authService.authenticateWithOAuth2("google", userInfo));
     }
 
-    @PostMapping("/facebook-login")
-    public ResponseEntity<?> loginWithFb(@RequestParam String idToken) {
-        try {
-            AuthenticationResponse token = authService.authenticateWithFacebook(idToken);
-            return ResponseEntity.ok(token);
-        } catch (Exception e) {
-            return ResponseEntity
-                    .status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("message: " +e.getMessage(), "Authentication failed: Invalid Firebase token"));
-        }
+    @GetMapping("/facebook/callback")
+    public ResponseEntity<?> handleFacebookCallback(@RequestParam("code") String code) throws Exception {
+        Map<String, Object> userInfo = facebookOAuth2Service.getUserInfoFromCode(code);
+        return ResponseEntity.ok(authService.authenticateWithOAuth2("facebook", userInfo));
     }
+    @Value("${oauth.google.client-id}")
+    private String googleClientId;
+
+    @Value("${oauth.google.redirect-uri}")
+    private String googleRedirectUri;
+
+    @Value("${oauth.facebook.client-id}")
+    private String facebookClientId;
+
+    @Value("${oauth.facebook.redirect-uri}")
+    private String facebookRedirectUri;
+
+    @GetMapping("/oauth-url")
+    public ResponseEntity<Map<String, String>> getOAuthUrl(@RequestParam("provider") String provider) {
+        String oauthUrl;
+        switch (provider.toLowerCase()) {
+            case "google":
+                oauthUrl = UriComponentsBuilder
+                        .fromHttpUrl("https://accounts.google.com/o/oauth2/v2/auth")
+                        .queryParam("client_id", googleClientId)
+                        .queryParam("redirect_uri", googleRedirectUri)
+                        .queryParam("response_type", "code")
+                        .queryParam("scope", "email profile")
+                        .queryParam("access_type", "offline")
+                        .build()
+                        .toUriString();
+                break;
+
+            case "facebook":
+                oauthUrl = UriComponentsBuilder
+                        .fromHttpUrl("https://www.facebook.com/v12.0/dialog/oauth")
+                        .queryParam("client_id", facebookClientId)
+                        .queryParam("redirect_uri", facebookRedirectUri)
+                        .queryParam("response_type", "code")
+                        .queryParam("scope", "email,public_profile")
+                        .build()
+                        .toUriString();
+                break;
+
+            default:
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported provider");
+        }
+
+        Map<String, String> response = new HashMap<>();
+        response.put("url", oauthUrl);
+        return ResponseEntity.ok(response);
+    }
+
 
 }
