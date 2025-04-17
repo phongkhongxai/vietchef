@@ -11,11 +11,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
+import java.util.Map;
 
 public interface AuthService {
     AuthenticationResponse login(LoginDto loginDto);
     AuthenticationResponse authenticateWithGoogle(String idToken) throws Exception;
     AuthenticationResponse authenticateWithFacebook(String accessToken) throws Exception;
+    AuthenticationResponse authenticateWithOAuth2(String provider, Map<String, Object> userData) throws Exception;
     String signup(SignupDto signupDto);
     AuthenticationResponse refreshToken(HttpServletRequest request, HttpServletResponse response) throws IOException;
     String verifyEmailCode(String email, String code);
