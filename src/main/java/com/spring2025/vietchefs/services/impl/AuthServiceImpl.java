@@ -41,6 +41,7 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -229,35 +230,34 @@ public class AuthServiceImpl implements AuthService {
         } else {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Unsupported provider: " + provider);
         }
-        if (email == null || uid == null) {
-            throw new Exception("Email or UID is missing from " + provider);
-        }
-
-        // Check if user exists
         User user = userRepository.findByUid(uid).orElse(null);
         if (user == null) {
-            if (userRepository.existsByEmail(email)) {
-                throw new VchefApiException(HttpStatus.BAD_REQUEST, "Email already exists with another account!");
+            Optional<User> userByEmail = userRepository.findByEmail(email);
+            if (userByEmail.isPresent()) {
+                user = userByEmail.get();
+                user.setUid(uid);
+                userRepository.save(user);
+            } else {
+                // Tạo user mới nếu không có ai trùng UID hay email
+                Role userRole = roleRepository.findByRoleName("ROLE_CUSTOMER")
+                        .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Role not found."));
+
+                user = User.builder()
+                        .uid(uid)
+                        .email(email)
+                        .fullName(name != null ? name : "Unknown")
+                        .avatarUrl(picture)
+                        .username(generateUniqueUsername(email))
+                        .emailVerified(true)
+                        .role(userRole)
+                        .dob(LocalDate.now())
+                        .phone("default")
+                        .gender("default")
+                        .password(passwordEncoder.encode(UUID.randomUUID().toString()))
+                        .build();
+
+                userRepository.save(user);
             }
-
-            Role userRole = roleRepository.findByRoleName("ROLE_CUSTOMER")
-                    .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Default role not found."));
-
-            user = User.builder()
-                    .uid(uid)
-                    .email(email)
-                    .fullName(name != null ? name : "Unknown")
-                    .avatarUrl(picture)
-                    .username(generateUniqueUsername(email))
-                    .emailVerified(true)
-                    .role(userRole)
-                    .dob(LocalDate.now())
-                    .phone("default")
-                    .gender("default")
-                    .password(passwordEncoder.encode(UUID.randomUUID().toString()))
-                    .build();
-
-            userRepository.save(user);
         }
 
         // Generate tokens
