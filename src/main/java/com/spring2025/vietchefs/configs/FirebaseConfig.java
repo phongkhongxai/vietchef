@@ -13,18 +13,18 @@ import java.io.InputStream;
 
 @Configuration
 public class FirebaseConfig {
-    @Bean
-    public FirebaseApp initializeFirebaseApp() throws IOException {
-        ClassPathResource serviceAccountResource = new ClassPathResource("secure-grammar-456201-n8-firebase-adminsdk-fbsvc-e933be345c.json");
-
-        try (InputStream serviceAccount = serviceAccountResource.getInputStream()) {
-            FirebaseOptions options = new FirebaseOptions.Builder()
-                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
-                    .build();
-
-            return FirebaseApp.initializeApp(options);
-        } catch (IOException e) {
-            throw new IOException("Không thể khởi tạo Firebase, tệp service account không tìm thấy hoặc không hợp lệ.", e);
-        }
-    }
+//    @Bean
+//    public FirebaseApp initializeFirebaseApp() throws IOException {
+//        ClassPathResource serviceAccountResource = new ClassPathResource("secure-grammar-456201-n8-firebase-adminsdk-fbsvc-e933be345c.json");
+//
+//        try (InputStream serviceAccount = serviceAccountResource.getInputStream()) {
+//            FirebaseOptions options = new FirebaseOptions.Builder()
+//                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
+//                    .build();
+//
+//            return FirebaseApp.initializeApp(options);
+//        } catch (IOException e) {
+//            throw new IOException("Không thể khởi tạo Firebase, tệp service account không tìm thấy hoặc không hợp lệ.", e);
+//        }
+//    }
 }
