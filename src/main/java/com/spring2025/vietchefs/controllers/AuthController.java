@@ -26,6 +26,8 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -115,9 +117,13 @@ public class AuthController {
     private FacebookOAuth2Service facebookOAuth2Service;
 
     @GetMapping("/google/callback")
-    public ResponseEntity<?> handleGoogleCallback(@RequestParam("code") String code) throws Exception {
+    public void handleGoogleCallback(@RequestParam("code") String code, HttpServletResponse response) throws Exception {
         Map<String, Object> userInfo = googleOAuth2Service.getUserInfoFromCode(code);
-        return ResponseEntity.ok(authService.authenticateWithOAuth2("google", userInfo));
+        AuthenticationResponse authResponse = authService.authenticateWithOAuth2("google", userInfo);
+        String redirectUrl = "https://vietchef.ddns.net/oauth-redirect"
+                + "?access_token=" + authResponse.getAccessToken()
+                + "&refresh_token=" + authResponse.getRefreshToken() +"&full_name="+authResponse.getFullName();
+        response.sendRedirect(redirectUrl);
     }
 
     @GetMapping("/facebook/callback")
