@@ -4,12 +4,14 @@ import com.spring2025.vietchefs.models.payload.dto.ChefDto;
 import com.spring2025.vietchefs.models.payload.dto.SignupDto;
 import com.spring2025.vietchefs.models.payload.dto.UserDto;
 import com.spring2025.vietchefs.models.payload.responseModel.UsersResponse;
+import com.spring2025.vietchefs.services.BookingService;
 import com.spring2025.vietchefs.services.ChefService;
 import com.spring2025.vietchefs.services.PaymentCycleService;
 import com.spring2025.vietchefs.services.UserService;
 import com.spring2025.vietchefs.utils.AppConstants;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
+import org.checkerframework.checker.units.qual.A;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +27,8 @@ public class AdminController {
     private ChefService chefService;
     @Autowired
     private UserService userService;
+    @Autowired
+    private BookingService bookingService;
     @Autowired
     private PaymentCycleService paymentCycleService;
 
@@ -46,9 +50,9 @@ public class AdminController {
 
 //    @SecurityRequirement(name = "Bearer Authentication")
 //    @PreAuthorize("hasRole('ROLE_ADMIN')")
-//    @PostMapping("/paymentCycles/check")
+//    @PostMapping("/bookings/check")
 //    public ResponseEntity<?> paymentCyclesCheck() {
-//        paymentCycleService.checkOverduePaymentCycles();
+//        bookingService.markOverdueAndRefundBookings();
 //        return new ResponseEntity<>("Hehe", HttpStatus.OK);
 //    }
 
