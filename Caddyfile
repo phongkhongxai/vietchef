@@ -1,0 +1,6 @@
+vietchef.ddns.net {
+    reverse_proxy spring_app:8080
+}
+{
+    email thieuphong2003@gmail.com
+}
