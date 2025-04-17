@@ -1,6 +1,7 @@
 package com.spring2025.vietchefs.controllers;
 
 
+import com.google.firebase.auth.FirebaseAuthException;
 import com.spring2025.vietchefs.models.payload.dto.LoginDto;
 import com.spring2025.vietchefs.models.payload.dto.SignupDto;
 import com.spring2025.vietchefs.models.payload.requestModel.NewPasswordRequest;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/no-auth")
@@ -71,6 +73,29 @@ public class AuthController {
         String response = authService.resetPassword(newPasswordRequest);
         return new ResponseEntity<>(response, HttpStatus.OK);
 
+    }
+    @PostMapping("/google-login")
+    public ResponseEntity<?> loginWithGoogle(@RequestParam String idToken) {
+        try {
+            AuthenticationResponse token = authService.authenticateWithGoogle(idToken);
+            return ResponseEntity.ok(token);
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message: " +e.getMessage(), "Authentication failed: Invalid Firebase token"));
+        }
+    }
+
+    @PostMapping("/facebook-login")
+    public ResponseEntity<?> loginWithFb(@RequestParam String idToken) {
+        try {
+            AuthenticationResponse token = authService.authenticateWithFacebook(idToken);
+            return ResponseEntity.ok(token);
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("message: " +e.getMessage(), "Authentication failed: Invalid Firebase token"));
+        }
     }
 
 }
