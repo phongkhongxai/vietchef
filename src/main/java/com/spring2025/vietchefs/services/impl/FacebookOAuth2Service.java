@@ -47,14 +47,12 @@ public class FacebookOAuth2Service {
         String userInfoUrl = "https://graph.facebook.com/me?fields=id,name,email,picture";
 
         // Build the WebClient request for getting user info
-        Map<String, Object> userInfoResponse = webClientBuilder
+        return webClientBuilder
                 .get()
                 .uri(userInfoUrl)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .retrieve()
                 .bodyToMono(Map.class)
-                .block();  // .block() để chờ kết quả bất đồng bộ
-
-        return userInfoResponse;
+                .block();
     }
 }
