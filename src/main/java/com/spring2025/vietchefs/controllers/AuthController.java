@@ -120,10 +120,20 @@ public class AuthController {
     public void handleGoogleCallback(@RequestParam("code") String code, HttpServletResponse response) throws Exception {
         Map<String, Object> userInfo = googleOAuth2Service.getUserInfoFromCode(code);
         AuthenticationResponse authResponse = authService.authenticateWithOAuth2("google", userInfo);
-        String redirectUrl = "https://vietchef.ddns.net/oauth-redirect"
+        String redirectUrl = "http://vietchef.ddns.net/no-auth/oauth-redirect"
                 + "?access_token=" + authResponse.getAccessToken()
                 + "&refresh_token=" + authResponse.getRefreshToken() +"&full_name="+authResponse.getFullName();
         response.sendRedirect(redirectUrl);
+    }
+    @GetMapping("/oauth-redirect")
+    public String handleOAuthRedirect(@RequestParam("access_token") String accessToken,
+                                      @RequestParam("refresh_token") String refreshToken,
+                                      @RequestParam("full_name") String fullName) {
+        // Xử lý các thông tin được truyền từ callback
+        System.out.println("Access Token: " + accessToken);
+        System.out.println("Refresh Token: " + refreshToken);
+        System.out.println("Full Name: " + fullName);
+        return "Đăng nhập thành công với " + fullName;
     }
 
     @GetMapping("/facebook/callback")
