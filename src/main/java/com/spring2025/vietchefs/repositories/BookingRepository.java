@@ -18,8 +18,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     Page<Booking> findByChefIdAndIsDeletedFalse(Long chefId, Pageable pageable);
     Page<Booking> findByChefIdAndStatusNotInAndIsDeletedFalse(Long chefId, List<String> statusList, Pageable pageable);
 
-
-    List<Booking> findByStatusInAndCreatedAtBefore(List<String> statuses, LocalDateTime before);
+    // Tìm tất cả các booking có status trong danh sách (PENDING, PAID, ...)
+    List<Booking> findByStatusIn(List<String> statuses);
+    // Tìm booking có status trong danh sách AND createdAt < thời điểm now
+    List<Booking> findByStatusInAndCreatedAtBefore(List<String> statuses, LocalDateTime dateTime);
 
 
 }
