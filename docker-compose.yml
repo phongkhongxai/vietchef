@@ -26,31 +26,13 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/vietchef?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: vietchef_user
       SPRING_DATASOURCE_PASSWORD: vietchef_pass
-    expose:
-      - "8080"
-    networks:
-      - vietchef_network
-
-  caddy:
-    image: caddy:latest
-    container_name: caddy_proxy
-    restart: always
     ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - spring_app
+      - "80:8080"
     networks:
       - vietchef_network
 
 volumes:
   mysql_data:
-  caddy_data:
-  caddy_config:
 
 networks:
   vietchef_network:
