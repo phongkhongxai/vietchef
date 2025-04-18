@@ -1,11 +1,6 @@
 package com.spring2025.vietchefs.controllers;
 
 
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseAuthException;
-import com.google.firebase.auth.FirebaseToken;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.spring2025.vietchefs.models.payload.dto.LoginDto;
 import com.spring2025.vietchefs.models.payload.dto.SignupDto;
 import com.spring2025.vietchefs.models.payload.requestModel.NewPasswordRequest;
@@ -21,13 +16,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -131,6 +123,12 @@ public class AuthController {
                                       @RequestParam("full_name") String fullName) {
 
         return "Đăng nhập thành công với " + fullName;
+    }
+    @PutMapping("/save-device-token")
+    public String saveTokenDevice(@RequestParam Long userId, @RequestParam String token){
+        authService.updateTokenExpo(userId, token);
+        return "Ok";
+
     }
 
     @GetMapping("/facebook/callback")
