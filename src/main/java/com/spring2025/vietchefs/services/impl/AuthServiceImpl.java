@@ -256,7 +256,8 @@ public class AuthServiceImpl implements AuthService {
                         .password(passwordEncoder.encode(UUID.randomUUID().toString()))
                         .build();
 
-                userRepository.save(user);
+                user = userRepository.save(user);
+                walletService.createWallet(user.getId(), "CUSTOMER");
             }
         }
 
