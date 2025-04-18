@@ -18,6 +18,7 @@ import java.util.List;
 public class WalletDto {
     private Long id;
     private Long userId;
+    private String paypalAccountEmail;
     private BigDecimal balance;
     private String walletType;
 }
