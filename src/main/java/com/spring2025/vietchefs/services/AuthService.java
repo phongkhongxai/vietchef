@@ -15,6 +15,7 @@ import java.util.Map;
 
 public interface AuthService {
     AuthenticationResponse login(LoginDto loginDto);
+    void updateTokenExpo(Long userId,String token);
     AuthenticationResponse authenticateWithGoogle(String idToken) throws Exception;
     AuthenticationResponse authenticateWithFacebook(String accessToken) throws Exception;
     AuthenticationResponse authenticateWithOAuth2(String provider, Map<String, Object> userData) throws Exception;

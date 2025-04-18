@@ -109,6 +109,16 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    public void updateTokenExpo(Long userId,String token) {
+        User user = userRepository.findExistUserById(userId);
+        if (user == null) return;
+        if (token != null && !token.isBlank()) {
+            user.setExpoToken(token);
+            userRepository.save(user);
+        }
+    }
+
+    @Override
     public AuthenticationResponse authenticateWithGoogle(String idToken) throws Exception {
         // Xác thực idToken từ Firebase
         FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(idToken);
