@@ -47,6 +47,14 @@ public class UserController {
     }
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @PutMapping("/profile/my-wallet")
+    public ResponseEntity<WalletDto> updateEmailWallet(@AuthenticationPrincipal UserDetails userDetails, @RequestParam String email) {
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        WalletDto bs = walletService.updateEmailPaypalForWallet(bto.getId(), email);
+        return new ResponseEntity<>(bs, HttpStatus.OK);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
     @PutMapping("/profile")
     public ResponseEntity<UserDto> updateMyProfile(@AuthenticationPrincipal UserDetails userDetails, @ModelAttribute @Valid UserRequest userDTO) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());

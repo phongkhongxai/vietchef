@@ -16,6 +16,7 @@ import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
@@ -271,7 +272,7 @@ public class PaypalService{
                                             .wallet(wallet)
                                             .transactionType("DEPOSIT")
                                             .amount(amount)
-                                            .description("Nạp tiền thành công qua PayPal")
+                                            .description("Successful deposit via Paypal")
                                             .status("COMPLETED")
                                             .isDeleted(false)
                                             .build());
@@ -280,7 +281,7 @@ public class PaypalService{
                                             .wallet(wallet)
                                             .transactionType("DEPOSIT")
                                             .amount(amount)
-                                            .description("Nạp tiền thành công qua PayPal")
+                                            .description("Successful deposit via Paypal")
                                             .status("COMPLETED")
                                             .isDeleted(false)
                                             .build());
@@ -357,7 +358,33 @@ public class PaypalService{
     }
 
     // 4. Chi trả
-    public Mono<Void> createPayout(String receiverEmail, BigDecimal amount, String currency, String note) {
+    public Mono<String> createPayout(Long walletId, BigDecimal amount, String currency, String note) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return Mono.error(new IllegalArgumentException("Amount must be greater than zero"));
+        }
+
+        // Lấy ví theo ID
+        Wallet wallet = walletRepository.findById(walletId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found with id: " + walletId));
+
+        // Kiểm tra số dư
+        if (wallet.getBalance().compareTo(amount) < 0) {
+            return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Số dư trong ví không đủ"));
+        }
+        Optional<Payment> payment = paymentRepository.findTopByWalletAndPaymentTypeOrderByCreatedAtDesc(wallet, "PAYOUT");
+        if (payment.isPresent() && payment.get().getCreatedAt() != null) {
+            // Kiểm tra xem thời gian tạo giao dịch có trong vòng 24 giờ qua không
+            LocalDateTime createdAt = payment.get().getCreatedAt();
+            if (createdAt.isAfter(LocalDateTime.now().minusDays(1))) {
+                return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Bạn không thể thực hiện rút tiền trong vòng 24 giờ sau lần rút gần nhất."));
+            }
+        }
+        if (wallet.getPaypalAccountEmail()==null){
+            return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Email Paypal đang null."));
+
+        }
+        String receiverEmail = wallet.getPaypalAccountEmail();
+
         return getAccessToken()
                 .flatMap(token -> {
                     String jsonBody = "{"
@@ -381,12 +408,25 @@ public class PaypalService{
                             .bodyValue(jsonBody)
                             .retrieve()
                             .bodyToMono(String.class)
-                            .map(response -> {
+                            .flatMap(response -> {
                                 try {
                                     JsonNode jsonNode = objectMapper.readTree(response);
+
+                                    if (jsonNode.has("name") && jsonNode.has("message")) {
+                                        String errorName = jsonNode.get("name").asText();
+                                        String errorMessage = jsonNode.get("message").asText();
+
+                                        if ("RECEIVER_UNREGISTERED".equals(errorName)) {
+                                            return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Email chưa đăng ký tài khoản PayPal."));
+                                        }
+
+                                        // Các lỗi khác
+                                        return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "PayPal payout error: " + errorMessage));
+                                    }
+
+                                    // ✅ Xử lý thành công
                                     String payoutId = jsonNode.get("batch_header").get("payout_batch_id").asText();
 
-                                    // Lưu payout vào DB
                                     Payment payoutEntity = new Payment();
                                     payoutEntity.setTransactionId(payoutId);
                                     payoutEntity.setPaymentMethod("PayPal");
@@ -395,13 +435,39 @@ public class PaypalService{
                                     payoutEntity.setStatus("COMPLETED");
                                     payoutEntity.setPaymentType("PAYOUT");
                                     payoutEntity.setIsDeleted(false);
+                                    payoutEntity.setWallet(wallet);
                                     paymentRepository.save(payoutEntity);
+                                    wallet.setBalance(wallet.getBalance().subtract(amount));
+                                    walletRepository.save(wallet);
 
-                                    return Mono.empty(); // Hoàn tất mà không cần giá trị trả về
+                                    // Lưu Transaction
+                                    if (wallet.getWalletType().equalsIgnoreCase("CUSTOMER")) {
+                                        customerTransactionRepository.save(CustomerTransaction.builder()
+                                                .wallet(wallet)
+                                                .transactionType("WITHDRAWL")
+                                                .amount(amount)
+                                                .description("Successful withdrawal")
+                                                .status("COMPLETED")
+                                                .isDeleted(false)
+                                                .build());
+                                    } else {
+                                        chefTransactionRepository.save(ChefTransaction.builder()
+                                                .wallet(wallet)
+                                                .transactionType("WITHDRAWL")
+                                                .amount(amount)
+                                                .description("Successful withdrawal")
+                                                .status("COMPLETED")
+                                                .isDeleted(false)
+                                                .build());
+                                    }
+
+                                    return Mono.just("Payout created successfully with Payout ID: " + payoutId);
                                 } catch (Exception e) {
-                                    throw new VchefApiException(HttpStatus.BAD_REQUEST,"Failed to parse payout ID:"+e);
+                                    return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Lỗi xử lý response từ PayPal: " + e.getMessage()));
                                 }
                             });
-                }).then();
+
+                });
     }
+
 }

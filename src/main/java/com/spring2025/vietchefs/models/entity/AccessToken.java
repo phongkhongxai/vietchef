@@ -16,7 +16,7 @@ public class AccessToken {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
-
+    @Column(length = 555)
     private String token;
 
     private boolean expired;

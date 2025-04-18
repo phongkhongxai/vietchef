@@ -12,5 +12,6 @@ import java.util.Optional;
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
     Optional<Payment> findByTransactionId(String transactionId);
     List<Payment> findByWalletAndIsDeletedFalse(Wallet wallet);
+    Optional<Payment> findTopByWalletAndPaymentTypeOrderByCreatedAtDesc(Wallet wallet, String paymentType);
 }
 

@@ -40,6 +40,15 @@ public class PaymentController {
         String currency = "USD";
         return paypalService.depositToWallet(walletId, amount, currency, returnUrl, cancelUrl);
     }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @PostMapping("/withdrawl")
+    public Mono<String> withdrawlWallet(@RequestParam Long walletId,
+                                        @RequestParam BigDecimal amount) {
+        String currency = "USD";
+        String note ="From VietChef with love.";
+        return paypalService.createPayout(walletId, amount, currency,note);
+    }
 
     // Hoàn tất thanh toán
     @GetMapping("/success")
@@ -69,14 +78,14 @@ public class PaymentController {
     }
 
     // Chi trả
-    @PostMapping("/payout")
-    public Mono<ResponseEntity<String>> createPayout(
-            @RequestParam String receiverEmail,
-            @RequestParam BigDecimal amount,
-            @RequestParam String currency,
-            @RequestParam String note) {
-        return paypalService.createPayout(receiverEmail, amount, currency, note)
-                .then(Mono.just(ResponseEntity.ok("Chi trả thành công")))
-                .onErrorResume(e -> Mono.just(ResponseEntity.status(500).body("Error: " + e.getMessage())));
-    }
+//    @PostMapping("/payout")
+//    public Mono<ResponseEntity<String>> createPayout(
+//            @RequestParam String receiverEmail,
+//            @RequestParam BigDecimal amount,
+//            @RequestParam String currency,
+//            @RequestParam String note) {
+//        return paypalService.createPayout(receiverEmail, amount, currency, note)
+//                .then(Mono.just(ResponseEntity.ok("Chi trả thành công")))
+//                .onErrorResume(e -> Mono.just(ResponseEntity.status(500).body("Error: " + e.getMessage())));
+//    }
 }
