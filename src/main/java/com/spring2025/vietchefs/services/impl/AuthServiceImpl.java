@@ -109,12 +109,12 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void updateTokenExpo(Long userId,String token) {
-        User user = userRepository.findExistUserById(userId);
-        if (user == null) return;
+    public void updateTokenExpo(String email,String token) {
+        Optional<User> user = userRepository.findByUsernameOrEmail(email,email);
+        if (user.isEmpty()) return;
         if (token != null && !token.isBlank()) {
-            user.setExpoToken(token);
-            userRepository.save(user);
+            user.get().setExpoToken(token);
+            userRepository.save(user.get());
         }
     }
 
