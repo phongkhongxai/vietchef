@@ -46,11 +46,11 @@ public class JwtTokenProvider {
                 .setIssuedAt(currentDate)
                 .setExpiration(expirationDate)
                 .claim("userId", userId)
-                .claim("roleName", role);
+                .claim("roleName", role)
+                .claim("avatarUrl", user.getAvatarUrl());
         if ("ROLE_CHEF".equals(role) && user.getChef() != null) {
             builder.claim("chefId", user.getChef().getId());
         }
-
         return builder
                 .signWith(SignatureAlgorithm.HS384, key())
                 .compact();
