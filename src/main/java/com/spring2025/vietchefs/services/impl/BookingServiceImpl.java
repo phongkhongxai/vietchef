@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -140,6 +141,9 @@ public class BookingServiceImpl implements BookingService {
         if (chef.getReputationPoints() < 60 && chef.getStatus().equalsIgnoreCase("LOCKED")) {
             throw new VchefApiException(HttpStatus.FORBIDDEN, "Chef không đủ uy tín để nhận booking dài hạn.");
         }
+        if (dto.getGuestCount()>chef.getMaxServingSize()) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef just can serving max is "+chef.getMaxServingSize()+".");
+        }
         Booking booking = new Booking();
         booking.setCustomer(customer);
         booking.setChef(chef);
@@ -185,7 +189,9 @@ public class BookingServiceImpl implements BookingService {
         if (chef.getReputationPoints() < 80) {
             throw new VchefApiException(HttpStatus.FORBIDDEN, "Chef không đủ uy tín để nhận booking dài hạn.");
         }
-
+        if (dto.getGuestCount()>chef.getMaxServingSize()) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef just can serving max is "+chef.getMaxServingSize()+".");
+        }
         // Kiểm tra xem đầu bếp có hỗ trợ package này không
         if (!chef.getPackages().contains(selectedPackage)) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Selected package is not available for this chef.");
@@ -284,6 +290,9 @@ public class BookingServiceImpl implements BookingService {
         if (chef.getReputationPoints() < 60 || chef.getStatus().equalsIgnoreCase("LOCKED")) {
             throw new VchefApiException(HttpStatus.FORBIDDEN, "Chef không đủ uy tín để nhận booking dài hạn.");
         }
+        if (dto.getGuestCount()>chef.getMaxServingSize()) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef just can serving max is "+chef.getMaxServingSize()+".");
+        }
         BigDecimal totalBookingPrice = BigDecimal.ZERO;
         ReviewSingleBookingResponse reviewSingleBookingResponse = new ReviewSingleBookingResponse();
 
@@ -376,7 +385,9 @@ public class BookingServiceImpl implements BookingService {
         if (chef.getReputationPoints() < 80) {
             throw new VchefApiException(HttpStatus.FORBIDDEN, "Chef không đủ uy tín để nhận booking dài hạn.");
         }
-
+        if (dto.getGuestCount()>chef.getMaxServingSize()) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef just can serving max is "+chef.getMaxServingSize()+".");
+        }
         Package bookingPackage = packageRepository.findById(dto.getPackageId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Package not found"));
         if (dto.getBookingDetails().size() != bookingPackage.getDurationDays()) {
@@ -1214,7 +1225,7 @@ public class BookingServiceImpl implements BookingService {
                 }
             }
             // Kiểm tra ngày sửa < hôm nay với PAID/DEPOSITED → refund
-            else if (isPaidStatus && booking.getUpdatedAt().toLocalDate().isBefore(now.toLocalDate())) {
+            else if (isPaidStatus && Duration.between(booking.getUpdatedAt(), now).toHours() > 6) {
                 // Kiểm tra đã hoàn tiền chưa
                 boolean hasRefund = customerTransactionRepository
                         .existsByBookingIdAndTransactionType(booking.getId(), "REFUND");
