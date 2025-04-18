@@ -162,6 +162,7 @@ public class AuthController {
                         .queryParam("response_type", "code")
                         .queryParam("scope", "email profile")
                         .queryParam("access_type", "offline")
+                        .queryParam("prompt", "select_account")
                         .build()
                         .toUriString();
                 break;
