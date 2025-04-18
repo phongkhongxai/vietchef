@@ -125,11 +125,11 @@ public class AuthController {
         return "Đăng nhập thành công với " + fullName;
     }
     @PutMapping("/save-device-token")
-    public String saveTokenDevice(@RequestParam Long userId, @RequestParam String token){
+    public ResponseEntity<Void> saveTokenDevice(@RequestParam Long userId, @RequestParam String token) {
         authService.updateTokenExpo(userId, token);
-        return "Ok";
-
+        return ResponseEntity.ok().build();
     }
+
 
     @GetMapping("/facebook/callback")
     public ResponseEntity<?> handleFacebookCallback(@RequestParam("code") String code) throws Exception {
