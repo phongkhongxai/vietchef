@@ -127,9 +127,9 @@ public class AuthController {
 
         return "Đăng nhập thành công với " + fullName;
     }
-    @GetMapping("/save-device-token")
-    public ResponseEntity<Void> saveTokenDevice(@RequestParam Long userId, @RequestParam String token) {
-        authService.updateTokenExpo(userId, token);
+    @PutMapping("/save-device-token")
+    public ResponseEntity<Void> saveTokenDevice(@RequestParam String email, @RequestParam String token) {
+        authService.updateTokenExpo(email, token);
         return ResponseEntity.ok().build();
     }
 
