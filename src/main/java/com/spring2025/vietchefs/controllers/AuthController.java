@@ -20,6 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -129,7 +130,8 @@ public class AuthController {
     }
     @PutMapping("/save-device-token")
     public ResponseEntity<Void> saveTokenDevice(@RequestParam String email, @RequestParam String token) {
-        authService.updateTokenExpo(email, token);
+        String decodedToken = URLDecoder.decode(token, StandardCharsets.UTF_8);
+        authService.updateTokenExpo(email, decodedToken);
         return ResponseEntity.ok().build();
     }
 
