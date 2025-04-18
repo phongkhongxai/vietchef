@@ -69,6 +69,16 @@ public class WalletServiceImpl implements WalletService {
     }
 
     @Override
+    public WalletDto updateEmailPaypalForWallet(Long userId, String email) {
+        Wallet wallet = walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for user id: " + userId));
+
+        wallet.setPaypalAccountEmail(email);
+        walletRepository.save(wallet);
+        return modelMapper.map(wallet, WalletDto.class);
+    }
+
+    @Override
     public WalletPlusResponse getWalletByUserId(Long userId,int pageNo, int pageSize, String sortBy, String sortDir) {
         Wallet wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for user id: " + userId));

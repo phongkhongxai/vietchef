@@ -1273,6 +1273,7 @@ public class BookingServiceImpl implements BookingService {
                         .bookingId(booking.getId())
                         .screen("CustomerWalletScreen")
                         .build());
+                chefService.updateReputation(booking.getChef(),-1);
             }
         }
     }
