@@ -26,6 +26,8 @@ public class ImageService {
     private BookingDetailRepository bookingDetailRepository;
     @Autowired
     private ReviewRepository reviewRepository;
+    @Autowired
+    private MenuRepository menuRepository;
 
     public String uploadImage(MultipartFile file, Long entityId, String entityType) throws IOException {
         // Upload ảnh lên Azure Blob Storage
@@ -75,7 +77,7 @@ public class ImageService {
                     review.setImageUrl(imageUrl);
                     reviewRepository.save(review);
                 }
-                
+
                 Image image1 = Image.builder()
                         .imageUrl(imageUrl)
                         .entityType(entityType)
@@ -89,11 +91,23 @@ public class ImageService {
         }else if ("BOOKING_DETAIL".equals(entityType)) {
             Optional<BookingDetail> detailOptional = bookingDetailRepository.findById(entityId);
             if (detailOptional.isPresent()) {
-                BookingDetail bookingDetail = detailOptional.get();
-                // Nếu BookingDetail có thuộc tính imageUrl thì lưu
-//                    bookingDetail.setImageUrl(imageUrl);
-//                    bookingDetailRepository.save(bookingDetail);
-
+                Image image1 = Image.builder()
+                        .imageUrl(imageUrl)
+                        .entityType(entityType)
+                        .entityId(entityId)
+                        .build();
+                image = imageRepository.save(image1);
+            }
+            else {
+                throw new VchefApiException(HttpStatus.NOT_FOUND, "BookingDetail not found");
+            }
+        }
+        else if ("MENU".equals(entityType)) {
+            Optional<Menu> menuOp = menuRepository.findById(entityId);
+            if (menuOp.isPresent()) {
+                Menu menu = menuOp.get();
+                menu.setImageUrl(imageUrl);
+                menuRepository.save(menu);
                 Image image1 = Image.builder()
                         .imageUrl(imageUrl)
                         .entityType(entityType)
@@ -101,7 +115,7 @@ public class ImageService {
                         .build();
                 image = imageRepository.save(image1);
             } else {
-                throw new VchefApiException(HttpStatus.NOT_FOUND, "BookingDetail not found");
+                throw new VchefApiException(HttpStatus.NOT_FOUND, "Menu not found");
             }
         }
         return image.getImageUrl();

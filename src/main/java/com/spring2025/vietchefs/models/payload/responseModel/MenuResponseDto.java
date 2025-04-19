@@ -20,5 +20,8 @@ public class MenuResponseDto {
     private Double discountPercentage;
     private BigDecimal afterPrice;
     private List<MenuItemResponseDto> menuItems;
+    private String imageUrl;
+
+
 }
 

@@ -464,7 +464,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     }
 
     @Override
-    public BookingDetailDto updateStatusBookingDetailWatingCompleted(Long bookingDetailId, Long userId,List<MultipartFile> files) {
+    public BookingDetailDto updateStatusBookingDetailWatingCompleted(Long bookingDetailId, Long userId, List<MultipartFile> files) {
         Chef chef = chefRepository.findByUserId(userId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found"));
         LocalTime completedTime = LocalTime.now();
