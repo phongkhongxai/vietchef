@@ -127,6 +127,23 @@ public class NotificationService {
         }
         notificationRepository.save(notification);
     }
+    public void markAsReadByIds(List<Long> ids) {
+        List<Notification> notifications = notificationRepository.findAllById(ids);
 
+        if (notifications.isEmpty()) return; // Không có thông báo nào hợp lệ
+
+        for (Notification notification : notifications) {
+            notification.setRead(true);
+        }
+
+        notificationRepository.saveAll(notifications);
+    }
+    public void markAllAsReadByUser(Long userId) {
+        List<Notification> notifications = notificationRepository.findByUserIdAndIsReadFalse(userId);
+        for (Notification n : notifications) {
+            n.setRead(true);
+        }
+        notificationRepository.saveAll(notifications);
+    }
 }
 
