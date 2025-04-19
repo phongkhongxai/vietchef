@@ -15,6 +15,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -40,6 +41,21 @@ public class NotificationController {
                                                @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
         return notificationService.getALlNotificationsOfUser(bto.getId(), pageNo,  pageSize,  sortBy,  sortDir);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_CHEF')")
+    @PutMapping("/my/all")
+    public ResponseEntity<String> updateNotiReadAll(@AuthenticationPrincipal UserDetails userDetails) {
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        notificationService.markAllAsReadByUser(bto.getId());
+        return ResponseEntity.ok("OKE");
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_CHEF')")
+    @PutMapping("/my")
+    public ResponseEntity<String> updateNotiReadIds(@RequestParam List<Long> ids) {
+        notificationService.markAsReadByIds(ids);
+        return ResponseEntity.ok("OKE");
     }
 }
 

@@ -1,0 +1,148 @@
+@startuml
+
+package "BookingSingle Flow" {
+    class BookingService {
+        +ReviewSingleBookingResponse calculateFinalPriceForSingleBooking(BookingPriceRequestDto dto)
+        +BookingResponseDto createSingleBooking(BookingRequestDto dto)
+    }
+
+    class BookingController {
+        +ResponseEntity<?> createBookingSingle(BookingRequestDto dto)
+        +ResponseEntity<?> calculatePriceBookingSingle(BookingPriceRequestDto dto)
+    }
+
+    class BookingPriceRequestDto {
+        -Long chefId
+        -int guestCount
+        -BookingDetailPriceRequestDto bookingDetail
+    }
+
+    class BookingDetailPriceRequestDto {
+        -LocalDate sessionDate
+        -Boolean chefBringIngredients
+        -LocalTime startTime
+        -String location
+        -Long menuId
+        -List<Long> extraDishIds
+        -List<BookingDetailItemRequestDto> dishes
+    }
+
+    class BookingDetailItemRequestDto {
+        -Long dishId
+        -String notes
+    }
+
+    class ReviewSingleBookingResponse {
+        -LocalTime timeBeginTravel
+        -LocalTime timeBeginCook
+        -BigDecimal cookTimeMinutes
+        -BigDecimal chefCookingFee
+        -BigDecimal priceOfDishes
+        -BigDecimal arrivalFee
+        -BigDecimal platformFee
+        -BigDecimal totalPrice
+        -Boolean chefBringIngredients
+        -Long menuId
+        -BigDecimal totalChefFeePrice
+    }
+
+    class BookingRequestDto {
+        -Long customerId
+        -Long chefId
+        -String requestDetails
+        -int guestCount
+        -Long packageId
+        -List<BookingDetailRequestDto> bookingDetails
+    }
+
+    class BookingDetailRequestDto {
+        -LocalDate sessionDate
+        -LocalTime startTime
+        -String location
+        -BigDecimal totalPrice
+        -BigDecimal chefCookingFee
+        -BigDecimal priceOfDishes
+        -BigDecimal arrivalFee
+        -BigDecimal discountAmout
+        -LocalTime timeBeginCook
+        -LocalTime timeBeginTravel
+        -BigDecimal platformFee
+        -BigDecimal totalChefFeePrice
+        -BigDecimal totalCookTime
+        -Boolean isUpdated
+        -Long menuId
+        -Boolean chefBringIngredients
+        -List<BookingDetailItemRequestDto> dishes
+    }
+
+    class BookingResponseDto {
+        -Long id
+        -CustomerDto customer
+        -ChefResponseDto chef
+        -String bookingType
+        -String status
+        -String requestDetails
+        -int guestCount
+        -BigDecimal totalPrice
+        -PackageResponseDto bookingPackage
+        -List<BookingDetailDto> bookingDetails
+    }
+
+    class BookingDetailDto {
+        -Long id
+        -LocalDate sessionDate
+        -String status
+        -LocalTime startTime
+        -LocalTime endTime
+        -String location
+        -BigDecimal totalPrice
+        -BigDecimal chefCookingFee
+        -BigDecimal priceOfDishes
+        -BigDecimal arrivalFee
+        -BigDecimal chefServingFee
+        -BigDecimal platformFee
+        -BigDecimal totalChefFeePrice
+        -BigDecimal discountAmout
+        -LocalTime timeBeginCook
+        -LocalTime timeBeginTravel
+        -Boolean isServing
+        -Boolean isUpdated
+        -Long menuId
+        -Boolean chefBringIngredients
+        -List<BookingDetailItemDto> dishes
+    }
+
+    class BookingDetailItemDto {
+        -Long id
+        -Long bookingDetailId
+        -DishDto dish
+        -String notes
+    }
+
+    class PackageResponseDto {
+        -Long id
+        -String name
+        -int durationDays
+        -BigDecimal discount
+        -int maxDishesPerMeal
+        -int maxGuestCountPerMeal
+    }
+
+    BookingService --> ReviewSingleBookingResponse : return
+    BookingService --> BookingResponseDto : return
+
+    BookingPriceRequestDto --> BookingDetailPriceRequestDto
+    BookingDetailPriceRequestDto --> BookingDetailItemRequestDto
+
+    BookingRequestDto --> BookingDetailRequestDto
+    BookingDetailRequestDto --> BookingDetailItemRequestDto
+
+    BookingResponseDto --> BookingDetailDto
+    BookingDetailDto --> BookingDetailItemDto
+    BookingResponseDto --> PackageResponseDto
+}
+
+BookingController --> BookingService : call createSingleBooking()
+BookingController --> BookingService : call calculateFinalPriceForSingleBooking()
+
+@enduml
