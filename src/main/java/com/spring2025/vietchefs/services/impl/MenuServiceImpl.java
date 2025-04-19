@@ -26,7 +26,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -46,9 +48,11 @@ public class MenuServiceImpl implements MenuService {
     @Autowired
     private CalculateService calculateService;
     @Autowired
+    private ImageService imageService;
+    @Autowired
     private ModelMapper modelMapper;
     @Override
-    public MenuResponseDto createMenu(MenuRequestDto menuRequestDto) {
+    public MenuResponseDto createMenu(MenuRequestDto menuRequestDto, MultipartFile imageFile) {
         Chef chef = chefRepository.findById(menuRequestDto.getChefId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found"));
 
@@ -63,6 +67,8 @@ public class MenuServiceImpl implements MenuService {
         menu.setDescription(menuRequestDto.getDescription());
         menu.setHasDiscount(menuRequestDto.getHasDiscount());
         menu.setDiscountPercentage(menuRequestDto.getDiscountPercentage());
+        menu.setImageUrl("defaultMenu");
+
         if (menuRequestDto.getTotalCookTime() == null) {
             // Chuyển danh sách Dish thành danh sách ID món ăn (Long)
             List<Long> dishIds = dishes.stream()
@@ -87,6 +93,14 @@ public class MenuServiceImpl implements MenuService {
         menu.setMenuItems(menuItems);
 
         menu = menuRepository.save(menu);
+        if (imageFile != null) {
+            try {
+                String imageUrl = imageService.uploadImage(imageFile,menu.getId(), "MENU");
+                menu.setImageUrl(imageUrl);
+            } catch (IOException e) {
+                throw new VchefApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to upload image.");
+            }
+        }
 
         return modelMapper.map(menu, MenuResponseDto.class);
     }
@@ -178,32 +192,27 @@ public class MenuServiceImpl implements MenuService {
     }
 
     @Override
-    public MenuResponseDto updateMenu(Long menuId, MenuUpdateDto menuUpdateDto) {
+    public MenuResponseDto updateMenu(Long menuId, MenuUpdateDto menuUpdateDto, MultipartFile imageFile) {
         Menu menu = menuRepository.findById(menuId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Menu not found with id: " + menuId));
-        List<Dish> dishes = menuUpdateDto.getMenuItems().stream()
-                .map(itemDto -> dishRepository.findById(itemDto.getDishId())
-                        .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Dish not found")))
-                .toList();
-
         menu.setName(menuUpdateDto.getName() != null ? menuUpdateDto.getName() : menu.getName());
         menu.setDescription(menuUpdateDto.getDescription() != null ? menuUpdateDto.getDescription() : menu.getDescription());
         menu.setHasDiscount(menuUpdateDto.getHasDiscount() != null ? menuUpdateDto.getHasDiscount() : menu.getHasDiscount());
         menu.setDiscountPercentage(menuUpdateDto.getDiscountPercentage() != null ? menuUpdateDto.getDiscountPercentage() : menu.getDiscountPercentage());
 
-        if (menuUpdateDto.getTotalCookTime() == null) {
-            List<Long> dishIds = dishes.stream()
-                    .map(Dish::getId)
-                    .collect(Collectors.toList());
-            BigDecimal calculatedTotalCookTime = calculateService.calculateTotalCookTimeFromMenu(menu.getId(),dishIds, 4);
-            menu.setTotalCookTime(calculatedTotalCookTime);
-        } else {
-            menu.setTotalCookTime(menuUpdateDto.getTotalCookTime());
-        }
+        // Nếu menuItems khác null => xử lý cập nhật
         if (menuUpdateDto.getMenuItems() != null && !menuUpdateDto.getMenuItems().isEmpty()) {
+            // Lấy danh sách Dish tương ứng
+            List<Dish> dishes = menuUpdateDto.getMenuItems().stream()
+                    .map(itemDto -> dishRepository.findById(itemDto.getDishId())
+                            .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Dish not found")))
+                    .toList();
+
+            // Xoá các menu item cũ
             List<MenuItem> menuItemList = menuItemRepository.findByMenu(menu);
             menuItemRepository.deleteAll(menuItemList);
 
+            // Tạo các menu item mới
             List<MenuItem> newMenuItems = menuUpdateDto.getMenuItems().stream()
                     .map(itemDto -> {
                         Dish dish = dishes.stream()
@@ -215,13 +224,37 @@ public class MenuServiceImpl implements MenuService {
                         newItem.setDish(dish);
                         return newItem;
                     })
-                    .collect(Collectors.toList());
+                    .toList();
 
             menuItemRepository.saveAll(newMenuItems);
+
+            // Cập nhật thời gian nấu nếu cần
+            if (menuUpdateDto.getTotalCookTime() == null) {
+                List<Long> dishIds = dishes.stream().map(Dish::getId).toList();
+                BigDecimal calculatedTotalCookTime = calculateService.calculateTotalCookTimeFromMenu(menu.getId(), dishIds, 4);
+                menu.setTotalCookTime(calculatedTotalCookTime);
+            } else {
+                menu.setTotalCookTime(menuUpdateDto.getTotalCookTime());
+            }
+        } else {
+            // Nếu không truyền menuItems, chỉ cập nhật totalCookTime nếu có
+            if (menuUpdateDto.getTotalCookTime() != null) {
+                menu.setTotalCookTime(menuUpdateDto.getTotalCookTime());
+            }
+            // Nếu totalCookTime == null thì giữ nguyên totalCookTime hiện tại
         }
+
 
         // Lưu menu đã cập nhật và trả về DTO
         Menu updatedMenu = menuRepository.save(menu);
+        if (imageFile != null) {
+            try{
+                String imageUrl = imageService.uploadImage(imageFile, menuId, "MENU");
+                updatedMenu.setImageUrl(imageUrl);
+            } catch (IOException e) {
+                throw new VchefApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to upload image.");
+            }
+        }
         return modelMapper.map(updatedMenu, MenuResponseDto.class);
     }
 
