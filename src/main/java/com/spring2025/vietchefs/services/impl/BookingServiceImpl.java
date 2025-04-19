@@ -105,8 +105,59 @@ public class BookingServiceImpl implements BookingService {
 
         // create Pageable instance
         Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
-        List<String> excludedStatuses = List.of("PENDING", "OVERDUE");
+        List<String> excludedStatuses = List.of("PENDING");
         Page<Booking> bookings = bookingRepository.findByChefIdAndStatusNotInAndIsDeletedFalse(chef.getId(), excludedStatuses, pageable);
+
+        // get content for page object
+        List<Booking> listOfBookings = bookings.getContent();
+
+        List<BookingResponseDto> content = listOfBookings.stream().map(bt -> modelMapper.map(bt, BookingResponseDto.class)).collect(Collectors.toList());
+        BookingsResponse templatesResponse = new BookingsResponse();
+        templatesResponse.setContent(content);
+        templatesResponse.setPageNo(bookings.getNumber());
+        templatesResponse.setPageSize(bookings.getSize());
+        templatesResponse.setTotalElements(bookings.getTotalElements());
+        templatesResponse.setTotalPages(bookings.getTotalPages());
+        templatesResponse.setLast(bookings.isLast());
+        return templatesResponse;
+    }
+
+    @Override
+    public BookingsResponse getBookingsByCustomerIdAndStatus(Long customerId, List<String> statusList, int pageNo, int pageSize, String sortBy, String sortDir) {
+        User customer = userRepository.findById(customerId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"User not found with id: "+ customerId));
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+
+        // create Pageable instance
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+
+        Page<Booking> bookings = bookingRepository.findByCustomerIdAndStatusInIgnoreCaseAndIsDeletedFalse(customer.getId(), statusList,pageable);
+
+        // get content for page object
+        List<Booking> listOfBookings = bookings.getContent();
+
+        List<BookingResponseDto> content = listOfBookings.stream().map(bt -> modelMapper.map(bt, BookingResponseDto.class)).collect(Collectors.toList());
+        BookingsResponse templatesResponse = new BookingsResponse();
+        templatesResponse.setContent(content);
+        templatesResponse.setPageNo(bookings.getNumber());
+        templatesResponse.setPageSize(bookings.getSize());
+        templatesResponse.setTotalElements(bookings.getTotalElements());
+        templatesResponse.setTotalPages(bookings.getTotalPages());
+        templatesResponse.setLast(bookings.isLast());
+        return templatesResponse;
+    }
+
+    @Override
+    public BookingsResponse getBookingsByChefIdAndStatus(Long userId, List<String> statusList, int pageNo, int pageSize, String sortBy, String sortDir) {
+        Chef chef = chefRepository.findByUserId(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"Chef not found with userid: "+ userId));
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+
+        // create Pageable instance
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+        Page<Booking> bookings = bookingRepository.findByChefIdAndStatusInIgnoreCaseAndIsDeletedFalse(chef.getId(), statusList, pageable);
 
         // get content for page object
         List<Booking> listOfBookings = bookings.getContent();
@@ -608,7 +659,7 @@ public class BookingServiceImpl implements BookingService {
             if (isSinglePaid || isLongTermDeposited || isPaidFirst) {
                 List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking(booking);
                 for (BookingDetail detail : bookingDetails) {
-                    detail.setStatus("CANCELLED");
+                    detail.setStatus("CANCELED");
                     bookingDetailRepository.save(detail);
                 }
                 // 4. Lấy ví của khách hàng để hoàn tiền
@@ -1203,7 +1254,6 @@ public class BookingServiceImpl implements BookingService {
             String status = booking.getStatus().toUpperCase();
             boolean isPendingStatus = status.equals("PENDING") || status.equals("PENDING_FIRST_CYCLE");
             boolean isPaidStatus = status.equals("PAID") || status.equals("DEPOSITED") || status.equals("PAID_FIRST_CYCLE");
-
             // Kiểm tra với updatedAt > 1 tiếng cho PENDING
             if (isPendingStatus) {
                 if (booking.getUpdatedAt().isBefore(now.minusHours(1))) {

@@ -9,6 +9,7 @@ import com.spring2025.vietchefs.models.payload.requestModel.*;
 import com.spring2025.vietchefs.models.payload.responseModel.*;
 import com.spring2025.vietchefs.services.*;
 import com.spring2025.vietchefs.utils.AppConstants;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -37,39 +38,69 @@ public class BookingController {
     @Autowired
     private BookingDetailService bookingDetailService;
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_ADMIN') or hasRole('ROLE_CHEF')")
+    @Operation(
+            summary = "Lấy danh sách đơn đặt của người dùng hiện tại. (ví dụ: PENDING, PAID, CONFIRMED, CANCELED, COMPLETED)"
+    )
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
     @GetMapping("/my-bookings")
     public BookingsResponse getBookingsMySelf(
            @AuthenticationPrincipal UserDetails userDetails,
+           @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
             @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
             @RequestParam(value = "sortBy", defaultValue = AppConstants.DEFAULT_SORT_BY, required = false) String sortBy,
             @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir){
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
-        return bookingService.getBookingsByCustomerId(bto.getId(),pageNo, pageSize, sortBy, sortDir);
+        if (status != null && !status.isEmpty()) {
+            List<String> statusList = switch (status.toUpperCase()) {
+                case "PENDING" -> List.of("PENDING", "PENDING_FIRST_CYCLE");
+                case "PAID" -> List.of("PAID","DEPOSITED","PAID_FIRST_CYCLE");
+                case "CONFIRMED" -> List.of("CONFIRMED", "CONFIRMED_PAID","CONFIRMED_PARTIALLY_PAID");
+                case "CANCELED" -> List.of("CANCELED","OVERDUE","REJECTED");
+                default -> List.of(status.toUpperCase());
+            };
+            return bookingService.getBookingsByCustomerIdAndStatus(bto.getId(), statusList, pageNo, pageSize, sortBy, sortDir);
+        } else {
+            return bookingService.getBookingsByCustomerId(bto.getId(), pageNo, pageSize, sortBy, sortDir);
+        }
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_ADMIN') or hasRole('ROLE_CHEF')")
+    @Operation(
+            summary = "Lấy danh sách đơn đặt của người dùng hiện tại. (ví dụ: PAID, CONFIRMED, CANCELED, COMPLETED)"
+    )
+    @PreAuthorize("hasRole('ROLE_CHEF')")
     @GetMapping("/chefs/my-bookings")
     public BookingsResponse getBookingsChefSelf(
             @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
             @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
             @RequestParam(value = "sortBy", defaultValue = AppConstants.DEFAULT_SORT_BY, required = false) String sortBy,
             @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir){
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
-        return bookingService.getBookingsByChefId(bto.getId(),pageNo, pageSize, sortBy, sortDir);
+        if (status != null && !status.isEmpty()) {
+            List<String> statusList = switch (status.toUpperCase()) {
+                case "PAID" -> List.of("PAID","DEPOSITED","PAID_FIRST_CYCLE");
+                case "CONFIRMED" -> List.of("CONFIRMED", "CONFIRMED_PAID","CONFIRMED_PARTIALLY_PAID");
+                case "CANCELED" -> List.of("CANCELED","OVERDUE","REJECTED");
+                default -> List.of(status.toUpperCase());
+            };
+            return bookingService.getBookingsByChefIdAndStatus(bto.getId(), statusList, pageNo, pageSize, sortBy, sortDir);
+        } else {
+            return bookingService.getBookingsByChefId(bto.getId(), pageNo, pageSize, sortBy, sortDir);
+        }
     }
     @PreAuthorize("hasRole('ROLE_CHEF')")
     @GetMapping("/booking-details/chefs")
     public BookingDetailsResponse getBookingDetailOfChef(
             @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
             @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
             @RequestParam(value = "sortBy", defaultValue = AppConstants.DEFAULT_SORT_BY, required = false) String sortBy,
             @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir){
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
-        return bookingDetailService.getBookingDetailsByChef(bto.getChefId(),pageNo, pageSize, sortBy, sortDir);
+        return bookingDetailService.getBookingDetailsByChef(bto.getId(),pageNo, pageSize, sortBy, sortDir);
     }
     @PreAuthorize("hasRole('ROLE_CUSTOMER')")
     @GetMapping("/booking-details/user")
