@@ -1,9 +1,6 @@
 package com.spring2025.vietchefs.repositories;
 
-import com.spring2025.vietchefs.models.entity.Booking;
-import com.spring2025.vietchefs.models.entity.BookingDetail;
-import com.spring2025.vietchefs.models.entity.Chef;
-import com.spring2025.vietchefs.models.entity.Dish;
+import com.spring2025.vietchefs.models.entity.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -44,6 +41,10 @@ public interface BookingDetailRepository extends JpaRepository<BookingDetail, Lo
             @Param("chefId") Long chefId,
             Pageable pageable
     );
+    Page<BookingDetail> findByBooking_ChefAndStatusIgnoreCaseAndIsDeletedFalse(Chef chef, String status, Pageable pageable);
+    Page<BookingDetail> findByBooking_ChefAndStatusInIgnoreCaseAndIsDeletedFalse(Chef chef, List<String> status, Pageable pageable);
+
+
     @Query("SELECT bd FROM BookingDetail bd " +
             "WHERE bd.booking.customer.id = :customerId " +
             "AND bd.isDeleted = false")
@@ -51,6 +52,10 @@ public interface BookingDetailRepository extends JpaRepository<BookingDetail, Lo
             @Param("customerId") Long customerId,
             Pageable pageable
     );
+    Page<BookingDetail> findByBooking_CustomerAndStatusIgnoreCaseAndIsDeletedFalse(User user, String status, Pageable pageable);
+    Page<BookingDetail> findByBooking_CustomerAndStatusInIgnoreCaseAndIsDeletedFalse(User user, List<String> status, Pageable pageable);
+
+
 
     @Query("SELECT bd.sessionDate, COUNT(bd) " +
             "FROM BookingDetail bd " +

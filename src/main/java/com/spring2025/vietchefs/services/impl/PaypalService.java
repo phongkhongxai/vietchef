@@ -84,8 +84,6 @@ public class PaypalService{
         if (!"PENDING".equals(booking.getStatus())) {
             return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Booking must be in PENDING status to initiate payment"));
         }
-        booking.setStatus("PAYMENT_PROCESSING");
-        bookingRepository.save(booking);
         return getAccessToken()
                 .flatMap(token -> {
                     String jsonBody = "{"

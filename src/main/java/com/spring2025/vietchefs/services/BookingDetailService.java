@@ -20,7 +20,9 @@ public interface BookingDetailService {
     BookingDetail createBookingDetail(Booking booking, BookingDetailRequestDto dto);
     BookingDetailResponse getBookingDetailById(Long id);
     BookingDetailsResponse getBookingDetailsByChef(Long chefId,int pageNo, int pageSize, String sortBy, String sortDir);
+    BookingDetailsResponse getBookingDetailsByChefStatus(Long chefId,List<String> statusList,int pageNo, int pageSize, String sortBy, String sortDir);
     BookingDetailsResponse getBookingDetailsByCustomer(Long customerId,int pageNo, int pageSize, String sortBy, String sortDir);
+    BookingDetailsResponse getBookingDetailsByCustomerStatus(Long customerId, List<String> statusList,int pageNo, int pageSize, String sortBy, String sortDir);
     BookingDetailsResponse getBookingDetailByBooking(Long bookingId,int pageNo, int pageSize, String sortBy, String sortDir);
     ReviewBookingDetailResponse calculateUpdatedBookingDetail(Long bookingDetailId, BookingDetailUpdateDto dto);
     BookingDetailDto updateBookingDetail(Long bookingDetailId, BookingDetailUpdateRequest bookingDetailUpdateRequest);
