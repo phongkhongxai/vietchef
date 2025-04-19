@@ -1,18 +1,12 @@
 package com.spring2025.vietchefs.services.impl;
 
-import com.spring2025.vietchefs.models.entity.Chef;
-import com.spring2025.vietchefs.models.entity.Dish;
-import com.spring2025.vietchefs.models.entity.FoodType;
-import com.spring2025.vietchefs.models.entity.Menu;
+import com.spring2025.vietchefs.models.entity.*;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.dto.DishDto;
 import com.spring2025.vietchefs.models.payload.requestModel.DishRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.DishResponseDto;
 import com.spring2025.vietchefs.models.payload.responseModel.DishesResponse;
-import com.spring2025.vietchefs.repositories.ChefRepository;
-import com.spring2025.vietchefs.repositories.DishRepository;
-import com.spring2025.vietchefs.repositories.FoodTypeRepository;
-import com.spring2025.vietchefs.repositories.MenuRepository;
+import com.spring2025.vietchefs.repositories.*;
 import com.spring2025.vietchefs.services.DishService;
 import jakarta.transaction.Transactional;
 import org.modelmapper.ModelMapper;
@@ -28,6 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,6 +33,8 @@ public class DishServiceImpl implements DishService {
     private DishRepository dishRepository;
     @Autowired
     private MenuRepository menuRepository;
+    @Autowired
+    private MenuItemRepository menuItemRepository;
     @Autowired
     private ChefRepository chefRepository;
     @Autowired
@@ -115,10 +112,18 @@ public class DishServiceImpl implements DishService {
     @Override
     public String deleteDish(Long id) {
         Optional<Dish> dishOptional = dishRepository.findById(id);
-        if (dishOptional.isEmpty()){
-            throw new VchefApiException(HttpStatus.NOT_FOUND, "Dish not found with id: "+ id);
+        if (dishOptional.isEmpty()) {
+            throw new VchefApiException(HttpStatus.NOT_FOUND, "Dish not found with id: " + id);
         }
         Dish dish = dishOptional.get();
+        List<MenuItem> relatedMenuItems = menuItemRepository.findAllByDish(dish);
+        Set<Menu> relatedMenus = relatedMenuItems.stream()
+                .map(MenuItem::getMenu)
+                .collect(Collectors.toSet());
+        for (Menu menu : relatedMenus) {
+            menu.setIsDeleted(true);
+            menuRepository.save(menu);
+        }
         dish.setIsDeleted(true);
         dishRepository.save(dish);
         return "Deleted dish successfully";

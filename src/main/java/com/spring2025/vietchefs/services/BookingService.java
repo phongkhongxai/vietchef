@@ -14,6 +14,8 @@ import java.util.Set;
 public interface BookingService {
     BookingsResponse getBookingsByCustomerId(Long customerId, int pageNo, int pageSize, String sortBy, String sortDir);
     BookingsResponse getBookingsByChefId(Long userId, int pageNo, int pageSize, String sortBy, String sortDir);
+    BookingsResponse getBookingsByCustomerIdAndStatus(Long customerId,List<String> statusList, int pageNo, int pageSize, String sortBy, String sortDir);
+    BookingsResponse getBookingsByChefIdAndStatus(Long userId,List<String> statusList, int pageNo, int pageSize, String sortBy, String sortDir);
     BookingResponseDto getBookingById(Long id);
     BookingResponseDto createSingleBooking(BookingRequestDto dto);
     BookingResponseDto createLongtermBooking(BookingRequestDto dto);
