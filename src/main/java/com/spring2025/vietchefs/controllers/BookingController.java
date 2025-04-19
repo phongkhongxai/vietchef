@@ -100,18 +100,29 @@ public class BookingController {
             @RequestParam(value = "sortBy", defaultValue = AppConstants.DEFAULT_SORT_BY, required = false) String sortBy,
             @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir){
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
-        return bookingDetailService.getBookingDetailsByChef(bto.getId(),pageNo, pageSize, sortBy, sortDir);
+        if (status != null && !status.isEmpty()) {
+            List<String> statusList = List.of(status.toUpperCase());
+            return bookingDetailService.getBookingDetailsByCustomerStatus(bto.getId(), statusList, pageNo, pageSize, sortBy, sortDir);
+        } else {
+            return bookingDetailService.getBookingDetailsByChef(bto.getId(), pageNo, pageSize, sortBy, sortDir);
+        }
     }
     @PreAuthorize("hasRole('ROLE_CUSTOMER')")
     @GetMapping("/booking-details/user")
     public BookingDetailsResponse getBookingDetailOfUser(
             @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(value = "status", required = false) String status,
             @RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
             @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
             @RequestParam(value = "sortBy", defaultValue = AppConstants.DEFAULT_SORT_BY, required = false) String sortBy,
             @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir){
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
-        return bookingDetailService.getBookingDetailsByCustomer(bto.getId(),pageNo, pageSize, sortBy, sortDir);
+        if (status != null && !status.isEmpty()) {
+            List<String> statusList = List.of(status.toUpperCase());
+            return bookingDetailService.getBookingDetailsByCustomerStatus(bto.getId(), statusList, pageNo, pageSize, sortBy, sortDir);
+        } else {
+            return bookingDetailService.getBookingDetailsByCustomer(bto.getId(), pageNo, pageSize, sortBy, sortDir);
+        }
     }
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_ADMIN') or hasRole('ROLE_CHEF')")
