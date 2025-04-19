@@ -224,7 +224,7 @@ public class DishServiceImpl implements DishService {
         // create Pageable instance
         Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
 
-        Page<Dish> dishes = dishRepository.findByNotInMenuAndIsDeletedFalse(menu.getId(),pageable);
+        Page<Dish> dishes = dishRepository.findByNotInMenuAndIsDeletedFalseAndChefId(menu.getId(), menu.getChef().getId(),pageable);
 
         // get content for page object
         List<Dish> listOfDishes = dishes.getContent();
