@@ -22,4 +22,18 @@ public interface ChefRepository extends JpaRepository<Chef, Long> {
 
     @Query("SELECT c FROM Chef c LEFT JOIN FETCH c.packages WHERE c.id = :chefId")
     Optional<Chef> findWithPackagesById(@Param("chefId") Long chefId);
+    @Query("""
+    SELECT c FROM Chef c
+    WHERE 
+        (LOWER(c.user.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) 
+         OR LOWER(c.bio) LIKE LOWER(CONCAT('%', :keyword, '%')))
+        AND c.status = :status 
+        AND c.isDeleted = false
+""")
+    Page<Chef> searchByFullNameOrBioAndStatus(
+            @Param("keyword") String keyword,
+            @Param("status") String status,
+            Pageable pageable
+    );
+
 }
