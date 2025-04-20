@@ -3,6 +3,7 @@ package com.spring2025.vietchefs.controllers;
 import com.spring2025.vietchefs.models.payload.dto.DishDto;
 import com.spring2025.vietchefs.models.payload.requestModel.DishRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.ChefsResponse;
+import com.spring2025.vietchefs.models.payload.responseModel.DishResponseDto;
 import com.spring2025.vietchefs.models.payload.responseModel.DishesResponse;
 import com.spring2025.vietchefs.services.DishService;
 import com.spring2025.vietchefs.utils.AppConstants;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/dishes")
@@ -41,7 +43,7 @@ public class DishController {
     @GetMapping
     public DishesResponse getAllDishes(
             @RequestParam(value = "chefId", required = false) Long chefId,
-            @RequestParam(value = "foodTypeId", required = false) Long foodTypeId,
+            @RequestParam(value = "foodTypeIds", required = false) List<Long> foodTypeIds,
                                         @RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
                                        @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
                                        @RequestParam(value = "sortBy", defaultValue = AppConstants.DEFAULT_SORT_BY, required = false) String sortBy,
@@ -49,10 +51,22 @@ public class DishController {
         if (chefId != null) {
             return dishService.getDishesByChef(chefId, pageNo, pageSize, sortBy, sortDir);
         }
-        if (foodTypeId != null) {
-            return dishService.getDishesByFoodType(foodTypeId, pageNo, pageSize, sortBy, sortDir);
+        if (foodTypeIds != null && !foodTypeIds.isEmpty()) {
+            return dishService.getDishesByFoodType(foodTypeIds, pageNo, pageSize, sortBy, sortDir);
         }
         return dishService.getAllDishes(pageNo, pageSize, sortBy, sortDir);
+    }
+    @GetMapping("/nearby/food-types")
+    public DishesResponse getDishesNearByByFoodType(
+            @RequestParam(value = "foodTypeIds", required = false) List<Long> foodTypeIds,
+            @RequestParam(value = "customerLat") double customerLat,
+            @RequestParam(value = "customerLng") double customerLng,
+            @RequestParam(value = "distance") double distance,
+            @RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
+            @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
+            @RequestParam(value = "sortBy", defaultValue = AppConstants.DEFAULT_SORT_BY, required = false) String sortBy,
+            @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir){
+        return dishService.getDishesByFoodTypeNearBy(foodTypeIds,customerLat,customerLng,distance,pageNo, pageSize, sortBy, sortDir);
     }
     @GetMapping("/nearby")
     public DishesResponse getDishesNearBy(
@@ -98,7 +112,7 @@ public class DishController {
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getDishById(@PathVariable("id") Long id) {
-        DishDto dishDto = dishService.getDishById(id);
+        DishResponseDto dishDto = dishService.getDishById(id);
         return new ResponseEntity<>(dishDto, HttpStatus.OK);
     }
 

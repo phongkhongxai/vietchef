@@ -1,12 +1,15 @@
 package com.spring2025.vietchefs.models.payload.responseModel;
 
 import com.spring2025.vietchefs.models.payload.dto.ChefDto;
+import com.spring2025.vietchefs.models.payload.dto.FoodTypeDto;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.util.List;
+
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
@@ -14,7 +17,7 @@ import java.math.BigDecimal;
 public class DishResponseDto {
     private Long id;
     private ChefDto chef;
-    private Long foodTypeId;
+    private List<FoodTypeDto> foodTypes;
     private String name;
     private String description;
     private String cuisineType;

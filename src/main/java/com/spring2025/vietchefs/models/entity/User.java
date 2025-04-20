@@ -54,7 +54,8 @@ public class User {
     private boolean isPremium = false;
     @Column(nullable = false)
     private boolean isDelete = false;
-
+    @Column(nullable = false)
+    private boolean isBanned = false;
     @Column(nullable = false)
     private boolean emailVerified;
 

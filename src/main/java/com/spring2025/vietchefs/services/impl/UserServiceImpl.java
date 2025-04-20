@@ -1,5 +1,6 @@
 package com.spring2025.vietchefs.services.impl;
 
+import com.spring2025.vietchefs.models.entity.Chef;
 import com.spring2025.vietchefs.models.entity.Role;
 import com.spring2025.vietchefs.models.entity.User;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
@@ -8,6 +9,7 @@ import com.spring2025.vietchefs.models.payload.dto.UserDto;
 import com.spring2025.vietchefs.models.payload.requestModel.ChangePasswordRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.UserRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.UsersResponse;
+import com.spring2025.vietchefs.repositories.ChefRepository;
 import com.spring2025.vietchefs.repositories.RoleRepository;
 import com.spring2025.vietchefs.repositories.UserRepository;
 import com.spring2025.vietchefs.services.UserService;
@@ -36,6 +38,8 @@ public class UserServiceImpl implements UserService {
     private RoleRepository roleRepository;
     @Autowired
     private ModelMapper modelMapper;
+    @Autowired
+    private ChefRepository chefRepository;
     @Autowired
     private PasswordEncoder passwordEncoder;
     @Autowired
@@ -72,6 +76,20 @@ public class UserServiceImpl implements UserService {
         existingUser.setDelete(true);
         userRepository.save(existingUser);
         return "Deleted user successfully";
+    }
+
+    @Override
+    public void setUserBanStatus(Long userId, boolean banned) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User not found with id: " + userId));
+        user.setBanned(banned);
+        if (user.getChef() != null) {
+            Chef chef = user.getChef();
+            chef.setStatus(banned ? "BANNED" : "ACTIVE");
+            chefRepository.save(chef);
+        }
+        userRepository.save(user);
+        userRepository.save(user);
     }
 
     @Override

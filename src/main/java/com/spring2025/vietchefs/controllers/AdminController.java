@@ -72,4 +72,12 @@ public class AdminController {
         String msg = userService.deleteUser(id);
         return new ResponseEntity<>(msg, HttpStatus.NO_CONTENT);
     }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PutMapping("/{id}/ban")
+    public ResponseEntity<?> banUser(@PathVariable Long id, @RequestParam boolean banned) {
+        userService.setUserBanStatus(id, banned);
+        return ResponseEntity.ok("User " + (banned ? "banned" : "unbanned") + " successfully");
+    }
+
 }

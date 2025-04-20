@@ -20,6 +20,7 @@ public class FoodType {
     @Column(nullable = false)
     private Boolean isDeleted = false;
 
-    @OneToMany(mappedBy = "foodType", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ManyToMany(mappedBy = "foodTypes")
     private List<Dish> dishes;
+
 }
