@@ -220,6 +220,45 @@ public class ChefServiceImpl implements ChefService {
     }
 
     @Override
+    public ChefsResponse getAllChefsNearBySearch(String keySearch, double customerLat, double customerLng, double distance, int pageNo, int pageSize, String sortBy, String sortDir) {
+        // Tạo đối tượng Sort
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+
+        Page<Chef> chefs = chefRepository.searchByFullNameOrBioAndStatus(keySearch,"ACTIVE", pageable);
+
+        // Lấy danh sách các đầu bếp từ kết quả
+        List<Chef> listOfChefs = chefs.getContent();
+
+        // Lọc các đầu bếp có khoảng cách gần khách hàng trong bán kính mong muốn
+        List<Chef> filteredChefs = listOfChefs.stream()
+                .filter(chef -> {
+                    double chefLat = chef.getLatitude(); // Giả sử có latitude và longitude trong chef entity
+                    double chefLng = chef.getLongitude();
+                    double distanceToCustomer = calculateService.calculateDistance(customerLat, customerLng, chefLat, chefLng);
+                    return distanceToCustomer <= distance; // Lọc các đầu bếp trong bán kính mong muốn
+                })
+                .toList();
+
+        // Chuyển đổi thành DTO để trả về
+        List<ChefResponseDto> content = filteredChefs.stream()
+                .map(chef -> modelMapper.map(chef, ChefResponseDto.class))
+                .collect(Collectors.toList());
+
+        // Tạo đối tượng response
+        ChefsResponse chefsResponse = new ChefsResponse();
+        chefsResponse.setContent(content);
+        chefsResponse.setPageNo(chefs.getNumber());
+        chefsResponse.setPageSize(chefs.getSize());
+        chefsResponse.setTotalElements(filteredChefs.size());
+        chefsResponse.setTotalPages((int) Math.ceil((double) filteredChefs.size() / pageSize));
+        chefsResponse.setLast(filteredChefs.size() <= pageNo * pageSize);
+
+        return chefsResponse;
+    }
+
+    @Override
     public ChefResponseDto updateChef(Long chefId, ChefRequestDto requestDto) {
         Chef chef = chefRepository.findById(chefId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found with id: " + chefId));

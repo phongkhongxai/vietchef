@@ -16,6 +16,7 @@ public interface ChefService {
     ChefResponseDto approveChef(Long chefId); // Admin duyệt Chef
     ChefsResponse getAllChefs(int pageNo, int pageSize, String sortBy, String sortDir); // Lấy danh sách tất cả đầu bếp
     ChefsResponse getAllChefsNearBy( double customerLat, double customerLng, double distance,int pageNo, int pageSize, String sortBy, String sortDir);
+    ChefsResponse getAllChefsNearBySearch(String keySearch, double customerLat, double customerLng, double distance,int pageNo, int pageSize, String sortBy, String sortDir);
     ChefResponseDto updateChef(Long chefId, ChefRequestDto requestDto); // Cập nhật thông tin đầu bếp
     void deleteChef(Long chefId); // Xóa đầu bếp (Chỉ Admin)
 
