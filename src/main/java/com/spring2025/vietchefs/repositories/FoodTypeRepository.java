@@ -7,6 +7,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -18,4 +19,6 @@ public interface FoodTypeRepository extends JpaRepository<FoodType, Long> {
 
     @Query("SELECT p FROM FoodType p WHERE p.isDeleted = false")
     List<FoodType> findAllNotDeleted();
+    @Query("SELECT f FROM FoodType f WHERE f.id IN :ids AND f.isDeleted = false")
+    List<FoodType> findAllByIdInAndIsDeletedFalse(@Param("ids") List<Long> ids);
 }

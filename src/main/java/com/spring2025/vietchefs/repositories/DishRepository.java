@@ -28,7 +28,10 @@ public interface DishRepository extends JpaRepository<Dish, Long> {
     List<Dish> findByChefAndIsDeletedFalse(Chef chef);
 
 
-    Page<Dish> findByFoodTypeAndIsDeletedFalse(FoodType foodType, Pageable pageable);
+    Page<Dish> findByFoodTypesContainingAndIsDeletedFalse(FoodType foodType, Pageable pageable);
+    Page<Dish> findDistinctByFoodTypesInAndIsDeletedFalse(List<FoodType> foodTypes, Pageable pageable);
+
+
     @Query("SELECT d FROM Dish d WHERE d.isDeleted = false AND d.chef.id = :chefId AND d.id NOT IN " +
             "(SELECT mi.dish.id FROM MenuItem mi WHERE mi.menu.id = :menuId)")
     Page<Dish> findByNotInMenuAndIsDeletedFalseAndChefId(Long menuId, Long chefId, Pageable pageable);

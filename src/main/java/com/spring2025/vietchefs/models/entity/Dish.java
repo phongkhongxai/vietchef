@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalTime;
+import java.util.List;
 
 @Entity
 @Table(name = "dishes")
@@ -46,7 +47,12 @@ public class Dish {
     @Column(nullable = false)
     private Boolean isDeleted = false;
 
-    @ManyToOne
-    @JoinColumn(name = "food_type_id", nullable = false)
-    private FoodType foodType; // dựa trên foodType đã tạo
+    @ManyToMany
+    @JoinTable(
+            name = "dish_food_type",
+            joinColumns = @JoinColumn(name = "dish_id"),
+            inverseJoinColumns = @JoinColumn(name = "food_type_id")
+    )
+    private List<FoodType> foodTypes;
+
 }
