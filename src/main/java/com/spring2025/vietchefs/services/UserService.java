@@ -10,6 +10,7 @@ public interface UserService {
     //UserDto saveAdminUser(SignupDto signupDto);
     UserDto saveChefUser(SignupDto signupDto);
     String deleteUser(Long id);
+    void setUserBanStatus(Long userId, boolean banned);
     UsersResponse getAllUser(int pageNo, int pageSize, String sortBy, String sortDir);
     UserDto getProfileUserByUsernameOrEmail(String username, String email);
     UserDto updateProfile(Long userId, UserRequest userRequest);

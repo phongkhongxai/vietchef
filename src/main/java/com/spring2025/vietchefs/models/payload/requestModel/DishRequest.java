@@ -8,6 +8,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -15,7 +16,7 @@ import java.time.LocalTime;
 @AllArgsConstructor
 public class DishRequest {
     private Long chefId;
-    private Long foodTypeId;
+    private List<Long> foodTypeIds;
     private String name;
     private String description;
     private String cuisineType;

@@ -48,9 +48,12 @@ public class DishServiceImpl implements DishService {
     public DishDto createDish(DishDto dishDto, MultipartFile imageFile) {
         Chef chef = chefRepository.findById(dishDto.getChefId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"Chef not found."));
-        FoodType foodType = foodTypeRepository.findById(dishDto.getFoodTypeId())
-                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"FoodType not found."));
+        List<FoodType> foodTypes = foodTypeRepository.findAllByIdInAndIsDeletedFalse(dishDto.getFoodTypeIds());
+        if (foodTypes.isEmpty()) {
+            throw new VchefApiException(HttpStatus.NOT_FOUND, "No valid FoodTypes found for the given IDs.");
+        }
         Dish dish = modelMapper.map(dishDto, Dish.class);
+        dish.setFoodTypes(foodTypes);
         dish = dishRepository.save(dish);
         if (imageFile != null) {
             try {
@@ -64,12 +67,12 @@ public class DishServiceImpl implements DishService {
     }
 
     @Override
-    public DishDto getDishById(Long id) {
+    public DishResponseDto getDishById(Long id) {
         Optional<Dish> dish = dishRepository.findById(id);
         if (dish.isEmpty()){
             throw new VchefApiException(HttpStatus.NOT_FOUND, "Dish not found with id: "+ id);
         }
-        return modelMapper.map(dish.get(), DishDto.class);
+        return modelMapper.map(dish.get(), DishResponseDto.class);
 
     }
 
@@ -85,10 +88,14 @@ public class DishServiceImpl implements DishService {
                     .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"Chef not found with id " + dishRequest.getChefId()));
             dish.setChef(chef);
         }
-        if (dishRequest.getFoodTypeId() != null) {
-            FoodType foodType = foodTypeRepository.findById(dishRequest.getFoodTypeId())
-                    .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"FoodType not found with id " + dishRequest.getFoodTypeId()));
-            dish.setFoodType(foodType);
+        if (dishRequest.getFoodTypeIds() != null && !dishRequest.getFoodTypeIds().isEmpty()) {
+            List<FoodType> foodTypes = foodTypeRepository.findAllByIdInAndIsDeletedFalse(dishRequest.getFoodTypeIds());
+
+            if (foodTypes.isEmpty()) {
+                throw new VchefApiException(HttpStatus.NOT_FOUND, "No valid FoodTypes found for the given IDs.");
+            }
+
+            dish.setFoodTypes(foodTypes);
         }
         dish.setName(dishRequest.getName() != null ? dishRequest.getName() : dish.getName());
         dish.setDescription(dishRequest.getDescription() != null ? dishRequest.getDescription() : dish.getDescription());
@@ -247,22 +254,65 @@ public class DishServiceImpl implements DishService {
     }
 
     @Override
-    public DishesResponse getDishesByFoodType(Long foodTypeId, int pageNo, int pageSize, String sortBy, String sortDir) {
-        FoodType foodType = foodTypeRepository.findById(foodTypeId)
-                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"FoodType not found with id: "+ foodTypeId));
+    public DishesResponse getDishesByFoodType(List<Long> foodTypeIds, int pageNo, int pageSize, String sortBy, String sortDir) {
+        List<FoodType> foodTypes = foodTypeRepository.findAllById(foodTypeIds);
+        if (foodTypes.isEmpty()) {
+            throw new VchefApiException(HttpStatus.NOT_FOUND, "Không tìm thấy loại món ăn phù hợp với các ID: " + foodTypeIds);
+        }
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
                 : Sort.by(sortBy).descending();
 
         // create Pageable instance
         Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
 
-        Page<Dish> dishes = dishRepository.findByFoodTypeAndIsDeletedFalse(foodType,pageable);
-
+        Page<Dish> dishes = dishRepository.findDistinctByFoodTypesInAndIsDeletedFalse(foodTypes,pageable);
         // get content for page object
         List<Dish> listOfDishes = dishes.getContent();
 
         List<DishResponseDto> content = listOfDishes.stream().map(bt -> modelMapper.map(bt, DishResponseDto.class)).collect(Collectors.toList());
 
+        DishesResponse templatesResponse = new DishesResponse();
+        templatesResponse.setContent(content);
+        templatesResponse.setPageNo(dishes.getNumber());
+        templatesResponse.setPageSize(dishes.getSize());
+        templatesResponse.setTotalElements(dishes.getTotalElements());
+        templatesResponse.setTotalPages(dishes.getTotalPages());
+        templatesResponse.setLast(dishes.isLast());
+        return templatesResponse;
+    }
+
+    @Override
+    public DishesResponse getDishesByFoodTypeNearBy(List<Long> foodTypeIds, double customerLat, double customerLng,double distance, int pageNo, int pageSize, String sortBy, String sortDir) {
+        List<FoodType> foodTypes = foodTypeRepository.findAllById(foodTypeIds);
+        if (foodTypes.isEmpty()) {
+            throw new VchefApiException(HttpStatus.NOT_FOUND, "Không tìm thấy loại món ăn phù hợp với các ID: " + foodTypeIds);
+        }
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+
+        // create Pageable instance
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+
+        Page<Dish> dishes = dishRepository.findDistinctByFoodTypesInAndIsDeletedFalse(foodTypes,pageable);
+        // get content for page object
+        List<Dish> allDishes = dishes.getContent();
+
+        // Lọc các món có chef ở gần khách hàng
+        List<Dish> filteredDishes = allDishes.stream()
+                .filter(dish -> {
+                    Chef chef = dish.getChef();
+                    if (chef == null || chef.getLatitude() == null || chef.getLongitude() == null) return false;
+                    double chefLat = chef.getLatitude();
+                    double chefLng = chef.getLongitude();
+                    double distanceToCustomer = calculateService.calculateDistance(customerLat, customerLng, chefLat, chefLng);
+                    return distanceToCustomer <= distance;
+                })
+                .toList();
+
+        // Chuyển sang DTO
+        List<DishResponseDto> content = filteredDishes.stream()
+                .map(dish -> modelMapper.map(dish, DishResponseDto.class))
+                .collect(Collectors.toList());
         DishesResponse templatesResponse = new DishesResponse();
         templatesResponse.setContent(content);
         templatesResponse.setPageNo(dishes.getNumber());

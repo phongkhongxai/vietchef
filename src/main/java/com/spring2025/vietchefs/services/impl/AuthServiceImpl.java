@@ -85,6 +85,10 @@ public class AuthServiceImpl implements AuthService {
         if (!user.isEmailVerified()) {
             throw new VchefApiException(HttpStatus.FORBIDDEN, "Email is not verified. Please verify your email.");
         }
+        if (user.isBanned()) {
+            throw new VchefApiException(HttpStatus.FORBIDDEN, "User is banned.");
+        }
+
         if (loginDto.getExpoToken() != null && !loginDto.getExpoToken().isBlank()) {
             user.setExpoToken(loginDto.getExpoToken());
             userRepository.save(user);
@@ -156,6 +160,9 @@ public class AuthServiceImpl implements AuthService {
                     .build();
 
             userRepository.save(user);
+        }
+        if (user.isBanned()) {
+            throw new VchefApiException(HttpStatus.FORBIDDEN, "User is banned.");
         }
         // Tạo token cho user
         Authentication authentication = new UsernamePasswordAuthenticationToken(user.getEmail(), null);

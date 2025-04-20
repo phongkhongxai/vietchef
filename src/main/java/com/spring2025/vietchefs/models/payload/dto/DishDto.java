@@ -10,6 +10,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -18,7 +19,7 @@ import java.time.LocalTime;
 public class DishDto {
     private Long id;
     private Long chefId;
-    private Long foodTypeId;
+    private List<Long> foodTypeIds;
     private String name;
     private String description;
     private String cuisineType;
