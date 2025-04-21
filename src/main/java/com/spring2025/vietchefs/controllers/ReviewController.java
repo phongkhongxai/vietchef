@@ -30,6 +30,7 @@ import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -106,10 +107,28 @@ public class ReviewController {
     public ResponseEntity<Map<String, Object>> getReviewsByChef(
             @PathVariable Long chefId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "newest") String sort) {
         
-        Page<ReviewResponse> reviewPage = reviewService.getReviewsByChef(
-                chefId, PageRequest.of(page, size, Sort.by("createAt").descending()));
+        // Determine the sort specification based on the sort parameter
+        Pageable pageable;
+        switch (sort.toLowerCase()) {
+            case "oldest":
+                pageable = PageRequest.of(page, size, Sort.by("createAt").ascending());
+                break;
+            case "highest-rating":
+                pageable = PageRequest.of(page, size, Sort.by("rating").descending());
+                break;
+            case "lowest-rating":
+                pageable = PageRequest.of(page, size, Sort.by("rating").ascending());
+                break;
+            case "newest":
+            default:
+                pageable = PageRequest.of(page, size, Sort.by("createAt").descending());
+                break;
+        }
+        
+        Page<ReviewResponse> reviewPage = reviewService.getReviewsByChef(chefId, pageable);
         
         long reviewCount = reviewService.getReviewCountForChef(chefId);
         
