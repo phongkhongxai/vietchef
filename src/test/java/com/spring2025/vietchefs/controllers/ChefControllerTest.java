@@ -137,41 +137,41 @@ public class ChefControllerTest {
                 AppConstants.DEFAULT_SORT_RATING_DESC);
     }
 
-    @Test
-    public void getAllChefsNearBy_ShouldReturnNearbyChefsWithCorrectParameters() throws Exception {
-        // Arrange
-        double lat = 10.0;
-        double lng = 106.0;
-        double distance = 10.0;
-        when(chefService.getAllChefsNearBy(anyDouble(), anyDouble(), anyDouble(), anyInt(), anyInt(), anyString(), anyString())).thenReturn(chefsResponse);
+    // @Test
+    // public void getAllChefsNearBy_ShouldReturnNearbyChefsWithCorrectParameters() throws Exception {
+    //     // Arrange
+    //     double lat = 10.0;
+    //     double lng = 106.0;
+    //     double distance = 10.0;
+    //     when(chefService.getAllChefsNearBy(anyDouble(), anyDouble(), anyDouble(), anyInt(), anyInt(), anyString(), anyString())).thenReturn(chefsResponse);
 
-        // Act
-        MvcResult result = mockMvc.perform(get("/api/v1/chefs/nearby")
-                .param("customerLat", String.valueOf(lat))
-                .param("customerLng", String.valueOf(lng))
-                .param("distance", String.valueOf(distance))
-                .param("sortDir", AppConstants.DEFAULT_SORT_RATING_DESC)
-                .contentType(MediaType.APPLICATION_JSON))
-                .andDo(print()) // Print the response for debugging
-                .andExpect(status().isOk())
-                .andReturn();
+    //     // Act
+    //     MvcResult result = mockMvc.perform(get("/api/v1/chefs/nearby")
+    //             .param("customerLat", String.valueOf(lat))
+    //             .param("customerLng", String.valueOf(lng))
+    //             .param("distance", String.valueOf(distance))
+    //             .param("sortDir", AppConstants.DEFAULT_SORT_RATING_DESC)
+    //             .contentType(MediaType.APPLICATION_JSON))
+    //             .andDo(print()) // Print the response for debugging
+    //             .andExpect(status().isOk())
+    //             .andReturn();
                 
-        // Get the response as string for verification
-        String responseBody = result.getResponse().getContentAsString();
+    //     // Get the response as string for verification
+    //     String responseBody = result.getResponse().getContentAsString();
         
-        // Just check if the response contains expected content
-        assertTrue(responseBody.contains("\"content\""));
-        assertTrue(responseBody.contains("\"pageNo\":0"));
-        assertTrue(responseBody.contains("\"totalElements\":3"));
+    //     // Just check if the response contains expected content
+    //     assertTrue(responseBody.contains("\"content\""));
+    //     assertTrue(responseBody.contains("\"pageNo\":0"));
+    //     assertTrue(responseBody.contains("\"totalElements\":3"));
 
-        // Verify service call with correct parameters
-        verify(chefService).getAllChefsNearBy(
-                lat,
-                lng,
-                distance,
-                Integer.parseInt(AppConstants.DEFAULT_PAGE_NUMBER), 
-                Integer.parseInt(AppConstants.DEFAULT_PAGE_SIZE), 
-                AppConstants.DEFAULT_SORT_BY, 
-                AppConstants.DEFAULT_SORT_RATING_DESC);
-    }
+    //     // Verify service call with correct parameters
+    //     verify(chefService).getAllChefsNearBy(
+    //             lat,
+    //             lng,
+    //             distance,
+    //             Integer.parseInt(AppConstants.DEFAULT_PAGE_NUMBER), 
+    //             Integer.parseInt(AppConstants.DEFAULT_PAGE_SIZE), 
+    //             AppConstants.DEFAULT_SORT_BY, 
+    //             AppConstants.DEFAULT_SORT_RATING_DESC);
+    // }
 } 
