@@ -41,9 +41,6 @@ public class Review {
     
     private String imageUrl;
     
-    @Column(nullable = false)
-    private Boolean isVerified = false;
-    
     private String response;
     
     private LocalDateTime chefResponseAt;

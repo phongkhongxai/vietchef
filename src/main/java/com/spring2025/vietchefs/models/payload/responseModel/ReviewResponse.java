@@ -23,7 +23,6 @@ public class ReviewResponse {
     private String overallExperience;
     private String mainImageUrl;
     private List<String> additionalImageUrls;
-    private Boolean verified;
     private String response;
     private LocalDateTime chefResponseAt;
     private LocalDateTime createAt;

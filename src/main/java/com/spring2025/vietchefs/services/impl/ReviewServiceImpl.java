@@ -138,12 +138,6 @@ public class ReviewServiceImpl implements ReviewService {
         review.setOverallExperience(request.getOverallExperience());
         review.setCreateAt(LocalDateTime.now());
         review.setIsDeleted(false);
-        review.setIsVerified(false);
-        
-        // Check if booking exists and is completed
-        if (booking != null && "completed".equals(booking.getStatus())) {
-            review.setIsVerified(true);
-        }
         
         // Calculate weighted rating based on criteria ratings
         BigDecimal calculatedRating = calculateWeightedRating(request.getCriteriaRatings());
@@ -181,11 +175,6 @@ public class ReviewServiceImpl implements ReviewService {
             detail.setCriteria(criteria);
             detail.setRating(entry.getValue());
             
-            // Add comment if available
-            if (request.getCriteriaComments() != null && request.getCriteriaComments().containsKey(entry.getKey())) {
-                detail.setComment(request.getCriteriaComments().get(entry.getKey()));
-            }
-            
             reviewDetailRepository.save(detail);
         }
         
@@ -203,7 +192,7 @@ public class ReviewServiceImpl implements ReviewService {
             throw new IllegalArgumentException("Only the user who created the review can update it");
         }
         
-        // Update basic info
+        // Update review details
         existingReview.setDescription(request.getDescription());
         existingReview.setOverallExperience(request.getOverallExperience());
         
@@ -258,11 +247,6 @@ public class ReviewServiceImpl implements ReviewService {
             detail.setCriteria(criteria);
             detail.setRating(entry.getValue());
             
-            // Add comment if available
-            if (request.getCriteriaComments() != null && request.getCriteriaComments().containsKey(entry.getKey())) {
-                detail.setComment(request.getCriteriaComments().get(entry.getKey()));
-            }
-            
             reviewDetailRepository.save(detail);
         }
         
@@ -313,8 +297,14 @@ public class ReviewServiceImpl implements ReviewService {
                 continue;
             }
             
-            BigDecimal weight = criteria.getWeight();
             BigDecimal rating = entry.getValue();
+            
+            // Skip criteria with rating 0 (not rated by user)
+            if (rating.compareTo(BigDecimal.ZERO) == 0) {
+                continue;
+            }
+            
+            BigDecimal weight = criteria.getWeight();
             
             weightedSum = weightedSum.add(rating.multiply(weight));
             totalWeight = totalWeight.add(weight);
@@ -342,7 +332,7 @@ public class ReviewServiceImpl implements ReviewService {
         Chef chef = chefRepository.findById(chefId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chef not found with id: " + chefId));
                 
-        return reviewRepository.countByChefAndVerified(chef);
+        return reviewRepository.countByChef(chef);
     }
 
     @Override
@@ -359,26 +349,10 @@ public class ReviewServiceImpl implements ReviewService {
                                   reviewRepository.countByChefAndRatingGreaterThanEqual(chef, new BigDecimal("3.5")));
         distribution.put("2-star", reviewRepository.countByChefAndRatingGreaterThanEqual(chef, new BigDecimal("1.5")) - 
                                   reviewRepository.countByChefAndRatingGreaterThanEqual(chef, new BigDecimal("2.5")));
-        distribution.put("1-star", reviewRepository.countByChefAndVerified(chef) - 
+        distribution.put("1-star", reviewRepository.countByChef(chef) - 
                                   reviewRepository.countByChefAndRatingGreaterThanEqual(chef, new BigDecimal("1.5")));
         
         return distribution;
-    }
-
-    @Override
-    public boolean isVerifiedReview(Long reviewId) {
-        Review review = reviewRepository.findById(reviewId)
-                .orElseThrow(() -> new ResourceNotFoundException("Review not found with id: " + reviewId));
-        return review.getIsVerified();
-    }
-
-    @Override
-    @Transactional
-    public void markReviewAsVerified(Long reviewId) {
-        Review review = reviewRepository.findById(reviewId)
-                .orElseThrow(() -> new ResourceNotFoundException("Review not found with id: " + reviewId));
-        review.setIsVerified(true);
-        reviewRepository.save(review);
     }
     
     private ReviewResponse mapToResponse(Review review) {
@@ -400,7 +374,6 @@ public class ReviewServiceImpl implements ReviewService {
                 .collect(Collectors.toList());
         response.setAdditionalImageUrls(additionalImageUrls);
         
-        response.setVerified(review.getIsVerified());
         response.setResponse(review.getResponse());
         response.setChefResponseAt(review.getChefResponseAt());
         response.setCreateAt(review.getCreateAt());
