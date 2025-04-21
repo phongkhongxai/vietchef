@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -29,12 +30,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT us FROM User us WHERE us.isDelete = false")
     Page<User> findAllNotDeleted(Pageable pageable);
 
-    Page<User> findByRoleAndIsDeleteFalse(Role role, Pageable pageable);
 
     Optional<User> findByUid(String uid);
     Optional<User> findByResetPasswordToken(String token);
     Optional<User> findByResetPasswordTokenAndEmail(String token, String email);
-    List<User> findByIsPremiumTrue();
+    @Query("SELECT u FROM User u WHERE u.role.roleName = :roleName AND u.isDelete = false")
+    Page<User> findByRoleNameAndIsDeleteFalse(@Param("roleName") String roleName, Pageable pageable);
+
 
 
 
