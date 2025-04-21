@@ -20,5 +20,4 @@ public class ReviewCreateRequest {
     private MultipartFile mainImage;
     private List<MultipartFile> additionalImages;
     private Map<Long, BigDecimal> criteriaRatings;
-    private Map<Long, String> criteriaComments;
 } 

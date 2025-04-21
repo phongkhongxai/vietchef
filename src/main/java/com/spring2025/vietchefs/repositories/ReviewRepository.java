@@ -21,12 +21,12 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     List<Review> findByUserAndIsDeletedFalseOrderByCreateAtDesc(User user);
     Optional<Review> findByBookingAndIsDeletedFalse(Booking booking);
     
-    @Query("SELECT AVG(r.rating) FROM Review r WHERE r.chef = ?1 AND r.isDeleted = false AND r.isVerified = true")
+    @Query("SELECT AVG(r.rating) FROM Review r WHERE r.chef = ?1 AND r.isDeleted = false")
     Optional<BigDecimal> findAverageRatingByChef(Chef chef);
     
-    @Query("SELECT COUNT(r) FROM Review r WHERE r.chef = ?1 AND r.isDeleted = false AND r.isVerified = true")
-    long countByChefAndVerified(Chef chef);
+    @Query("SELECT COUNT(r) FROM Review r WHERE r.chef = ?1 AND r.isDeleted = false")
+    long countByChef(Chef chef);
     
-    @Query("SELECT COUNT(r) FROM Review r WHERE r.chef = ?1 AND r.rating >= ?2 AND r.isDeleted = false AND r.isVerified = true")
+    @Query("SELECT COUNT(r) FROM Review r WHERE r.chef = ?1 AND r.rating >= ?2 AND r.isDeleted = false")
     long countByChefAndRatingGreaterThanEqual(Chef chef, BigDecimal rating);
 } 

@@ -27,7 +27,4 @@ public interface ReviewService {
     BigDecimal getAverageRatingForChef(Long chefId);
     long getReviewCountForChef(Long chefId);
     Map<String, Long> getRatingDistributionForChef(Long chefId);
-    
-    boolean isVerifiedReview(Long reviewId);
-    void markReviewAsVerified(Long reviewId);
 } 
