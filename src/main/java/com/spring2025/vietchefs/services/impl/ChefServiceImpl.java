@@ -15,7 +15,9 @@ import com.spring2025.vietchefs.repositories.ChefRepository;
 import com.spring2025.vietchefs.repositories.RoleRepository;
 import com.spring2025.vietchefs.repositories.UserRepository;
 import com.spring2025.vietchefs.services.ChefService;
+import com.spring2025.vietchefs.services.ReviewService;
 import com.spring2025.vietchefs.services.WalletService;
+import com.spring2025.vietchefs.utils.AppConstants;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -26,6 +28,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -46,6 +49,8 @@ public class ChefServiceImpl implements ChefService {
     private DistanceService distanceService;
     @Autowired
     private CalculateService calculateService;
+    @Autowired
+    private ReviewService reviewService;
 
     @Override
     public ChefDto createChef(ChefDto chefDto) {
@@ -145,18 +150,41 @@ public class ChefServiceImpl implements ChefService {
 
     @Override
     public ChefsResponse getAllChefs(int pageNo, int pageSize, String sortBy, String sortDir) {
-        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
-                : Sort.by(sortBy).descending();
+        Sort sort;
+        
+        // Xử lý trường hợp sắp xếp theo đánh giá
+        if (sortBy.equals("rating") || AppConstants.DEFAULT_SORT_RATING_DESC.equals(sortDir)) {
+            sort = Sort.by("id").ascending(); // Default sort, we'll handle rating sort later
+        } else {
+            sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                    : Sort.by(sortBy).descending();
+        }
 
         // create Pageable instance
         Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
 
-        Page<Chef> chefs = chefRepository.findByStatusAndIsDeletedFalse("ACTIVE",pageable);
+        Page<Chef> chefs = chefRepository.findByStatusAndIsDeletedFalse("ACTIVE", pageable);
 
         // get content for page object
         List<Chef> listOfChefs = chefs.getContent();
 
-        List<ChefResponseDto> content = listOfChefs.stream().map(bt -> modelMapper.map(bt, ChefResponseDto.class)).collect(Collectors.toList());
+        List<ChefResponseDto> content = listOfChefs.stream()
+                .map(chef -> {
+                    ChefResponseDto dto = modelMapper.map(chef, ChefResponseDto.class);
+                    // Lấy đánh giá trung bình cho chef
+                    dto.setAverageRating(reviewService.getAverageRatingForChef(chef.getId()));
+                    return dto;
+                })
+                .collect(Collectors.toList());
+        
+        // Sắp xếp theo rating nếu được yêu cầu
+        if (sortBy.equals("rating")) {
+            content.sort(sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ?
+                    Comparator.comparing(ChefResponseDto::getAverageRating, Comparator.nullsLast(Comparator.naturalOrder())) :
+                    Comparator.comparing(ChefResponseDto::getAverageRating, Comparator.nullsLast(Comparator.reverseOrder())));
+        } else if (AppConstants.DEFAULT_SORT_RATING_DESC.equals(sortDir)) {
+            content.sort(Comparator.comparing(ChefResponseDto::getAverageRating, Comparator.nullsLast(Comparator.reverseOrder())));
+        }
 
         ChefsResponse templatesResponse = new ChefsResponse();
         templatesResponse.setContent(content);
@@ -169,10 +197,17 @@ public class ChefServiceImpl implements ChefService {
     }
 
     @Override
-    public ChefsResponse getAllChefsNearBy( double customerLat, double customerLng, double distance,int pageNo, int pageSize, String sortBy, String sortDir) {
-        // Tạo đối tượng Sort
-        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
-                : Sort.by(sortBy).descending();
+    public ChefsResponse getAllChefsNearBy(double customerLat, double customerLng, double distance, int pageNo, int pageSize, String sortBy, String sortDir) {
+        Sort sort;
+        
+        // Xử lý trường hợp sắp xếp theo đánh giá
+        if (sortBy.equals("rating") || AppConstants.DEFAULT_SORT_RATING_DESC.equals(sortDir)) {
+            sort = Sort.by("id").ascending(); // Default sort, we'll handle rating sort later
+        } else {
+            sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                    : Sort.by(sortBy).descending();
+        }
+        
         Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
 
         Page<Chef> chefs = chefRepository.findByStatusAndIsDeletedFalse("ACTIVE", pageable);
@@ -190,10 +225,24 @@ public class ChefServiceImpl implements ChefService {
                 })
                 .toList();
 
-        // Chuyển đổi thành DTO để trả về
+        // Chuyển đổi thành DTO để trả về và thêm đánh giá trung bình
         List<ChefResponseDto> content = filteredChefs.stream()
-                .map(chef -> modelMapper.map(chef, ChefResponseDto.class))
+                .map(chef -> {
+                    ChefResponseDto dto = modelMapper.map(chef, ChefResponseDto.class);
+                    // Lấy đánh giá trung bình cho chef
+                    dto.setAverageRating(reviewService.getAverageRatingForChef(chef.getId()));
+                    return dto;
+                })
                 .collect(Collectors.toList());
+
+        // Sắp xếp theo rating nếu được yêu cầu
+        if (sortBy.equals("rating")) {
+            content.sort(sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ?
+                    Comparator.comparing(ChefResponseDto::getAverageRating, Comparator.nullsLast(Comparator.naturalOrder())) :
+                    Comparator.comparing(ChefResponseDto::getAverageRating, Comparator.nullsLast(Comparator.reverseOrder())));
+        } else if (AppConstants.DEFAULT_SORT_RATING_DESC.equals(sortDir)) {
+            content.sort(Comparator.comparing(ChefResponseDto::getAverageRating, Comparator.nullsLast(Comparator.reverseOrder())));
+        }
 
         // Tạo đối tượng response
         ChefsResponse chefsResponse = new ChefsResponse();

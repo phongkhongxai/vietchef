@@ -7,6 +7,7 @@ import com.spring2025.vietchefs.models.payload.responseModel.ChefsResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.DishesResponse;
 import com.spring2025.vietchefs.services.ChefService;
 import com.spring2025.vietchefs.utils.AppConstants;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -43,6 +44,9 @@ public class ChefController {
         ChefResponseDto dto = chefService.getChefById(chefId);
         return new ResponseEntity<>(dto, HttpStatus.OK);
     }
+    
+    @Operation(summary = "Get all active chefs with pagination and sorting", 
+            description = "Returns all active chefs. The results can be sorted by rating using sortDir='rating_desc'")
     @GetMapping
     public ChefsResponse getAllChefs(
             @RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
@@ -51,6 +55,9 @@ public class ChefController {
             @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir){
         return chefService.getAllChefs(pageNo, pageSize, sortBy, sortDir);
     }
+    
+    @Operation(summary = "Get nearby chefs with pagination and sorting",
+            description = "Returns chefs within the specified distance. The results can be sorted by rating using sortDir='rating_desc'")
     @GetMapping("/nearby")
     public ChefsResponse getAllChefsNearBy(
             @RequestParam(value = "customerLat") Double customerLat,
