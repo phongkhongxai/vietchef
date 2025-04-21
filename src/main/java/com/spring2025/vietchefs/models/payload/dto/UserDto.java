@@ -21,5 +21,6 @@ public class UserDto {
     private String username;
     private Long roleId;
     private Long chefId;
+    private boolean isBanned;
     private String avatarUrl;
 }

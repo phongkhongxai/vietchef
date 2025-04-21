@@ -56,13 +56,36 @@ public class AdminController {
 //        return new ResponseEntity<>("Hehe", HttpStatus.OK);
 //    }
 
-    @GetMapping
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @GetMapping("/users")
     public UsersResponse getAllUsers(@RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
                                      @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
                                      @RequestParam(value = "sortBy", defaultValue = AppConstants.DEFAULT_SORT_BY, required = false) String sortBy,
                                      @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir
     ) {
         return userService.getAllUser(pageNo, pageSize, sortBy, sortDir);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @GetMapping("/customers")
+    public UsersResponse getAllUsersCustomer(@RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
+                                     @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
+                                     @RequestParam(value = "sortBy", defaultValue = AppConstants.DEFAULT_SORT_BY, required = false) String sortBy,
+                                     @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir
+    ) {
+        return userService.getAllCustomer(pageNo, pageSize, sortBy, sortDir);
+
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @GetMapping("/chefs")
+    public UsersResponse getAllUsersChef(@RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
+                                     @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
+                                     @RequestParam(value = "sortBy", defaultValue = AppConstants.DEFAULT_SORT_BY, required = false) String sortBy,
+                                     @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir
+    ) {
+        return userService.getAllChef(pageNo, pageSize, sortBy, sortDir);
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
@@ -74,7 +97,7 @@ public class AdminController {
     }
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
-    @PutMapping("/{id}/ban")
+    @PutMapping("/users/{id}/ban")
     public ResponseEntity<?> banUser(@PathVariable Long id, @RequestParam boolean banned) {
         userService.setUserBanStatus(id, banned);
         return ResponseEntity.ok("User " + (banned ? "banned" : "unbanned") + " successfully");
