@@ -189,7 +189,6 @@ public class ReviewControllerTest {
         additionalImagesForReview1.add("http://example.com/images/review1-additional2.jpg");
         review1.setAdditionalImageUrls(additionalImagesForReview1);
         
-        review1.setVerified(true);
         review1.setResponse("Thank you for your wonderful review! We're glad you enjoyed the experience.");
         review1.setChefResponseAt(LocalDateTime.now().minusHours(1));
         review1.setCreateAt(LocalDateTime.now());
@@ -214,7 +213,6 @@ public class ReviewControllerTest {
         additionalImagesForReview2.add("http://example.com/images/review2-additional1.jpg");
         review2.setAdditionalImageUrls(additionalImagesForReview2);
         
-        review2.setVerified(true);
         review2.setResponse("We appreciate your feedback and hope to see you again soon!");
         review2.setChefResponseAt(LocalDateTime.now().minusHours(2));
         review2.setCreateAt(LocalDateTime.now().minusDays(1));
@@ -286,7 +284,6 @@ public class ReviewControllerTest {
         assertEquals("One of the best dining experiences I've ever had!", returnedReview1.getOverallExperience());
         assertEquals("http://example.com/images/review1-main.jpg", returnedReview1.getMainImageUrl());
         assertEquals(additionalImagesForReview1, returnedReview1.getAdditionalImageUrls());
-        assertTrue(returnedReview1.getVerified());
         assertEquals("Thank you for your wonderful review! We're glad you enjoyed the experience.", returnedReview1.getResponse());
         assertNotNull(returnedReview1.getChefResponseAt());
         assertNotNull(returnedReview1.getCreateAt());
@@ -324,7 +321,6 @@ public class ReviewControllerTest {
                     "      \"overallExperience\": \"" + review.getOverallExperience() + "\",\n" +
                     "      \"mainImageUrl\": \"" + review.getMainImageUrl() + "\",\n" +
                     "      \"additionalImageUrls\": " + review.getAdditionalImageUrls() + ",\n" +
-                    "      \"verified\": " + review.getVerified() + ",\n" +
                     "      \"response\": \"" + review.getResponse() + "\",\n" +
                     "      \"chefResponseAt\": \"" + review.getChefResponseAt() + "\",\n" +
                     "      \"createAt\": \"" + review.getCreateAt() + "\",\n" +

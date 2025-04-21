@@ -19,9 +19,6 @@ public class ReviewDetail {
     @Column(nullable = false)
     private BigDecimal rating;
     
-    @Column(columnDefinition = "TEXT")
-    private String comment;
-    
     @ManyToOne
     @JoinColumn(name = "review_id", nullable = false)
     private Review review;
