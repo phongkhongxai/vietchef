@@ -89,7 +89,6 @@ public class UserServiceImpl implements UserService {
             chefRepository.save(chef);
         }
         userRepository.save(user);
-        userRepository.save(user);
     }
 
     @Override
@@ -101,6 +100,56 @@ public class UserServiceImpl implements UserService {
         Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
 
         Page<User> users = userRepository.findAllNotDeleted(pageable);
+
+        List<User> userList = users.getContent();
+
+        List<UserDto> content = userList.stream().map(bt -> modelMapper.map(bt, UserDto.class)).collect(Collectors.toList());
+
+        UsersResponse templatesResponse = new UsersResponse();
+        templatesResponse.setContent(content);
+        templatesResponse.setPageNo(users.getNumber());
+        templatesResponse.setPageSize(users.getSize());
+        templatesResponse.setTotalElements(users.getTotalElements());
+        templatesResponse.setTotalPages(users.getTotalPages());
+        templatesResponse.setLast(users.isLast());
+
+        return templatesResponse;
+    }
+
+    @Override
+    public UsersResponse getAllCustomer(int pageNo, int pageSize, String sortBy, String sortDir) {
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+
+
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+
+        Page<User> users = userRepository.findByRoleNameAndIsDeleteFalse("ROLE_CUSTOMER",pageable);
+
+        List<User> userList = users.getContent();
+
+        List<UserDto> content = userList.stream().map(bt -> modelMapper.map(bt, UserDto.class)).collect(Collectors.toList());
+
+        UsersResponse templatesResponse = new UsersResponse();
+        templatesResponse.setContent(content);
+        templatesResponse.setPageNo(users.getNumber());
+        templatesResponse.setPageSize(users.getSize());
+        templatesResponse.setTotalElements(users.getTotalElements());
+        templatesResponse.setTotalPages(users.getTotalPages());
+        templatesResponse.setLast(users.isLast());
+
+        return templatesResponse;
+    }
+
+    @Override
+    public UsersResponse getAllChef(int pageNo, int pageSize, String sortBy, String sortDir) {
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+
+
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+
+        Page<User> users = userRepository.findByRoleNameAndIsDeleteFalse("ROLE_CHEF",pageable);
 
         List<User> userList = users.getContent();
 

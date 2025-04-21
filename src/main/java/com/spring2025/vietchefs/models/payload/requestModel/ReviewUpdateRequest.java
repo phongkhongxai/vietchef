@@ -21,5 +21,4 @@ public class ReviewUpdateRequest {
     private List<MultipartFile> additionalImages;
     private List<Long> imagesToDelete;
     private Map<Long, BigDecimal> criteriaRatings;
-    private Map<Long, String> criteriaComments;
 } 

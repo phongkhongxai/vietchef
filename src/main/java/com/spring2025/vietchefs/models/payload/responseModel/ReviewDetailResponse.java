@@ -24,14 +24,12 @@ public class ReviewDetailResponse {
     private String description;
     private String overallExperience;
     private String photos;
-    private Boolean verified;
     private String response;
     private LocalDateTime chefResponseAt;
     private LocalDateTime createAt;
     
     // Criteria-specific ratings and comments
     private Map<String, BigDecimal> criteriaRatings;
-    private Map<String, String> criteriaComments;
     
     // Replies and reactions
     private List<ReviewReply> replies;
