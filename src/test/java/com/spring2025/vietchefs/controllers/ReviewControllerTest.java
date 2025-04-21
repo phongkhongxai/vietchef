@@ -134,7 +134,6 @@ public class ReviewControllerTest {
         // Check that the response contains all the expected keys with zero/empty values
         assertEquals(Collections.emptyList(), responseBody.get("reviews"));
         assertEquals(0, responseBody.get("currentPage"));
-        assertEquals(0L, responseBody.get("totalItems"));
         assertEquals(1, responseBody.get("totalPages"));
         assertEquals(BigDecimal.ZERO, responseBody.get("averageRating"));
         assertEquals(0L, responseBody.get("totalReviews"));
@@ -152,7 +151,6 @@ public class ReviewControllerTest {
         // Print the JSON-like format
         System.out.println("\nJSON representation of response:");
         System.out.println("{\n" +
-                "  \"totalItems\": " + responseBody.get("totalItems") + ",\n" +
                 "  \"totalReviews\": " + responseBody.get("totalReviews") + ",\n" +
                 "  \"ratingDistribution\": " + returnedDistribution + ",\n" +
                 "  \"reviews\": " + responseBody.get("reviews") + ",\n" +
@@ -267,7 +265,6 @@ public class ReviewControllerTest {
         java.util.List<ReviewResponse> reviews = (java.util.List<ReviewResponse>) responseBody.get("reviews");
         assertEquals(2, reviews.size());
         assertEquals(0, responseBody.get("currentPage"));
-        assertEquals(2L, responseBody.get("totalItems"));
         assertEquals(1, responseBody.get("totalPages"));
         assertEquals(averageRating, responseBody.get("averageRating"));
         assertEquals(2L, responseBody.get("totalReviews"));
@@ -302,7 +299,6 @@ public class ReviewControllerTest {
         // Print the JSON-like format
         System.out.println("\nJSON representation of response:");
         System.out.println("{\n" +
-                "  \"totalItems\": " + responseBody.get("totalItems") + ",\n" +
                 "  \"totalReviews\": " + responseBody.get("totalReviews") + ",\n" +
                 "  \"ratingDistribution\": " + returnedDistribution + ",\n" +
                 "  \"reviews\": [");

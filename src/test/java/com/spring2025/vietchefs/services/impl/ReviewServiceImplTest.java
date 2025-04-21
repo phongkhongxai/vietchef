@@ -555,4 +555,34 @@ public class ReviewServiceImplTest {
         assertEquals(0L, distribution.get("1-star"));
         assertTrue(reviews.getContent().isEmpty());
     }
+
+    @Test
+    void getReviewCountForChef_ShouldMatchTotalReviewsFromPageResponse() {
+        // Arrange
+        long expectedCount = 5L;
+        Page<Review> reviewPage = new PageImpl<>(reviewList);
+        Pageable pageable = Pageable.unpaged();
+        
+        when(chefRepository.findById(testChef.getId())).thenReturn(Optional.of(testChef));
+        when(reviewRepository.findByChefAndIsDeletedFalse(eq(testChef), any(Pageable.class))).thenReturn(reviewPage);
+        when(reviewRepository.countByChef(testChef)).thenReturn(expectedCount);
+        when(reviewReactionService.getReactionCountsByReview(anyLong())).thenReturn(Collections.emptyMap());
+
+        // Act
+        long countResult = reviewService.getReviewCountForChef(testChef.getId());
+        Page<ReviewResponse> pageResult = reviewService.getReviewsByChef(testChef.getId(), pageable);
+
+        // Assert
+        assertEquals(expectedCount, countResult);
+        assertEquals(reviewList.size(), pageResult.getTotalElements());
+        
+        // The two values should be equal (or at least consistent in their logic)
+        // This might fail if your application logic for these values is different
+        // If this test fails, it indicates there's an inconsistency between totalReviews and totalItems
+        assertEquals(expectedCount, pageResult.getTotalElements());
+        
+        verify(chefRepository, times(2)).findById(testChef.getId());
+        verify(reviewRepository).countByChef(testChef);
+        verify(reviewRepository).findByChefAndIsDeletedFalse(eq(testChef), any(Pageable.class));
+    }
 } 

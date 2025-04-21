@@ -111,13 +111,14 @@ public class ReviewController {
         Page<ReviewResponse> reviewPage = reviewService.getReviewsByChef(
                 chefId, PageRequest.of(page, size, Sort.by("createAt").descending()));
         
+        long reviewCount = reviewService.getReviewCountForChef(chefId);
+        
         Map<String, Object> response = new HashMap<>();
         response.put("reviews", reviewPage.getContent());
         response.put("currentPage", reviewPage.getNumber());
-        response.put("totalItems", reviewPage.getTotalElements());
+        response.put("totalReviews", reviewCount);
         response.put("totalPages", reviewPage.getTotalPages());
         response.put("averageRating", reviewService.getAverageRatingForChef(chefId));
-        response.put("totalReviews", reviewService.getReviewCountForChef(chefId));
         response.put("ratingDistribution", reviewService.getRatingDistributionForChef(chefId));
         
         return ResponseEntity.ok(response);
