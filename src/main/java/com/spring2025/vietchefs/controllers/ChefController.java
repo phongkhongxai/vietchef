@@ -1,11 +1,13 @@
 package com.spring2025.vietchefs.controllers;
 
 import com.spring2025.vietchefs.models.payload.dto.DishDto;
+import com.spring2025.vietchefs.models.payload.dto.UserDto;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefRequestDto;
 import com.spring2025.vietchefs.models.payload.responseModel.ChefResponseDto;
 import com.spring2025.vietchefs.models.payload.responseModel.ChefsResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.DishesResponse;
 import com.spring2025.vietchefs.services.ChefService;
+import com.spring2025.vietchefs.services.UserService;
 import com.spring2025.vietchefs.utils.AppConstants;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -13,6 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -20,6 +24,8 @@ import org.springframework.web.bind.annotation.*;
 public class ChefController {
     @Autowired
     private ChefService chefService;
+    @Autowired
+    private UserService userService;
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_ADMIN')")
     @PostMapping("/register/{userId}")
@@ -32,12 +38,34 @@ public class ChefController {
     public ResponseEntity<ChefResponseDto> approveChef(@PathVariable Long chefId) {
         return ResponseEntity.ok(chefService.approveChef(chefId));
     }
-
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PutMapping("/reject/{chefId}")
+    public ResponseEntity<ChefResponseDto> rejectChef(@PathVariable Long chefId,@RequestParam String reason) {
+        return ResponseEntity.ok(chefService.rejectChef(chefId, reason));
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @GetMapping("/pending")
+    public ChefsResponse getAllChefsPending(
+            @RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
+            @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
+            @RequestParam(value = "sortBy", defaultValue = AppConstants.DEFAULT_SORT_BY, required = false) String sortBy,
+            @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir){
+        return chefService.getAllChefsPending(pageNo, pageSize, sortBy, sortDir);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
     @PutMapping("/{chefId}")
     public ResponseEntity<ChefResponseDto> updateChef(@PathVariable Long chefId, @RequestBody ChefRequestDto chefRequestDto) {
         return ResponseEntity.ok(chefService.updateChef(chefId,chefRequestDto));
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_CHEF')")
+    @PutMapping("/my-chef")
+    public ResponseEntity<ChefResponseDto> updateChef(@AuthenticationPrincipal UserDetails userDetails, @RequestBody ChefRequestDto chefRequestDto) {
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        return ResponseEntity.ok(chefService.updateChefBySelf(bto.getId(),chefRequestDto));
     }
     @GetMapping("/{chefId}")
     public ResponseEntity<?> getChefById(@PathVariable Long chefId){
