@@ -48,7 +48,7 @@ public class JwtTokenProvider {
                 .claim("userId", userId)
                 .claim("roleName", role)
                 .claim("avatarUrl", user.getAvatarUrl());
-        if ("ROLE_CHEF".equals(role) && user.getChef() != null) {
+        if (user.getChef() != null) {
             builder.claim("chefId", user.getChef().getId());
         }
         return builder
