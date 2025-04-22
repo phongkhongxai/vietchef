@@ -13,11 +13,14 @@ public interface ChefService {
     void updateReputation(Chef chef, int delta);
     ChefResponseDto getChefById(Long id);
     ChefResponseDto registerChefRequest(Long userId, ChefRequestDto requestDto); // Đăng ký làm đầu bếp (Chờ duyệt)
-    ChefResponseDto approveChef(Long chefId); // Admin duyệt Chef
+    ChefResponseDto approveChef(Long chefId);
+    ChefResponseDto rejectChef(Long chefId, String reason);
+    ChefsResponse getAllChefsPending(int pageNo, int pageSize, String sortBy, String sortDir);
     ChefsResponse getAllChefs(int pageNo, int pageSize, String sortBy, String sortDir); // Lấy danh sách tất cả đầu bếp
     ChefsResponse getAllChefsNearBy( double customerLat, double customerLng, double distance,int pageNo, int pageSize, String sortBy, String sortDir);
     ChefsResponse getAllChefsNearBySearch(String keySearch, double customerLat, double customerLng, double distance,int pageNo, int pageSize, String sortBy, String sortDir);
     ChefResponseDto updateChef(Long chefId, ChefRequestDto requestDto); // Cập nhật thông tin đầu bếp
+    ChefResponseDto updateChefBySelf(Long userId, ChefRequestDto requestDto);
     void deleteChef(Long chefId); // Xóa đầu bếp (Chỉ Admin)
 
 
