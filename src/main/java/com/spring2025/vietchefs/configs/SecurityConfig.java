@@ -4,6 +4,7 @@ package com.spring2025.vietchefs.configs;
 
 import com.spring2025.vietchefs.security.JwtAuthenticationEntryPoint;
 import com.spring2025.vietchefs.security.JwtAuthenticationFilter;
+import io.swagger.v3.oas.models.servers.Server;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -66,7 +67,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {add
         http.csrf((csrf) -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests((authorize) ->
@@ -122,7 +123,10 @@ public class SecurityConfig {
                                         .bearerFormat("JWT")
                         )
                 )
-                .addSecurityItem(new SecurityRequirement().addList("Bearer Authentication"));
+                .addSecurityItem(new SecurityRequirement().addList("Bearer Authentication"))//;
+                .servers(Arrays.asList(
+                        new Server().url("https://vietchef.ddns.net")  // Đảm bảo Swagger sử dụng HTTPS
+                ));
     }
 
 
