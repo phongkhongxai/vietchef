@@ -17,6 +17,7 @@ public class ReviewDetailResponse {
     private Long id;
     private Long userId;
     private String userName;
+    private String userAvatar;
     private Long chefId;
     private String chefName;
     private Long bookingId;
