@@ -160,9 +160,9 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     }
 
     @Override
-    public BookingDetailsResponse getBookingDetailsByChef(Long chefId, int pageNo, int pageSize, String sortBy, String sortDir) {
-        Chef chef = chefRepository.findById(chefId)
-                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"Chef not found with id: "+ chefId));
+    public BookingDetailsResponse getBookingDetailsByChef(Long userId, int pageNo, int pageSize, String sortBy, String sortDir) {
+        Chef chef = chefRepository.findByUserId(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"Chef not found with userId: "+ userId));
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
                 : Sort.by(sortBy).descending();
 
@@ -197,9 +197,9 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     }
 
     @Override
-    public BookingDetailsResponse getBookingDetailsByChefStatus(Long chefId, List<String> statusList, int pageNo, int pageSize, String sortBy, String sortDir) {
-        Chef chef = chefRepository.findById(chefId)
-                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"Chef not found with id: "+ chefId));
+    public BookingDetailsResponse getBookingDetailsByChefStatus(Long userId, List<String> statusList, int pageNo, int pageSize, String sortBy, String sortDir) {
+        Chef chef = chefRepository.findByUserId(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"Chef not found with userId: "+ userId));
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
                 : Sort.by(sortBy).descending();
         // create Pageable instance

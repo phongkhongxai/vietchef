@@ -50,6 +50,8 @@ public class ChefServiceImpl implements ChefService {
     @Autowired
     private CalculateService calculateService;
     @Autowired
+    private EmailVerificationService emailVerificationService;
+    @Autowired
     private ReviewService reviewService;
 
     @Override
@@ -116,7 +118,6 @@ public class ChefServiceImpl implements ChefService {
         if (chefRepository.findByUser(user).isPresent()) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef profile already exists for this user.");
         }
-
         // Đặt trạng thái chờ duyệt (PENDING)
         Chef chef = new Chef();
         chef.setUser(user);
@@ -145,7 +146,6 @@ public class ChefServiceImpl implements ChefService {
         if (!chef.getStatus().equals("PENDING")) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef is not in PENDING status.");
         }
-
         // Đặt trạng thái thành ACTIVE
         chef.setStatus("ACTIVE");
 
@@ -159,7 +159,52 @@ public class ChefServiceImpl implements ChefService {
         walletService.updateWalletType(user.getId(), "CHEF");
 
         chefRepository.save(chef);
+        emailVerificationService.sendChefApprovalEmail(chef.getUser());
         return modelMapper.map(chef, ChefResponseDto.class);
+    }
+
+    @Override
+    public ChefResponseDto rejectChef(Long chefId, String reason) {
+        Chef chef = chefRepository.findById(chefId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found with id: " + chefId));
+
+        if (!chef.getStatus().equals("PENDING")) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef is not in PENDING status.");
+        }
+        chef.setStatus("REJECTED");
+        chefRepository.save(chef);
+        emailVerificationService.sendChefRejectionEmail(chef.getUser(), reason);
+
+        return modelMapper.map(chef, ChefResponseDto.class);
+    }
+
+    @Override
+    public ChefsResponse getAllChefsPending(int pageNo, int pageSize, String sortBy, String sortDir) {
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+
+        Page<Chef> chefs = chefRepository.findByStatusAndIsDeletedFalse("PENDING", pageable);
+
+        // get content for page object
+        List<Chef> listOfChefs = chefs.getContent();
+
+        List<ChefResponseDto> content = listOfChefs.stream()
+                .map(chef -> {
+                    ChefResponseDto dto = modelMapper.map(chef, ChefResponseDto.class);
+                    dto.setAverageRating(reviewService.getAverageRatingForChef(chef.getId()));
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        ChefsResponse templatesResponse = new ChefsResponse();
+        templatesResponse.setContent(content);
+        templatesResponse.setPageNo(chefs.getNumber());
+        templatesResponse.setPageSize(chefs.getSize());
+        templatesResponse.setTotalElements(chefs.getTotalElements());
+        templatesResponse.setTotalPages(chefs.getTotalPages());
+        templatesResponse.setLast(chefs.isLast());
+        return templatesResponse;
     }
 
     @Override
@@ -313,6 +358,21 @@ public class ChefServiceImpl implements ChefService {
     public ChefResponseDto updateChef(Long chefId, ChefRequestDto requestDto) {
         Chef chef = chefRepository.findById(chefId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found with id: " + chefId));
+
+        chef.setBio(requestDto.getBio() != null ? requestDto.getBio() : chef.getBio());
+        chef.setDescription(requestDto.getDescription() != null ? requestDto.getDescription() : chef.getDescription());
+        chef.setAddress(requestDto.getAddress() != null ? requestDto.getAddress() : chef.getAddress());
+        chef.setPrice(requestDto.getPrice() != null ? requestDto.getPrice() : chef.getPrice());
+        chef.setMaxServingSize(requestDto.getMaxServingSize() != null ? requestDto.getMaxServingSize() : chef.getMaxServingSize());
+
+        chefRepository.save(chef);
+        return modelMapper.map(chef, ChefResponseDto.class);
+    }
+
+    @Override
+    public ChefResponseDto updateChefBySelf(Long userId, ChefRequestDto requestDto) {
+        Chef chef = chefRepository.findByUserId(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found with user: " + userId));
 
         chef.setBio(requestDto.getBio() != null ? requestDto.getBio() : chef.getBio());
         chef.setDescription(requestDto.getDescription() != null ? requestDto.getDescription() : chef.getDescription());

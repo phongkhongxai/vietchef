@@ -12,6 +12,8 @@ public interface UserService {
     String deleteUser(Long id);
     void setUserBanStatus(Long userId, boolean banned);
     UsersResponse getAllUser(int pageNo, int pageSize, String sortBy, String sortDir);
+    UsersResponse getAllCustomer(int pageNo, int pageSize, String sortBy, String sortDir);
+    UsersResponse getAllChef(int pageNo, int pageSize, String sortBy, String sortDir);
     UserDto getProfileUserByUsernameOrEmail(String username, String email);
     UserDto updateProfile(Long userId, UserRequest userRequest);
     void changePassword(Long userId, ChangePasswordRequest request);

@@ -20,7 +20,6 @@ public interface ReviewService {
     ReviewResponse createReview(ReviewCreateRequest request, Long userId);
     ReviewResponse updateReview(Long id, ReviewUpdateRequest request, Long userId);
     void deleteReview(Long id);
-    
     ReviewResponse addChefResponse(Long reviewId, String response, Long chefId);
     
     BigDecimal calculateWeightedRating(Map<Long, BigDecimal> criteriaRatings);
