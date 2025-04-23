@@ -35,8 +35,8 @@ public class PaymentController {
     @PostMapping("/deposit")
     public Mono<String> depositToWallet(@RequestParam Long walletId,
                                         @RequestParam BigDecimal amount) {
-        String returnUrl = "http://35.240.147.10/api/v1/payment/success";
-        String cancelUrl = "http://35.240.147.10/api/v1/payment/cancel";
+        String returnUrl = "https://vietchef.ddns.net/api/v1/payment/success";
+        String cancelUrl = "https://vietchef.ddns.net/api/v1/payment/cancel";
         String currency = "USD";
         return paypalService.depositToWallet(walletId, amount, currency, returnUrl, cancelUrl);
     }
