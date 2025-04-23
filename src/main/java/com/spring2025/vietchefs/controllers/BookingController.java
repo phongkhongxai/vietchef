@@ -102,7 +102,7 @@ public class BookingController {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
         if (status != null && !status.isEmpty()) {
             List<String> statusList = List.of(status.toUpperCase());
-            return bookingDetailService.getBookingDetailsByCustomerStatus(bto.getId(), statusList, pageNo, pageSize, sortBy, sortDir);
+            return bookingDetailService.getBookingDetailsByChefStatus(bto.getId(), statusList, pageNo, pageSize, sortBy, sortDir);
         } else {
             return bookingDetailService.getBookingDetailsByChef(bto.getId(), pageNo, pageSize, sortBy, sortDir);
         }
