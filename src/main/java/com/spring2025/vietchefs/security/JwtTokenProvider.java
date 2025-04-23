@@ -33,7 +33,6 @@ public class JwtTokenProvider {
         String token = generateToken(authentication, user, jwtRefreshExpiration);
         return token;
     }
-
     public String generateToken(Authentication authentication, User user, long expiration) {
         String username = authentication.getName();
         String userId = user.getId().toString();
