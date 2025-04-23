@@ -360,6 +360,7 @@ public class ReviewServiceImpl implements ReviewService {
         response.setId(review.getId());
         response.setUserId(review.getUser().getId());
         response.setUserName(review.getUser().getFullName());
+        response.setUserAvatar(review.getUser().getAvatarUrl());
         response.setChefId(review.getChef().getId());
         response.setBookingId(review.getBooking() != null ? review.getBooking().getId() : null);
         response.setRating(review.getRating());

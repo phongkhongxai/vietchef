@@ -102,7 +102,9 @@ public class ChefServiceImpl implements ChefService {
             throw new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found with id: "+ id);
 
         }
-        return modelMapper.map(chef.get(), ChefResponseDto.class);
+        ChefResponseDto result = modelMapper.map(chef.get(), ChefResponseDto.class);
+        result.setAverageRating(reviewService.getAverageRatingForChef(id));
+        return result;
     }
 
     @Override
