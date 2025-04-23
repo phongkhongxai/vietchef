@@ -116,7 +116,7 @@ public class AuthController {
         Map<String, Object> userInfo = googleOAuth2Service.getUserInfoFromCode(code);
         AuthenticationResponse authResponse = authService.authenticateWithOAuth2("google", userInfo);
         String fullNameEncoded = URLEncoder.encode(authResponse.getFullName(), StandardCharsets.UTF_8);
-        String redirectUrl = "http://vietchef.ddns.net/no-auth/oauth-redirect"
+        String redirectUrl = "https://vietchef.ddns.net/no-auth/oauth-redirect"
                 + "?access_token=" + authResponse.getAccessToken()
                 + "&refresh_token=" + authResponse.getRefreshToken() +"&full_name="+fullNameEncoded;
         response.sendRedirect(redirectUrl);
