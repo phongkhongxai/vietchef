@@ -42,8 +42,8 @@ public class PaymentController {
     }
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
-    @PostMapping("/withdrawl")
-    public Mono<String> withdrawlWallet(@RequestParam Long walletId,
+    @PostMapping("/withdrawal")
+    public Mono<String> withdrawalWallet(@RequestParam Long walletId,
                                         @RequestParam BigDecimal amount) {
         String currency = "USD";
         String note ="From VietChef with love.";
