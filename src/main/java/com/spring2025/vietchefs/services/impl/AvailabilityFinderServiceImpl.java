@@ -182,6 +182,9 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Customer location cannot be empty");
         }
         
+        // Lưu thời gian request hiện tại
+        LocalDateTime requestTime = LocalDateTime.now();
+        
         // Lấy thông tin chef
         Chef chef = chefRepository.findById(chefId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, 
@@ -303,9 +306,22 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         
         System.out.println("DEBUG: After final filtering, found " + finalSlots.size() + " slots");
         
+        // Lọc các khung giờ theo business rule: phải sau thời gian request ít nhất 24h
+        List<AvailableTimeSlotResponse> validTimeSlots = finalSlots.stream()
+                .filter(slot -> {
+                    // Tạo LocalDateTime từ date và startTime của slot
+                    LocalDateTime slotStartDateTime = LocalDateTime.of(slot.getDate(), slot.getStartTime());
+                    
+                    // Kiểm tra xem slot có sau thời gian request ít nhất 24h không
+                    return slotStartDateTime.isAfter(requestTime.plusHours(24));
+                })
+                .collect(Collectors.toList());
+        
+        System.out.println("DEBUG: After 24h business rule filtering, found " + validTimeSlots.size() + " slots");
+        
         // Convert time slots from chef's timezone to customer's timezone
         List<AvailableTimeSlotResponse> convertedSlots = new ArrayList<>();
-        for (AvailableTimeSlotResponse slot : finalSlots) {
+        for (AvailableTimeSlotResponse slot : validTimeSlots) {
             // Create LocalDateTime objects for conversion
             LocalDateTime startDateTime = LocalDateTime.of(slot.getDate(), slot.getStartTime());
             LocalDateTime endDateTime = LocalDateTime.of(slot.getDate(), slot.getEndTime());
@@ -380,6 +396,9 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         if (customerLocation == null || customerLocation.trim().isEmpty()) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Customer location cannot be empty");
         }
+        
+        // Lưu thời gian request hiện tại
+        LocalDateTime requestTime = LocalDateTime.now();
 
         Chef chef = chefRepository.findById(chefId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,
@@ -509,9 +528,22 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         
         System.out.println("DEBUG: After final filtering, found " + finalSlots.size() + " slots");
         
+        // Lọc các khung giờ theo business rule: phải sau thời gian request ít nhất 24h
+        List<AvailableTimeSlotResponse> validTimeSlots = finalSlots.stream()
+                .filter(slot -> {
+                    // Tạo LocalDateTime từ date và startTime của slot
+                    LocalDateTime slotStartDateTime = LocalDateTime.of(slot.getDate(), slot.getStartTime());
+                    
+                    // Kiểm tra xem slot có sau thời gian request ít nhất 24h không
+                    return slotStartDateTime.isAfter(requestTime.plusHours(24));
+                })
+                .collect(Collectors.toList());
+        
+        System.out.println("DEBUG: After 24h business rule filtering, found " + validTimeSlots.size() + " slots");
+        
         // Convert time slots from chef's timezone to customer's timezone
         List<AvailableTimeSlotResponse> convertedSlots = new ArrayList<>();
-        for (AvailableTimeSlotResponse slot : finalSlots) {
+        for (AvailableTimeSlotResponse slot : validTimeSlots) {
             // Create LocalDateTime objects for conversion
             LocalDateTime startDateTime = LocalDateTime.of(slot.getDate(), slot.getStartTime());
             LocalDateTime endDateTime = LocalDateTime.of(slot.getDate(), slot.getEndTime());
