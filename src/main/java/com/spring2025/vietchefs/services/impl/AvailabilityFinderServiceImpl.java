@@ -1,20 +1,25 @@
 package com.spring2025.vietchefs.services.impl;
 
-import com.spring2025.vietchefs.models.entity.Booking;
-import com.spring2025.vietchefs.models.entity.BookingDetail;
 import com.spring2025.vietchefs.models.entity.Chef;
 import com.spring2025.vietchefs.models.entity.ChefBlockedDate;
 import com.spring2025.vietchefs.models.entity.ChefSchedule;
-import com.spring2025.vietchefs.models.entity.ChefTimeSettings;
+import com.spring2025.vietchefs.models.entity.Booking;
+import com.spring2025.vietchefs.models.entity.BookingDetail;
 import com.spring2025.vietchefs.models.entity.User;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.requestModel.AvailableTimeSlotRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.AvailableTimeSlotResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.DistanceResponse;
-import com.spring2025.vietchefs.repositories.*;
+import com.spring2025.vietchefs.repositories.BookingDetailRepository;
+import com.spring2025.vietchefs.repositories.ChefBlockedDateRepository;
+import com.spring2025.vietchefs.repositories.ChefRepository;
+import com.spring2025.vietchefs.repositories.ChefScheduleRepository;
+import com.spring2025.vietchefs.repositories.PackageRepository;
+import com.spring2025.vietchefs.repositories.UserRepository;
 import com.spring2025.vietchefs.services.AvailabilityFinderService;
 import com.spring2025.vietchefs.services.BookingConflictService;
 import com.spring2025.vietchefs.services.impl.CalculateService;
+import com.spring2025.vietchefs.services.impl.DistanceService;
 import com.spring2025.vietchefs.utils.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -54,9 +59,6 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
     
     @Autowired
     private ChefBlockedDateRepository blockedDateRepository;
-    
-    @Autowired
-    private ChefTimeSettingsRepository timeSettingsRepository;
     
     @Autowired
     private BookingConflictService bookingConflictService;
@@ -428,14 +430,9 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
     private List<AvailableTimeSlotResponse> findAvailableTimeSlots(
             Chef chef, LocalDate startDate, LocalDate endDate) {
         
-        // Lấy cài đặt thời gian của chef
-        ChefTimeSettings timeSettings = getChefTimeSettings(chef);
-        
-        // Áp dụng cài đặt thời gian
-        int prepTimeMinutes = timeSettings.getStandardPrepTime() != null ? 
-                timeSettings.getStandardPrepTime() : DEFAULT_PREP_TIME_MINUTES;
-        int cleanupTimeMinutes = timeSettings.getStandardCleanupTime() != null ? 
-                timeSettings.getStandardCleanupTime() : DEFAULT_CLEANUP_TIME_MINUTES;
+        // Using default preparation and cleanup times directly
+        int prepTimeMinutes = DEFAULT_PREP_TIME_MINUTES;
+        int cleanupTimeMinutes = DEFAULT_CLEANUP_TIME_MINUTES;
         
         List<AvailableTimeSlotResponse> availableSlots = new ArrayList<>();
         LocalDate currentDate = startDate;
@@ -642,25 +639,6 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
      */
     private boolean hasTimeOverlap(LocalTime start1, LocalTime end1, LocalTime start2, LocalTime end2) {
         return start1.isBefore(end2) && end1.isAfter(start2);
-    }
-    
-    /**
-     * Lấy cài đặt thời gian của chef
-     */
-    private ChefTimeSettings getChefTimeSettings(Chef chef) {
-        return timeSettingsRepository.findByChef(chef)
-                .orElse(createDefaultTimeSettings(chef));
-    }
-    
-    /**
-     * Tạo cài đặt thời gian mặc định cho chef
-     */
-    private ChefTimeSettings createDefaultTimeSettings(Chef chef) {
-        ChefTimeSettings settings = new ChefTimeSettings();
-        settings.setChef(chef);
-        settings.setStandardPrepTime(DEFAULT_PREP_TIME_MINUTES);
-        settings.setStandardCleanupTime(DEFAULT_CLEANUP_TIME_MINUTES);
-        return settings;
     }
     
     /**

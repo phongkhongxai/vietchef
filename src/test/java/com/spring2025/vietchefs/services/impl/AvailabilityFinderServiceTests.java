@@ -50,9 +50,6 @@ public class AvailabilityFinderServiceTests {
     private ChefBlockedDateRepository blockedDateRepository;
     
     @Mock
-    private ChefTimeSettingsRepository timeSettingsRepository;
-    
-    @Mock
     private BookingConflictService bookingConflictService;
     
     @Mock
