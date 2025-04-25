@@ -1,5 +1,6 @@
 package com.spring2025.vietchefs.controllers;
 
+import com.spring2025.vietchefs.models.payload.requestModel.ChefBlockedDateRangeRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefBlockedDateRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefBlockedDateUpdateRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.ChefBlockedDateResponse;
@@ -110,5 +111,18 @@ public class ChefBlockedDateController {
     public ResponseEntity<String> deleteBlockedDate(@PathVariable Long blockId) {
         blockedDateService.deleteBlockedDate(blockId);
         return ResponseEntity.ok("Blocked date deleted successfully");
+    }
+
+    /**
+     * Tạo mới nhiều ngày bị chặn trong khoảng ngày cho chef hiện tại
+     * Endpoint: POST /api/v1/chef-blocked-dates/range
+     */
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PostMapping("/range")
+    public ResponseEntity<List<ChefBlockedDateResponse>> createBlockedDateRange(
+            @Valid @RequestBody ChefBlockedDateRangeRequest request) {
+        List<ChefBlockedDateResponse> responses = blockedDateService.createBlockedDateRangeForCurrentChef(request);
+        return new ResponseEntity<>(responses, HttpStatus.CREATED);
     }
 } 

@@ -1,5 +1,6 @@
 package com.spring2025.vietchefs.services;
 
+import com.spring2025.vietchefs.models.payload.requestModel.ChefBlockedDateRangeRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefBlockedDateRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefBlockedDateUpdateRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.ChefBlockedDateResponse;
@@ -27,6 +28,11 @@ public interface ChefBlockedDateService {
      * Tạo ngày bị chặn mới cho chef hiện tại
      */
     ChefBlockedDateResponse createBlockedDateForCurrentChef(ChefBlockedDateRequest request);
+
+    /**
+     * Tạo nhiều ngày bị chặn trong một khoảng thời gian cho chef hiện tại
+     */
+    List<ChefBlockedDateResponse> createBlockedDateRangeForCurrentChef(ChefBlockedDateRangeRequest request);
 
     /**
      * Lấy tất cả ngày bị chặn của chef hiện tại
