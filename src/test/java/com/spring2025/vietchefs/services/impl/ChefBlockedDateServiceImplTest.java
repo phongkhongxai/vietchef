@@ -6,6 +6,7 @@ import com.spring2025.vietchefs.models.entity.User;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefBlockedDateRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefBlockedDateUpdateRequest;
+import com.spring2025.vietchefs.models.payload.requestModel.ChefBlockedDateRangeRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.ChefBlockedDateResponse;
 import com.spring2025.vietchefs.repositories.ChefBlockedDateRepository;
 import com.spring2025.vietchefs.repositories.ChefRepository;
@@ -22,6 +23,7 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpStatus;
+import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -518,6 +520,298 @@ public class ChefBlockedDateServiceImplTest {
             // Verify repository was called with correct parameters
             verify(blockedDateRepository).findByChefAndBlockedDateAndIsDeletedFalse(
                     eq(testChef), eq(LocalDate.of(2023, 7, 15)));
+        }
+    }
+
+    @Test
+    void createBlockedDateRangeForCurrentChef_ShouldCreateMultipleBlockedDates_WhenValidRangeProvided() {
+        // Arrange
+        try (MockedStatic<SecurityUtils> securityUtils = mockStatic(SecurityUtils.class)) {
+            securityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            
+            // Setup test dates
+            LocalDate startDate = LocalDate.of(2023, 7, 15);
+            LocalDate endDate = LocalDate.of(2023, 7, 17);
+            LocalTime startTime = LocalTime.of(9, 0);
+            LocalTime endTime = LocalTime.of(14, 0);
+            
+            ChefBlockedDateRangeRequest rangeRequest = new ChefBlockedDateRangeRequest();
+            rangeRequest.setStartDate(startDate);
+            rangeRequest.setEndDate(endDate);
+            rangeRequest.setStartTime(startTime);
+            rangeRequest.setEndTime(endTime);
+            rangeRequest.setReason("Vacation");
+            
+            when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
+            when(chefRepository.findByUser(any(User.class))).thenReturn(Optional.of(testChef));
+            when(scheduleRepository.findByChefAndDayOfWeekAndIsDeletedFalse(any(Chef.class), anyInt()))
+                    .thenReturn(List.of());
+            when(bookingConflictService.hasBookingConflict(any(), any(), any(), any())).thenReturn(false);
+            when(blockedDateRepository.findByChefAndBlockedDateAndIsDeletedFalse(any(Chef.class), any(LocalDate.class)))
+                    .thenReturn(List.of());
+            
+            // Setup saved blocked dates
+            ChefBlockedDate savedDay1 = new ChefBlockedDate();
+            savedDay1.setBlockId(1L);
+            savedDay1.setChef(testChef);
+            savedDay1.setBlockedDate(startDate);
+            savedDay1.setStartTime(startTime);
+            savedDay1.setEndTime(LocalTime.of(22, 0)); // MAX_WORK_HOUR
+            savedDay1.setReason("Vacation");
+            
+            ChefBlockedDate savedDay2 = new ChefBlockedDate();
+            savedDay2.setBlockId(2L);
+            savedDay2.setChef(testChef);
+            savedDay2.setBlockedDate(startDate.plusDays(1));
+            savedDay2.setStartTime(LocalTime.of(8, 0)); // MIN_WORK_HOUR
+            savedDay2.setEndTime(LocalTime.of(22, 0)); // MAX_WORK_HOUR
+            savedDay2.setReason("Vacation");
+            
+            ChefBlockedDate savedDay3 = new ChefBlockedDate();
+            savedDay3.setBlockId(3L);
+            savedDay3.setChef(testChef);
+            savedDay3.setBlockedDate(endDate);
+            savedDay3.setStartTime(LocalTime.of(8, 0)); // MIN_WORK_HOUR
+            savedDay3.setEndTime(endTime);
+            savedDay3.setReason("Vacation");
+            
+            // Setup responses
+            ChefBlockedDateResponse response1 = new ChefBlockedDateResponse();
+            response1.setBlockId(1L);
+            
+            ChefBlockedDateResponse response2 = new ChefBlockedDateResponse();
+            response2.setBlockId(2L);
+            
+            ChefBlockedDateResponse response3 = new ChefBlockedDateResponse();
+            response3.setBlockId(3L);
+            
+            // Mock the save operation with a simple implementation
+            when(blockedDateRepository.save(any(ChefBlockedDate.class))).thenAnswer(invocation -> {
+                ChefBlockedDate date = invocation.getArgument(0);
+                if (date.getBlockedDate().isEqual(startDate)) {
+                    return savedDay1;
+                } else if (date.getBlockedDate().isEqual(startDate.plusDays(1))) {
+                    return savedDay2;
+                } else if (date.getBlockedDate().isEqual(endDate)) {
+                    return savedDay3;
+                }
+                return new ChefBlockedDate(); // Fallback
+            });
+            
+            // Mock mapping of saved objects to responses
+            when(modelMapper.map(eq(savedDay1), eq(ChefBlockedDateResponse.class))).thenReturn(response1);
+            when(modelMapper.map(eq(savedDay2), eq(ChefBlockedDateResponse.class))).thenReturn(response2);
+            when(modelMapper.map(eq(savedDay3), eq(ChefBlockedDateResponse.class))).thenReturn(response3);
+            
+            // Act
+            List<ChefBlockedDateResponse> results = blockedDateService.createBlockedDateRangeForCurrentChef(rangeRequest);
+            
+            // Assert
+            assertNotNull(results);
+            assertEquals(3, results.size());
+            
+            // Verify the service interacted with the repository 3 times (once for each day)
+            verify(blockedDateRepository, times(3)).save(any(ChefBlockedDate.class));
+            
+            // Verify date, time ranges with explicit argument captors
+            ArgumentCaptor<ChefBlockedDate> dateCaptor = ArgumentCaptor.forClass(ChefBlockedDate.class);
+            verify(blockedDateRepository, times(3)).save(dateCaptor.capture());
+            
+            List<ChefBlockedDate> capturedDates = dateCaptor.getAllValues();
+            assertEquals(3, capturedDates.size());
+            
+            // First day (startDate)
+            ChefBlockedDate firstDay = capturedDates.stream()
+                .filter(d -> d.getBlockedDate().equals(startDate))
+                .findFirst()
+                .orElse(null);
+            assertNotNull(firstDay);
+            assertEquals(startTime, firstDay.getStartTime());
+            assertEquals(LocalTime.of(22, 0), firstDay.getEndTime());
+            
+            // Middle day
+            ChefBlockedDate middleDay = capturedDates.stream()
+                .filter(d -> d.getBlockedDate().equals(startDate.plusDays(1)))
+                .findFirst()
+                .orElse(null);
+            assertNotNull(middleDay);
+            assertEquals(LocalTime.of(8, 0), middleDay.getStartTime());
+            assertEquals(LocalTime.of(22, 0), middleDay.getEndTime());
+            
+            // Last day (endDate)
+            ChefBlockedDate lastDay = capturedDates.stream()
+                .filter(d -> d.getBlockedDate().equals(endDate))
+                .findFirst()
+                .orElse(null);
+            assertNotNull(lastDay);
+            assertEquals(LocalTime.of(8, 0), lastDay.getStartTime());
+            assertEquals(endTime, lastDay.getEndTime());
+        }
+    }
+
+    @Test
+    void createBlockedDateRangeForCurrentChef_ShouldCreateSingleBlockedDate_WhenStartAndEndDateAreSame() {
+        // Arrange
+        try (MockedStatic<SecurityUtils> securityUtils = mockStatic(SecurityUtils.class)) {
+            securityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            
+            // Setup test dates - same start and end date
+            LocalDate singleDate = LocalDate.of(2023, 7, 15);
+            LocalTime startTime = LocalTime.of(9, 0);
+            LocalTime endTime = LocalTime.of(14, 0);
+            
+            ChefBlockedDateRangeRequest rangeRequest = new ChefBlockedDateRangeRequest();
+            rangeRequest.setStartDate(singleDate);
+            rangeRequest.setEndDate(singleDate);
+            rangeRequest.setStartTime(startTime);
+            rangeRequest.setEndTime(endTime);
+            rangeRequest.setReason("Single day off");
+            
+            when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
+            when(chefRepository.findByUser(any(User.class))).thenReturn(Optional.of(testChef));
+            when(scheduleRepository.findByChefAndDayOfWeekAndIsDeletedFalse(any(Chef.class), anyInt()))
+                    .thenReturn(List.of());
+            when(bookingConflictService.hasBookingConflict(any(), any(), any(), any())).thenReturn(false);
+            when(blockedDateRepository.findByChefAndBlockedDateAndIsDeletedFalse(any(Chef.class), any(LocalDate.class)))
+                    .thenReturn(List.of());
+            
+            // Setup saved blocked date
+            ChefBlockedDate savedDate = new ChefBlockedDate();
+            savedDate.setBlockId(1L);
+            savedDate.setChef(testChef);
+            savedDate.setBlockedDate(singleDate);
+            savedDate.setStartTime(startTime);
+            savedDate.setEndTime(endTime);
+            savedDate.setReason("Single day off");
+            
+            // Setup response
+            ChefBlockedDateResponse response = new ChefBlockedDateResponse();
+            response.setBlockId(1L);
+            
+            when(blockedDateRepository.save(any(ChefBlockedDate.class))).thenReturn(savedDate);
+            when(modelMapper.map(any(ChefBlockedDate.class), eq(ChefBlockedDateResponse.class))).thenReturn(response);
+            
+            // Act
+            List<ChefBlockedDateResponse> results = blockedDateService.createBlockedDateRangeForCurrentChef(rangeRequest);
+            
+            // Assert
+            assertNotNull(results);
+            assertEquals(1, results.size());
+            
+            // Verify exactly one blocked date was created
+            verify(blockedDateRepository, times(1)).save(any(ChefBlockedDate.class));
+            
+            // Verify the single day uses the exact start and end times from the request
+            verify(blockedDateRepository).save(argThat(date -> 
+                date.getBlockedDate().equals(singleDate) &&
+                date.getStartTime().equals(startTime) &&
+                date.getEndTime().equals(endTime)));
+        }
+    }
+
+    @Test
+    void createBlockedDateRangeForCurrentChef_ShouldThrowException_WhenStartDateAfterEndDate() {
+        // Arrange
+        try (MockedStatic<SecurityUtils> securityUtils = mockStatic(SecurityUtils.class)) {
+            securityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            
+            // Setup invalid date range (start date after end date)
+            LocalDate startDate = LocalDate.of(2023, 7, 20);
+            LocalDate endDate = LocalDate.of(2023, 7, 15);
+            
+            ChefBlockedDateRangeRequest invalidRangeRequest = new ChefBlockedDateRangeRequest();
+            invalidRangeRequest.setStartDate(startDate);
+            invalidRangeRequest.setEndDate(endDate);
+            invalidRangeRequest.setStartTime(LocalTime.of(9, 0));
+            invalidRangeRequest.setEndTime(LocalTime.of(14, 0));
+            
+            when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
+            when(chefRepository.findByUser(any(User.class))).thenReturn(Optional.of(testChef));
+            
+            // Act & Assert
+            VchefApiException exception = assertThrows(VchefApiException.class, () -> {
+                blockedDateService.createBlockedDateRangeForCurrentChef(invalidRangeRequest);
+            });
+            
+            assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+            assertTrue(exception.getMessage().contains("Start date must be before or equal to end date"));
+            
+            // Verify no save operations were attempted
+            verify(blockedDateRepository, never()).save(any(ChefBlockedDate.class));
+        }
+    }
+
+    @Test
+    void createBlockedDateRangeForCurrentChef_ShouldThrowException_WhenTimeConstraintViolated() {
+        // Arrange
+        try (MockedStatic<SecurityUtils> securityUtils = mockStatic(SecurityUtils.class)) {
+            securityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            
+            // Time outside allowed working hours (8:00-22:00)
+            LocalTime invalidStartTime = LocalTime.of(6, 0); // Before 8:00
+            
+            ChefBlockedDateRangeRequest invalidTimeRequest = new ChefBlockedDateRangeRequest();
+            invalidTimeRequest.setStartDate(LocalDate.of(2023, 7, 15));
+            invalidTimeRequest.setEndDate(LocalDate.of(2023, 7, 17));
+            invalidTimeRequest.setStartTime(invalidStartTime);
+            invalidTimeRequest.setEndTime(LocalTime.of(14, 0));
+            
+            when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
+            when(chefRepository.findByUser(any(User.class))).thenReturn(Optional.of(testChef));
+            
+            // Act & Assert
+            VchefApiException exception = assertThrows(VchefApiException.class, () -> {
+                blockedDateService.createBlockedDateRangeForCurrentChef(invalidTimeRequest);
+            });
+            
+            assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+            assertTrue(exception.getMessage().contains("Blocked time must be between"));
+            
+            // Verify no save operations were attempted
+            verify(blockedDateRepository, never()).save(any(ChefBlockedDate.class));
+        }
+    }
+
+    @Test
+    void createBlockedDateRangeForCurrentChef_ShouldThrowException_WhenConflictExists() {
+        // Arrange
+        try (MockedStatic<SecurityUtils> securityUtils = mockStatic(SecurityUtils.class)) {
+            securityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            
+            // Setup test dates
+            LocalDate startDate = LocalDate.of(2023, 7, 15);
+            LocalDate endDate = LocalDate.of(2023, 7, 17);
+            
+            ChefBlockedDateRangeRequest rangeRequest = new ChefBlockedDateRangeRequest();
+            rangeRequest.setStartDate(startDate);
+            rangeRequest.setEndDate(endDate);
+            rangeRequest.setStartTime(LocalTime.of(9, 0));
+            rangeRequest.setEndTime(LocalTime.of(14, 0));
+            
+            when(userRepository.findById(anyLong())).thenReturn(Optional.of(testUser));
+            when(chefRepository.findByUser(any(User.class))).thenReturn(Optional.of(testChef));
+            
+            // Create an existing blocked date that conflicts
+            ChefBlockedDate existingBlockedDate = new ChefBlockedDate();
+            existingBlockedDate.setBlockId(5L);
+            existingBlockedDate.setChef(testChef);
+            existingBlockedDate.setBlockedDate(startDate);
+            existingBlockedDate.setStartTime(LocalTime.of(10, 0));
+            existingBlockedDate.setEndTime(LocalTime.of(13, 0));
+            
+            when(blockedDateRepository.findByChefAndBlockedDateAndIsDeletedFalse(eq(testChef), eq(startDate)))
+                    .thenReturn(List.of(existingBlockedDate));
+            
+            // Act & Assert
+            VchefApiException exception = assertThrows(VchefApiException.class, () -> {
+                blockedDateService.createBlockedDateRangeForCurrentChef(rangeRequest);
+            });
+            
+            assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+            assertTrue(exception.getMessage().contains("conflicts with an existing blocked date"));
+            
+            // Verify no save operations were attempted
+            verify(blockedDateRepository, never()).save(any(ChefBlockedDate.class));
         }
     }
 }
