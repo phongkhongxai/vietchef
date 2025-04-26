@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/favorite-chefs")
-@Tag(name = "Favorite Chef Controller", description = "API for managing favorite chefs")
 public class FavoriteChefController {
 
     private final FavoriteChefService favoriteChefService;
