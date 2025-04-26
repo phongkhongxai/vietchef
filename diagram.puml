@@ -2,110 +2,99 @@
 actor User
 participant Controller
 participant BookingService
-participant BookingDetailService
-participant PaymentCycleService
 participant NotificationService
 participant ModelMapper
 
-participant UserRepository
-participant ChefRepository
-participant PackageRepository
 participant BookingRepository
+participant WalletRepository
 participant BookingDetailRepository
-participant DishRepository
-participant PaymentCycleRepository
+participant CustomerTransactionRepository
 
 database Database
 
-User -> Controller : Gửi BookingRequestDto (LONG_TERM)
-Controller -> BookingService : createLongtermBooking(dto)
+User -> Controller : Gửi yêu cầu đặt cọc (bookingId, userId)
+Controller -> BookingService : depositBooking(bookingId, userId)
 
-BookingService -> UserRepository : findById(dto.customerId)
-UserRepository -> Database : Execute
-Database --> UserRepository : Customer
-UserRepository --> BookingService : Customer
-
-BookingService -> ChefRepository : findById(dto.chefId)
-ChefRepository -> Database : Execute
-Database --> ChefRepository : Chef
-ChefRepository --> BookingService : Chef
-
-BookingService -> PackageRepository : findById(dto.packageId)
-PackageRepository -> Database : Execute
-Database --> PackageRepository : Package
-PackageRepository --> BookingService : Package
-
-alt Chef không đủ uy tín
-    BookingService --> Controller : Throw VchefApiException
-end
-
-alt GuestCount > MaxServingSize
-    BookingService --> Controller : Throw VchefApiException
-end
-
-alt Package không nằm trong danh sách của Chef
-    BookingService --> Controller : Throw VchefApiException
-end
-
-alt Số lượng BookingDetail != Duration của Package
-    BookingService --> Controller : Throw VchefApiException
-end
-
-BookingService -> BookingRepository : save(new Booking)
+BookingService -> BookingRepository : findById(bookingId)
 BookingRepository -> Database : Execute
 Database --> BookingRepository : Booking
 BookingRepository --> BookingService : Booking
 
-loop for each BookingDetail in dto.bookingDetails
-    BookingService -> BookingService : isOverlappingWithExistingBookings()
-    alt Lịch trùng
-        BookingService -> List : add("Lịch bị trùng...")
-    else
-        BookingService -> BookingDetailService : createBookingDetail(booking, detailDto)
-
-        BookingDetailService -> DishRepository : findById(dishId)
-        DishRepository -> Database : Execute
-        Database --> DishRepository : Dish
-        DishRepository --> BookingDetailService : Dish
-
-        BookingDetailService -> BookingDetailRepository : save(detail)
-        BookingDetailRepository -> Database : Execute
-        Database --> BookingDetailRepository : BookingDetail
-        BookingDetailRepository --> BookingDetailService : BookingDetail
-        BookingDetailService --> BookingService : BookingDetail
-    end
+alt Booking không tồn tại
+    BookingService --> Controller : Throw VchefApiException (NOT_FOUND)
 end
 
-alt Có lịch bị trùng
-    BookingService --> Controller : Throw VchefApiException (với danh sách overlapMessages)
+alt Booking không ở trạng thái PENDING
+    BookingService --> Controller : Throw VchefApiException (BAD_REQUEST)
 end
 
-BookingService -> BookingRepository : save(booking với totalPrice + details)
-BookingRepository -> Database : Execute
-Database --> BookingRepository : Booking1
-BookingRepository --> BookingService : Booking1
+alt Booking không phải LONG_TERM
+    BookingService --> Controller : Throw VchefApiException (BAD_REQUEST)
+end
 
-BookingService -> PaymentCycleService : createPaymentCycles(booking)
-
-PaymentCycleService -> BookingDetailRepository : findByBookingOrderBySessionDateAsc(booking)
+BookingService -> BookingDetailRepository : findByBookingOrderBySessionDateAsc(booking)
 BookingDetailRepository -> Database : Execute
 Database --> BookingDetailRepository : List<BookingDetail>
-BookingDetailRepository --> PaymentCycleService : List<BookingDetail>
+BookingDetailRepository --> BookingService : List<BookingDetail>
 
-loop for each cycle
-    PaymentCycleService -> PaymentCycleRepository : save(paymentCycle)
-    PaymentCycleRepository -> Database : Execute
-    Database --> PaymentCycleRepository : PaymentCycle
+alt BookingDetail rỗng
+    BookingService --> Controller : Throw VchefApiException (BAD_REQUEST)
 end
 
-PaymentCycleService --> BookingService : void
+BookingService -> BookingService : Kiểm tra ngày firstSession
+alt firstSession là hôm nay hoặc đã qua
+    BookingService --> Controller : ApiResponse (fail, message: Cannot deposit)
+end
 
-BookingService -> NotificationService : sendPushNotification(notification)
-NotificationService -> Database : (Ghi nhận/tracking)
+alt firstSession trong vòng 2 ngày tới
+    BookingService -> BookingRepository : save(booking cập nhật PENDING_FIRST_CYCLE + depositPaid)
+    BookingRepository -> Database : Update
+    Database --> BookingRepository : Booking
+    BookingRepository --> BookingService : Booking
+
+    BookingService -> ModelMapper : map(booking, BookingResponseDto)
+    ModelMapper --> BookingService : BookingResponseDto
+
+    BookingService --> Controller : ApiResponse (fail, message: Session too close, data: BookingResponseDto)
+end
+
+BookingService -> WalletRepository : findByUserId(userId)
+WalletRepository -> Database : Execute
+Database --> WalletRepository : Wallet
+WalletRepository --> BookingService : Wallet
+
+alt Ví không tồn tại
+    BookingService --> Controller : Throw VchefApiException (NOT_FOUND)
+end
+
+alt Số dư ví < depositAmount
+    BookingService --> Controller : ApiResponse (fail, message: Insufficient balance)
+end
+
+BookingService -> WalletRepository : save(wallet trừ depositAmount)
+WalletRepository -> Database : Update
+Database --> WalletRepository : Wallet
+WalletRepository --> BookingService : Wallet
+
+BookingService -> BookingRepository : save(booking cập nhật DEPOSITED + depositPaid)
+BookingRepository -> Database : Update
+Database --> BookingRepository : Booking
+BookingRepository --> BookingService : Booking
+
+BookingService -> CustomerTransactionRepository : save(transaction INITIAL_PAYMENT)
+CustomerTransactionRepository -> Database : Insert
+Database --> CustomerTransactionRepository : CustomerTransaction
+CustomerTransactionRepository --> BookingService : CustomerTransaction
+
+BookingService -> NotificationService : sendPushNotification(notification cho Customer)
+NotificationService -> Database : Ghi tracking (nếu có)
+
+BookingService -> NotificationService : sendPushNotification(notification cho Chef)
+NotificationService -> Database : Ghi tracking (nếu có)
 
 BookingService -> ModelMapper : map(booking, BookingResponseDto)
 ModelMapper --> BookingService : BookingResponseDto
 
-BookingService --> Controller : BookingResponseDto
-Controller --> User : Trả về BookingResponseDto
+BookingService --> Controller : ApiResponse (success, message: Deposit successfully, data: BookingResponseDto)
+Controller --> User : Trả về ApiResponse
 @enduml
