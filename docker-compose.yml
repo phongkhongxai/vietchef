@@ -29,6 +29,7 @@ services:
       VIRTUAL_HOST: vietchef.ddns.net
       LETSENCRYPT_HOST: vietchef.ddns.net
       LETSENCRYPT_EMAIL: thieuphong2003@gmail.com
+      CLIENT_MAX_BODY_SIZE: 10m
     expose:
       - "8080"
     networks:
