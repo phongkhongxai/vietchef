@@ -76,6 +76,7 @@ public class NotificationService {
             System.out.println("User not found, skipping notification for userId: " + userId);
             return;
         }
+
         User user = optionalUser.get();
 
         // Lấy token
