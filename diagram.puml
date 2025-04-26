@@ -2,16 +2,19 @@
 actor User
 participant Controller
 participant BookingService
+participant BookingDetailService
+participant PaymentCycleService
+participant NotificationService
+participant ModelMapper
+
 participant UserRepository
 participant ChefRepository
 participant PackageRepository
 participant BookingRepository
-participant BookingDetailService
 participant BookingDetailRepository
 participant DishRepository
-participant PaymentCycleService
-participant NotificationService
-participant ModelMapper
+participant PaymentCycleRepository
+
 database Database
 
 User -> Controller : Gửi BookingRequestDto (LONG_TERM)
@@ -84,10 +87,25 @@ BookingRepository --> BookingService : Booking1
 
 BookingService -> PaymentCycleService : createPaymentCycles(booking)
 
-BookingService -> NotificationService : sendPushNotification(notification)
+PaymentCycleService -> BookingDetailRepository : findByBookingOrderBySessionDateAsc(booking)
+BookingDetailRepository -> Database : Execute
+Database --> BookingDetailRepository : List<BookingDetail>
+BookingDetailRepository --> PaymentCycleService : List<BookingDetail>
 
-BookingService -> ModelMapper : map(booking1, BookingResponseDto)
+loop for each cycle
+    PaymentCycleService -> PaymentCycleRepository : save(paymentCycle)
+    PaymentCycleRepository -> Database : Execute
+    Database --> PaymentCycleRepository : PaymentCycle
+end
+
+PaymentCycleService --> BookingService : void
+
+BookingService -> NotificationService : sendPushNotification(notification)
+NotificationService -> Database : (Ghi nhận/tracking)
+
+BookingService -> ModelMapper : map(booking, BookingResponseDto)
 ModelMapper --> BookingService : BookingResponseDto
 
 BookingService --> Controller : BookingResponseDto
+Controller --> User : Trả về BookingResponseDto
 @enduml
