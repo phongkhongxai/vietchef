@@ -15,6 +15,7 @@ import java.util.Optional;
 @EnableJpaRepositories
 public interface FavoriteChefRepository extends JpaRepository<FavoriteChef, Long> {
     Optional<FavoriteChef> findByUserAndChefAndIsDeletedFalse(User user, Chef chef);
+    Optional<FavoriteChef> findByUserAndChef(User user, Chef chef);
     Page<FavoriteChef> findByUserAndIsDeletedFalse(User user, Pageable pageable);
     Page<FavoriteChef> findByUserIdAndIsDeletedFalse(Long userId, Pageable pageable);
     boolean existsByUserAndChefAndIsDeletedFalse(User user, Chef chef);
