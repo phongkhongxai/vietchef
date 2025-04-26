@@ -1,13 +1,93 @@
 @startuml
-actor Customer
-participant "BookingController" as Controller
-participant "BookingService" as Service
-participant "BookingDetailService" as DetailService
-participant "BookingResponseDto" as Response
+actor User
+participant Controller
+participant BookingService
+participant UserRepository
+participant ChefRepository
+participant PackageRepository
+participant BookingRepository
+participant BookingDetailService
+participant BookingDetailRepository
+participant DishRepository
+participant PaymentCycleService
+participant NotificationService
+participant ModelMapper
+database Database
 
-Customer -> Controller : createBookingSingle(dto)
-Controller -> Service : createSingleBooking(dto)
-Service -> DetailService : createBookingDetail(booking, dto)
-DetailService -> Response : return BookingResponseDto
-Controller -> Customer : return Response
+User -> Controller : Gửi BookingRequestDto (LONG_TERM)
+Controller -> BookingService : createLongtermBooking(dto)
+
+BookingService -> UserRepository : findById(dto.customerId)
+UserRepository -> Database : Execute
+Database --> UserRepository : Customer
+UserRepository --> BookingService : Customer
+
+BookingService -> ChefRepository : findById(dto.chefId)
+ChefRepository -> Database : Execute
+Database --> ChefRepository : Chef
+ChefRepository --> BookingService : Chef
+
+BookingService -> PackageRepository : findById(dto.packageId)
+PackageRepository -> Database : Execute
+Database --> PackageRepository : Package
+PackageRepository --> BookingService : Package
+
+alt Chef không đủ uy tín
+    BookingService --> Controller : Throw VchefApiException
+end
+
+alt GuestCount > MaxServingSize
+    BookingService --> Controller : Throw VchefApiException
+end
+
+alt Package không nằm trong danh sách của Chef
+    BookingService --> Controller : Throw VchefApiException
+end
+
+alt Số lượng BookingDetail != Duration của Package
+    BookingService --> Controller : Throw VchefApiException
+end
+
+BookingService -> BookingRepository : save(new Booking)
+BookingRepository -> Database : Execute
+Database --> BookingRepository : Booking
+BookingRepository --> BookingService : Booking
+
+loop for each BookingDetail in dto.bookingDetails
+    BookingService -> BookingService : isOverlappingWithExistingBookings()
+    alt Lịch trùng
+        BookingService -> List : add("Lịch bị trùng...")
+    else
+        BookingService -> BookingDetailService : createBookingDetail(booking, detailDto)
+
+        BookingDetailService -> DishRepository : findById(dishId)
+        DishRepository -> Database : Execute
+        Database --> DishRepository : Dish
+        DishRepository --> BookingDetailService : Dish
+
+        BookingDetailService -> BookingDetailRepository : save(detail)
+        BookingDetailRepository -> Database : Execute
+        Database --> BookingDetailRepository : BookingDetail
+        BookingDetailRepository --> BookingDetailService : BookingDetail
+        BookingDetailService --> BookingService : BookingDetail
+    end
+end
+
+alt Có lịch bị trùng
+    BookingService --> Controller : Throw VchefApiException (với danh sách overlapMessages)
+end
+
+BookingService -> BookingRepository : save(booking với totalPrice + details)
+BookingRepository -> Database : Execute
+Database --> BookingRepository : Booking1
+BookingRepository --> BookingService : Booking1
+
+BookingService -> PaymentCycleService : createPaymentCycles(booking)
+
+BookingService -> NotificationService : sendPushNotification(notification)
+
+BookingService -> ModelMapper : map(booking1, BookingResponseDto)
+ModelMapper --> BookingService : BookingResponseDto
+
+BookingService --> Controller : BookingResponseDto
 @enduml
