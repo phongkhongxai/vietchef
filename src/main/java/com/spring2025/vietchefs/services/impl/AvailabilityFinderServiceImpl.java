@@ -1,20 +1,26 @@
 package com.spring2025.vietchefs.services.impl;
 
-import com.spring2025.vietchefs.models.entity.Booking;
-import com.spring2025.vietchefs.models.entity.BookingDetail;
 import com.spring2025.vietchefs.models.entity.Chef;
 import com.spring2025.vietchefs.models.entity.ChefBlockedDate;
 import com.spring2025.vietchefs.models.entity.ChefSchedule;
-import com.spring2025.vietchefs.models.entity.ChefTimeSettings;
+import com.spring2025.vietchefs.models.entity.Booking;
+import com.spring2025.vietchefs.models.entity.BookingDetail;
 import com.spring2025.vietchefs.models.entity.User;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.requestModel.AvailableTimeSlotRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.AvailableTimeSlotResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.DistanceResponse;
-import com.spring2025.vietchefs.repositories.*;
+import com.spring2025.vietchefs.repositories.BookingDetailRepository;
+import com.spring2025.vietchefs.repositories.ChefBlockedDateRepository;
+import com.spring2025.vietchefs.repositories.ChefRepository;
+import com.spring2025.vietchefs.repositories.ChefScheduleRepository;
+import com.spring2025.vietchefs.repositories.PackageRepository;
+import com.spring2025.vietchefs.repositories.UserRepository;
 import com.spring2025.vietchefs.services.AvailabilityFinderService;
 import com.spring2025.vietchefs.services.BookingConflictService;
 import com.spring2025.vietchefs.services.impl.CalculateService;
+import com.spring2025.vietchefs.services.impl.DistanceService;
+import com.spring2025.vietchefs.services.impl.TimeZoneService;
 import com.spring2025.vietchefs.utils.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -24,7 +30,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -56,13 +64,11 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
     private ChefBlockedDateRepository blockedDateRepository;
     
     @Autowired
-    private ChefTimeSettingsRepository timeSettingsRepository;
-    
-    @Autowired
     private BookingConflictService bookingConflictService;
     
     @Autowired
     private CalculateService calculateService;
+    
     @Autowired
     private PackageRepository packageRepository;
     
@@ -71,6 +77,9 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
     
     @Autowired
     private DistanceService distanceService;
+    
+    @Autowired
+    private TimeZoneService timeZoneService;
     
     @Override
     public List<AvailableTimeSlotResponse> findAvailableTimeSlotsForChef(
@@ -173,6 +182,9 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Customer location cannot be empty");
         }
         
+        // Lưu thời gian request hiện tại
+        LocalDateTime requestTime = LocalDateTime.now();
+        
         // Lấy thông tin chef
         Chef chef = chefRepository.findById(chefId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, 
@@ -182,6 +194,13 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         if (chefAddress == null || chefAddress.trim().isEmpty()) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef address not found");
         }
+        
+        // Get chef and customer timezones
+        String chefTimezone = timeZoneService.getTimezoneFromAddress(chefAddress);
+        String customerTimezone = timeZoneService.getTimezoneFromAddress(customerLocation);
+        
+        System.out.println("Chef timezone: " + chefTimezone);
+        System.out.println("Customer timezone: " + customerTimezone);
         
         // Tính thời gian di chuyển từ vị trí của chef đến vị trí khách hàng
         DistanceResponse distanceResponse = distanceService.calculateDistanceAndTime(chefAddress, customerLocation);
@@ -285,8 +304,87 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                 })
                 .collect(Collectors.toList());
         
-        System.out.println("DEBUG: After final filtering, returning " + finalSlots.size() + " slots");
-        return finalSlots;
+        System.out.println("DEBUG: After final filtering, found " + finalSlots.size() + " slots");
+        
+        // Lọc các khung giờ theo business rule: phải sau thời gian request ít nhất 24h
+        List<AvailableTimeSlotResponse> validTimeSlots = finalSlots.stream()
+                .filter(slot -> {
+                    // Tạo LocalDateTime từ date và startTime của slot
+                    LocalDateTime slotStartDateTime = LocalDateTime.of(slot.getDate(), slot.getStartTime());
+                    
+                    // Kiểm tra xem slot có sau thời gian request ít nhất 24h không
+                    return slotStartDateTime.isAfter(requestTime.plusHours(24));
+                })
+                .collect(Collectors.toList());
+        
+        System.out.println("DEBUG: After 24h business rule filtering, found " + validTimeSlots.size() + " slots");
+        
+        // Convert time slots from chef's timezone to customer's timezone
+        List<AvailableTimeSlotResponse> convertedSlots = new ArrayList<>();
+        for (AvailableTimeSlotResponse slot : validTimeSlots) {
+            // Create LocalDateTime objects for conversion
+            LocalDateTime startDateTime = LocalDateTime.of(slot.getDate(), slot.getStartTime());
+            LocalDateTime endDateTime = LocalDateTime.of(slot.getDate(), slot.getEndTime());
+            
+            // Convert from chef's timezone to customer's timezone
+            LocalDateTime convertedStartDateTime = timeZoneService.convertBetweenTimezones(
+                    startDateTime, chefTimezone, customerTimezone);
+            LocalDateTime convertedEndDateTime = timeZoneService.convertBetweenTimezones(
+                    endDateTime, chefTimezone, customerTimezone);
+            
+            // Create a new slot with converted times
+            AvailableTimeSlotResponse convertedSlot = new AvailableTimeSlotResponse();
+            convertedSlot.setChefId(slot.getChefId());
+            convertedSlot.setChefName(slot.getChefName());
+            convertedSlot.setDate(convertedStartDateTime.toLocalDate());
+            convertedSlot.setStartTime(convertedStartDateTime.toLocalTime());
+            convertedSlot.setEndTime(convertedEndDateTime.toLocalTime());
+            convertedSlot.setDurationMinutes(slot.getDurationMinutes());
+            convertedSlot.setNote(slot.getNote());
+            
+            convertedSlots.add(convertedSlot);
+        }
+        
+        // Check for day boundary crossings and adjust
+        List<AvailableTimeSlotResponse> adjustedConvertedSlots = new ArrayList<>();
+        for (AvailableTimeSlotResponse slot : convertedSlots) {
+            // If end time is earlier than start time, it means we've crossed a day boundary
+            if (slot.getEndTime().isBefore(slot.getStartTime())) {
+                // Create a slot for the first day (from start time to midnight)
+                AvailableTimeSlotResponse firstDaySlot = new AvailableTimeSlotResponse();
+                firstDaySlot.setChefId(slot.getChefId());
+                firstDaySlot.setChefName(slot.getChefName());
+                firstDaySlot.setDate(slot.getDate());
+                firstDaySlot.setStartTime(slot.getStartTime());
+                firstDaySlot.setEndTime(LocalTime.MAX); // 23:59:59.999999999
+                firstDaySlot.setDurationMinutes((int) Duration.between(slot.getStartTime(), LocalTime.MAX).toMinutes());
+                firstDaySlot.setNote(slot.getNote());
+                
+                // Create a slot for the next day (from midnight to end time)
+                AvailableTimeSlotResponse nextDaySlot = new AvailableTimeSlotResponse();
+                nextDaySlot.setChefId(slot.getChefId());
+                nextDaySlot.setChefName(slot.getChefName());
+                nextDaySlot.setDate(slot.getDate().plusDays(1));
+                nextDaySlot.setStartTime(LocalTime.MIN); // 00:00
+                nextDaySlot.setEndTime(slot.getEndTime());
+                nextDaySlot.setDurationMinutes((int) Duration.between(LocalTime.MIN, slot.getEndTime()).toMinutes());
+                nextDaySlot.setNote(slot.getNote());
+                
+                adjustedConvertedSlots.add(firstDaySlot);
+                adjustedConvertedSlots.add(nextDaySlot);
+            } else {
+                // No day boundary crossed, just add the slot as is
+                adjustedConvertedSlots.add(slot);
+            }
+        }
+        
+        // Sort the final slots by date and start time
+        adjustedConvertedSlots.sort(Comparator
+                .comparing(AvailableTimeSlotResponse::getDate)
+                .thenComparing(AvailableTimeSlotResponse::getStartTime));
+        
+        System.out.println("DEBUG: After timezone conversion, returning " + adjustedConvertedSlots.size() + " slots");
+        return adjustedConvertedSlots;
     }
 
     @Override
@@ -298,6 +396,9 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         if (customerLocation == null || customerLocation.trim().isEmpty()) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Customer location cannot be empty");
         }
+        
+        // Lưu thời gian request hiện tại
+        LocalDateTime requestTime = LocalDateTime.now();
 
         Chef chef = chefRepository.findById(chefId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,
@@ -307,6 +408,13 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         if (chefAddress == null || chefAddress.trim().isEmpty()) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef address not found");
         }
+
+        // Get chef and customer timezones
+        String chefTimezone = timeZoneService.getTimezoneFromAddress(chefAddress);
+        String customerTimezone = timeZoneService.getTimezoneFromAddress(customerLocation);
+        
+        System.out.println("Chef timezone: " + chefTimezone);
+        System.out.println("Customer timezone: " + customerTimezone);
 
         DistanceResponse distanceResponse = distanceService.calculateDistanceAndTime(chefAddress, customerLocation);
         BigDecimal travelTimeHours = distanceResponse.getDurationHours();
@@ -418,8 +526,87 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                 })
                 .collect(Collectors.toList());
         
-        System.out.println("DEBUG: After final filtering, returning " + finalSlots.size() + " slots");
-        return finalSlots;
+        System.out.println("DEBUG: After final filtering, found " + finalSlots.size() + " slots");
+        
+        // Lọc các khung giờ theo business rule: phải sau thời gian request ít nhất 24h
+        List<AvailableTimeSlotResponse> validTimeSlots = finalSlots.stream()
+                .filter(slot -> {
+                    // Tạo LocalDateTime từ date và startTime của slot
+                    LocalDateTime slotStartDateTime = LocalDateTime.of(slot.getDate(), slot.getStartTime());
+                    
+                    // Kiểm tra xem slot có sau thời gian request ít nhất 24h không
+                    return slotStartDateTime.isAfter(requestTime.plusHours(24));
+                })
+                .collect(Collectors.toList());
+        
+        System.out.println("DEBUG: After 24h business rule filtering, found " + validTimeSlots.size() + " slots");
+        
+        // Convert time slots from chef's timezone to customer's timezone
+        List<AvailableTimeSlotResponse> convertedSlots = new ArrayList<>();
+        for (AvailableTimeSlotResponse slot : validTimeSlots) {
+            // Create LocalDateTime objects for conversion
+            LocalDateTime startDateTime = LocalDateTime.of(slot.getDate(), slot.getStartTime());
+            LocalDateTime endDateTime = LocalDateTime.of(slot.getDate(), slot.getEndTime());
+            
+            // Convert from chef's timezone to customer's timezone
+            LocalDateTime convertedStartDateTime = timeZoneService.convertBetweenTimezones(
+                    startDateTime, chefTimezone, customerTimezone);
+            LocalDateTime convertedEndDateTime = timeZoneService.convertBetweenTimezones(
+                    endDateTime, chefTimezone, customerTimezone);
+            
+            // Create a new slot with converted times
+            AvailableTimeSlotResponse convertedSlot = new AvailableTimeSlotResponse();
+            convertedSlot.setChefId(slot.getChefId());
+            convertedSlot.setChefName(slot.getChefName());
+            convertedSlot.setDate(convertedStartDateTime.toLocalDate());
+            convertedSlot.setStartTime(convertedStartDateTime.toLocalTime());
+            convertedSlot.setEndTime(convertedEndDateTime.toLocalTime());
+            convertedSlot.setDurationMinutes(slot.getDurationMinutes());
+            convertedSlot.setNote(slot.getNote());
+            
+            convertedSlots.add(convertedSlot);
+        }
+        
+        // Check for day boundary crossings and adjust
+        List<AvailableTimeSlotResponse> adjustedConvertedSlots = new ArrayList<>();
+        for (AvailableTimeSlotResponse slot : convertedSlots) {
+            // If end time is earlier than start time, it means we've crossed a day boundary
+            if (slot.getEndTime().isBefore(slot.getStartTime())) {
+                // Create a slot for the first day (from start time to midnight)
+                AvailableTimeSlotResponse firstDaySlot = new AvailableTimeSlotResponse();
+                firstDaySlot.setChefId(slot.getChefId());
+                firstDaySlot.setChefName(slot.getChefName());
+                firstDaySlot.setDate(slot.getDate());
+                firstDaySlot.setStartTime(slot.getStartTime());
+                firstDaySlot.setEndTime(LocalTime.MAX); // 23:59:59.999999999
+                firstDaySlot.setDurationMinutes((int) Duration.between(slot.getStartTime(), LocalTime.MAX).toMinutes());
+                firstDaySlot.setNote(slot.getNote());
+                
+                // Create a slot for the next day (from midnight to end time)
+                AvailableTimeSlotResponse nextDaySlot = new AvailableTimeSlotResponse();
+                nextDaySlot.setChefId(slot.getChefId());
+                nextDaySlot.setChefName(slot.getChefName());
+                nextDaySlot.setDate(slot.getDate().plusDays(1));
+                nextDaySlot.setStartTime(LocalTime.MIN); // 00:00
+                nextDaySlot.setEndTime(slot.getEndTime());
+                nextDaySlot.setDurationMinutes((int) Duration.between(LocalTime.MIN, slot.getEndTime()).toMinutes());
+                nextDaySlot.setNote(slot.getNote());
+                
+                adjustedConvertedSlots.add(firstDaySlot);
+                adjustedConvertedSlots.add(nextDaySlot);
+            } else {
+                // No day boundary crossed, just add the slot as is
+                adjustedConvertedSlots.add(slot);
+            }
+        }
+        
+        // Sort the final slots by date and start time
+        adjustedConvertedSlots.sort(Comparator
+                .comparing(AvailableTimeSlotResponse::getDate)
+                .thenComparing(AvailableTimeSlotResponse::getStartTime));
+        
+        System.out.println("DEBUG: After timezone conversion, returning " + adjustedConvertedSlots.size() + " slots");
+        return adjustedConvertedSlots;
     }
 
     /**
@@ -428,14 +615,9 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
     private List<AvailableTimeSlotResponse> findAvailableTimeSlots(
             Chef chef, LocalDate startDate, LocalDate endDate) {
         
-        // Lấy cài đặt thời gian của chef
-        ChefTimeSettings timeSettings = getChefTimeSettings(chef);
-        
-        // Áp dụng cài đặt thời gian
-        int prepTimeMinutes = timeSettings.getStandardPrepTime() != null ? 
-                timeSettings.getStandardPrepTime() : DEFAULT_PREP_TIME_MINUTES;
-        int cleanupTimeMinutes = timeSettings.getStandardCleanupTime() != null ? 
-                timeSettings.getStandardCleanupTime() : DEFAULT_CLEANUP_TIME_MINUTES;
+        // Using default preparation and cleanup times directly
+        int prepTimeMinutes = DEFAULT_PREP_TIME_MINUTES;
+        int cleanupTimeMinutes = DEFAULT_CLEANUP_TIME_MINUTES;
         
         List<AvailableTimeSlotResponse> availableSlots = new ArrayList<>();
         LocalDate currentDate = startDate;
@@ -642,25 +824,6 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
      */
     private boolean hasTimeOverlap(LocalTime start1, LocalTime end1, LocalTime start2, LocalTime end2) {
         return start1.isBefore(end2) && end1.isAfter(start2);
-    }
-    
-    /**
-     * Lấy cài đặt thời gian của chef
-     */
-    private ChefTimeSettings getChefTimeSettings(Chef chef) {
-        return timeSettingsRepository.findByChef(chef)
-                .orElse(createDefaultTimeSettings(chef));
-    }
-    
-    /**
-     * Tạo cài đặt thời gian mặc định cho chef
-     */
-    private ChefTimeSettings createDefaultTimeSettings(Chef chef) {
-        ChefTimeSettings settings = new ChefTimeSettings();
-        settings.setChef(chef);
-        settings.setStandardPrepTime(DEFAULT_PREP_TIME_MINUTES);
-        settings.setStandardCleanupTime(DEFAULT_CLEANUP_TIME_MINUTES);
-        return settings;
     }
     
     /**
