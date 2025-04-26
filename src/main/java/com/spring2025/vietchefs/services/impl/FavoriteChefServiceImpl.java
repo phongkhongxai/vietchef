@@ -52,8 +52,8 @@ public class FavoriteChefServiceImpl implements FavoriteChefService {
         Chef chef = chefRepository.findById(chefId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found with id: " + chefId));
 
-        // Kiểm tra xem chef có trong trạng thái approved không
-        if (!"APPROVED".equals(chef.getStatus())) {
+        // Kiểm tra xem chef có trong trạng thái active không
+        if (!"ACTIVE".equals(chef.getStatus())) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef is not active");
         }
 
