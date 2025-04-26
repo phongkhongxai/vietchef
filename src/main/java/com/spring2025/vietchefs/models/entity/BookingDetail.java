@@ -32,8 +32,6 @@ public class BookingDetail {
     @Column(nullable = false)
     private LocalTime startTime;
     @Column(nullable = false)
-    private Boolean isServing=false;
-    @Column(nullable = false)
     private LocalTime timeBeginCook;
     @Column(nullable = false)
     private LocalTime timeBeginTravel;

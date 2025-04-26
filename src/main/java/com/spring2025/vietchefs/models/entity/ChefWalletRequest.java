@@ -19,7 +19,6 @@ public class ChefWalletRequest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Liên kết với Chef để biết yêu cầu này của đầu bếp nào
     @ManyToOne
     @JoinColumn(name = "chef_id", nullable = false)
     private Chef chef;

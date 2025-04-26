@@ -50,7 +50,6 @@ public class Chef {
     private String certification; // Chứng chỉ ẩm thực (nếu có)
     @Column(nullable = false)
     private Boolean providesIngredients = false; // Có thể tự mua nguyên liệu không?
-
     @Column(nullable = true)
     private String preferredDishes; // Các món Việt Nam sở trường (VD: "Phở, Bún Bò, Cơm Tấm")
 

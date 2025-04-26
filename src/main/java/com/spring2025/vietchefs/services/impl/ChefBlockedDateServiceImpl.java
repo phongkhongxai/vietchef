@@ -5,6 +5,7 @@ import com.spring2025.vietchefs.models.entity.ChefBlockedDate;
 import com.spring2025.vietchefs.models.entity.ChefSchedule;
 import com.spring2025.vietchefs.models.entity.User;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
+import com.spring2025.vietchefs.models.payload.requestModel.ChefBlockedDateRangeRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefBlockedDateRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefBlockedDateUpdateRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.ChefBlockedDateResponse;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -167,6 +169,72 @@ public class ChefBlockedDateServiceImpl implements ChefBlockedDateService {
         return blockedDates.stream()
                 .map(date1 -> modelMapper.map(date1, ChefBlockedDateResponse.class))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<ChefBlockedDateResponse> createBlockedDateRangeForCurrentChef(ChefBlockedDateRangeRequest request) {
+        Chef chef = getCurrentChef();
+        
+        // Validate start and end times are within working hours
+        validateTimeConstraints(request.getStartTime(), request.getEndTime());
+        
+        // Validate date range
+        if (request.getStartDate().isAfter(request.getEndDate())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Start date must be before or equal to end date");
+        }
+        
+        List<ChefBlockedDateResponse> createdBlockedDates = new ArrayList<>();
+        LocalDate currentDate = request.getStartDate();
+        
+        // Iterate through each date in the range
+        while (!currentDate.isAfter(request.getEndDate())) {
+            // Determine start and end time for current date
+            LocalTime blockStartTime;
+            LocalTime blockEndTime;
+            
+            // First day: use the requested start time
+            if (currentDate.isEqual(request.getStartDate())) {
+                blockStartTime = request.getStartTime();
+                // If it's a single day request, use requested end time
+                if (currentDate.isEqual(request.getEndDate())) {
+                    blockEndTime = request.getEndTime();
+                } else {
+                    blockEndTime = MAX_WORK_HOUR;
+                }
+            } 
+            // Last day: use the requested end time
+            else if (currentDate.isEqual(request.getEndDate())) {
+                blockStartTime = MIN_WORK_HOUR;
+                blockEndTime = request.getEndTime();
+            }
+            // Middle days: block the full working day
+            else {
+                blockStartTime = MIN_WORK_HOUR;
+                blockEndTime = MAX_WORK_HOUR;
+            }
+            
+            // Validate no conflicts for each date
+            validateNoBlockedDateConflict(chef, currentDate, blockStartTime, blockEndTime, null);
+            validateNoScheduleConflict(chef, currentDate, blockStartTime, blockEndTime);
+            validateNoBookingConflict(chef, currentDate, blockStartTime, blockEndTime);
+            
+            // Create blocked date for current date
+            ChefBlockedDate blockedDate = new ChefBlockedDate();
+            blockedDate.setChef(chef);
+            blockedDate.setBlockedDate(currentDate);
+            blockedDate.setStartTime(blockStartTime);
+            blockedDate.setEndTime(blockEndTime);
+            blockedDate.setReason(request.getReason());
+            blockedDate.setIsDeleted(false);
+            
+            ChefBlockedDate savedBlockedDate = blockedDateRepository.save(blockedDate);
+            createdBlockedDates.add(modelMapper.map(savedBlockedDate, ChefBlockedDateResponse.class));
+            
+            // Move to next date
+            currentDate = currentDate.plusDays(1);
+        }
+        
+        return createdBlockedDates;
     }
 
     /**
