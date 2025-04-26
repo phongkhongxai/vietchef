@@ -20,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -57,12 +58,25 @@ public class FavoriteChefServiceImpl implements FavoriteChefService {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef is not active");
         }
 
-        // Kiểm tra xem đã tồn tại trong danh sách yêu thích chưa
-        if (favoriteChefRepository.existsByUserAndChefAndIsDeletedFalse(user, chef)) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef already in favorites");
+        // Tìm kiếm chef trong danh sách yêu thích (bất kể trạng thái isDeleted)
+        Optional<FavoriteChef> existingFavoriteChef = favoriteChefRepository.findByUserAndChef(user, chef);
+
+        // Nếu đã tồn tại trong danh sách yêu thích
+        if (existingFavoriteChef.isPresent()) {
+            FavoriteChef favoriteChef = existingFavoriteChef.get();
+            
+            // Nếu đã yêu thích (isDeleted = false) thì báo lỗi
+            if (!favoriteChef.getIsDeleted()) {
+                throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef already in favorites");
+            }
+            
+            // Nếu đã bị xóa (isDeleted = true) thì khôi phục lại (set isDeleted = false)
+            favoriteChef.setIsDeleted(false);
+            favoriteChef = favoriteChefRepository.save(favoriteChef);
+            return mapToFavoriteChefDto(favoriteChef);
         }
 
-        // Thêm mới vào danh sách yêu thích
+        // Nếu chưa tồn tại, thêm mới vào danh sách yêu thích
         FavoriteChef favoriteChef = new FavoriteChef();
         favoriteChef.setUser(user);
         favoriteChef.setChef(chef);
