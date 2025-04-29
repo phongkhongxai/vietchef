@@ -29,8 +29,48 @@ public class EmailVerificationService {
         user.setVerificationCode(code);
         user.setVerificationCodeExpiry(LocalDateTime.now().plusMinutes(10)); // Code valid for 10 minutes
 
-        // Send email with the verification code
-        sendEmailVerify(user.getEmail(), code);
+         try {
+             MimeMessage message = mailSender.createMimeMessage();
+             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+             helper.setTo(user.getEmail());
+             helper.setSubject("✅ Xác thực email - VietChefs");
+             helper.setFrom("apehome8386@gmail.com");
+
+             String content = "<!DOCTYPE html>" +
+                     "<html>" +
+                     "<head>" +
+                     "<meta charset='UTF-8'>" +
+                     "<style>" +
+                     "  body { font-family: 'Segoe UI', sans-serif; background-color: #f4f4f4; padding: 30px; }" +
+                     "  .container { max-width: 600px; background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin: auto; }" +
+                     "  h2 { color: #2c3e50; }" +
+                     "  .code-box { background-color: #eafaf1; border-left: 6px solid #2ecc71; padding: 15px; font-size: 24px; letter-spacing: 3px; font-weight: bold; color: #27ae60; text-align: center; margin: 20px 0; }" +
+                     "  p { color: #333333; font-size: 16px; line-height: 1.6; }" +
+                     "  .footer { font-size: 13px; color: #999999; margin-top: 30px; text-align: center; }" +
+                     "</style>" +
+                     "</head>" +
+                     "<body>" +
+                     "<div class='container'>" +
+                     "<h2>🔐 Xác thực email</h2>" +
+                     "<p>Xin chào <strong>" + user.getFullName() + "</strong>,</p>" +
+                     "<p>Cảm ơn bạn đã đăng ký tài khoản tại <strong>VietChefs</strong>.</p>" +
+                     "<p>Để hoàn tất quá trình đăng ký, vui lòng sử dụng mã xác thực sau:</p>" +
+                     "<div class='code-box'>" + code + "</div>" +
+                     "<p>Mã này sẽ hết hạn sau <strong>10 phút</strong>. Vui lòng không chia sẻ mã này với bất kỳ ai.</p>" +
+                     "<p>Nếu bạn không yêu cầu đăng ký, hãy bỏ qua email này.</p>" +
+                     "<div class='footer'>Trân trọng,<br>Đội ngũ VietChefs 🧑‍🍳</div>" +
+                     "</div>" +
+                     "</body>" +
+                     "</html>";
+
+             helper.setText(content, true);
+             mailSender.send(message);
+
+         } catch (MessagingException e) {
+             e.printStackTrace();
+             throw new RuntimeException("Không thể gửi email xác thực.");
+         }
     }
 
 

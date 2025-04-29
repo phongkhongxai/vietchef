@@ -365,19 +365,15 @@ public class AuthServiceImpl implements AuthService {
 
         User user = modelMapper.map(signupDto, User.class);
 
-        user.setPassword(passwordEncoder.encode(signupDto.getPassword()));
-
+        user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
         Role userRole = roleRepository.findByRoleName("ROLE_CUSTOMER")
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User Role not found."));
         user.setRole(userRole);
         user.setEmailVerified(false);
         user.setAvatarUrl("default");
         emailVerificationService.sendVerificationCode(user);
-
-        User user1 = userRepository.save(user);
-        walletService.createWallet(user1.getId(), "CUSTOMER");
-
-        return "User registered successfully! Please check your email for the verification code.";
+        userRepository.save(user);
+        return "Account registered successfully! Please check your email for the verification code.";
     }
 
 
@@ -443,6 +439,22 @@ public class AuthServiceImpl implements AuthService {
         user.setVerificationCodeExpiry(null);
         userRepository.save(user);
         return "Email verified successfully!";
+    }
+
+    @Override
+    public String setPasswordAfterVerified(String email, String password) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.BAD_REQUEST, "User not found with this email."));
+
+        if (!user.isEmailVerified()) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Email has not been verified yet.");
+        }
+        user.setPassword(passwordEncoder.encode(password));
+        userRepository.save(user);
+
+        walletService.createWallet(user.getId(), "CUSTOMER");
+
+        return "Password set successfully!";
     }
 
     @Override
