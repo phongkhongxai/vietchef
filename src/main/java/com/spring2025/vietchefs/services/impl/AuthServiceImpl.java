@@ -154,7 +154,6 @@ public class AuthServiceImpl implements AuthService {
                     .emailVerified(true)
                     .role(userRole)
                     .dob(LocalDate.now())
-                    .phone("default")
                     .gender("default")
                     .password(passwordEncoder.encode(UUID.randomUUID().toString())) // Mật khẩu ngẫu nhiên
                     .build();
@@ -210,7 +209,6 @@ public class AuthServiceImpl implements AuthService {
                     .emailVerified(true)
                     .role(userRole)
                     .dob(LocalDate.now())
-                    .phone("default")
                     .gender("default")
                     .password(passwordEncoder.encode(UUID.randomUUID().toString())) // Mật khẩu ngẫu nhiên
                     .build();
