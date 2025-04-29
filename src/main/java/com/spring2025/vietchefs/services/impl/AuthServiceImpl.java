@@ -154,7 +154,6 @@ public class AuthServiceImpl implements AuthService {
                     .emailVerified(true)
                     .role(userRole)
                     .dob(LocalDate.now())
-                    .phone("default")
                     .gender("default")
                     .password(passwordEncoder.encode(UUID.randomUUID().toString())) // Mật khẩu ngẫu nhiên
                     .build();
@@ -210,7 +209,6 @@ public class AuthServiceImpl implements AuthService {
                     .emailVerified(true)
                     .role(userRole)
                     .dob(LocalDate.now())
-                    .phone("default")
                     .gender("default")
                     .password(passwordEncoder.encode(UUID.randomUUID().toString())) // Mật khẩu ngẫu nhiên
                     .build();
@@ -268,7 +266,6 @@ public class AuthServiceImpl implements AuthService {
                         .emailVerified(true)
                         .role(userRole)
                         .dob(LocalDate.now())
-                        .phone("default")
                         .gender("default")
                         .password(passwordEncoder.encode(UUID.randomUUID().toString()))
                         .build();
@@ -362,7 +359,9 @@ public class AuthServiceImpl implements AuthService {
         if (userRepository.existsByEmail(signupDto.getEmail())) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Email is already exist!");
         }
-
+        if (userRepository.existsByPhone(signupDto.getPhone())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Phone number is already exist!");
+        }
         User user = modelMapper.map(signupDto, User.class);
 
         user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
