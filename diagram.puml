@@ -1,100 +1,23 @@
 @startuml
-actor User
+actor Chef
 participant Controller
-participant BookingService
-participant NotificationService
-participant ModelMapper
+participant ChefService
+participant ChefRepository
+participant Database
 
-participant BookingRepository
-participant WalletRepository
-participant BookingDetailRepository
-participant CustomerTransactionRepository
+Chef -> Controller : Gửi yêu cầu tự cập nhật profile
+Controller -> ChefService : updateChefBySelf(userId, requestDto)
 
-database Database
+ChefService -> ChefRepository : findByUserId(userId)
+ChefRepository -> Database : Execute
+Database --> ChefRepository : Chef
+ChefRepository --> ChefService : Chef
 
-User -> Controller : Gửi yêu cầu đặt cọc (bookingId, userId)
-Controller -> BookingService : depositBooking(bookingId, userId)
+ChefService -> ChefRepository : save(Chef đã cập nhật)
+ChefRepository -> Database : Update
+Database --> ChefRepository : Chef
+ChefRepository --> ChefService : Chef
 
-BookingService -> BookingRepository : findById(bookingId)
-BookingRepository -> Database : Execute
-Database --> BookingRepository : Booking
-BookingRepository --> BookingService : Booking
-
-alt Booking không tồn tại
-    BookingService --> Controller : Throw VchefApiException (NOT_FOUND)
-end
-
-alt Booking không ở trạng thái PENDING
-    BookingService --> Controller : Throw VchefApiException (BAD_REQUEST)
-end
-
-alt Booking không phải LONG_TERM
-    BookingService --> Controller : Throw VchefApiException (BAD_REQUEST)
-end
-
-BookingService -> BookingDetailRepository : findByBookingOrderBySessionDateAsc(booking)
-BookingDetailRepository -> Database : Execute
-Database --> BookingDetailRepository : List<BookingDetail>
-BookingDetailRepository --> BookingService : List<BookingDetail>
-
-alt BookingDetail rỗng
-    BookingService --> Controller : Throw VchefApiException (BAD_REQUEST)
-end
-
-BookingService -> BookingService : Kiểm tra ngày firstSession
-alt firstSession là hôm nay hoặc đã qua
-    BookingService --> Controller : ApiResponse (fail, message: Cannot deposit)
-end
-
-alt firstSession trong vòng 2 ngày tới
-    BookingService -> BookingRepository : save(booking cập nhật PENDING_FIRST_CYCLE + depositPaid)
-    BookingRepository -> Database : Update
-    Database --> BookingRepository : Booking
-    BookingRepository --> BookingService : Booking
-
-    BookingService -> ModelMapper : map(booking, BookingResponseDto)
-    ModelMapper --> BookingService : BookingResponseDto
-
-    BookingService --> Controller : ApiResponse (fail, message: Session too close, data: BookingResponseDto)
-end
-
-BookingService -> WalletRepository : findByUserId(userId)
-WalletRepository -> Database : Execute
-Database --> WalletRepository : Wallet
-WalletRepository --> BookingService : Wallet
-
-alt Ví không tồn tại
-    BookingService --> Controller : Throw VchefApiException (NOT_FOUND)
-end
-
-alt Số dư ví < depositAmount
-    BookingService --> Controller : ApiResponse (fail, message: Insufficient balance)
-end
-
-BookingService -> WalletRepository : save(wallet trừ depositAmount)
-WalletRepository -> Database : Update
-Database --> WalletRepository : Wallet
-WalletRepository --> BookingService : Wallet
-
-BookingService -> BookingRepository : save(booking cập nhật DEPOSITED + depositPaid)
-BookingRepository -> Database : Update
-Database --> BookingRepository : Booking
-BookingRepository --> BookingService : Booking
-
-BookingService -> CustomerTransactionRepository : save(transaction INITIAL_PAYMENT)
-CustomerTransactionRepository -> Database : Insert
-Database --> CustomerTransactionRepository : CustomerTransaction
-CustomerTransactionRepository --> BookingService : CustomerTransaction
-
-BookingService -> NotificationService : sendPushNotification(notification cho Customer)
-NotificationService -> Database : Ghi tracking (nếu có)
-
-BookingService -> NotificationService : sendPushNotification(notification cho Chef)
-NotificationService -> Database : Ghi tracking (nếu có)
-
-BookingService -> ModelMapper : map(booking, BookingResponseDto)
-ModelMapper --> BookingService : BookingResponseDto
-
-BookingService --> Controller : ApiResponse (success, message: Deposit successfully, data: BookingResponseDto)
-Controller --> User : Trả về ApiResponse
+ChefService --> Controller : Trả về ChefResponseDto
+Controller --> Chef : ChefResponseDto
 @enduml

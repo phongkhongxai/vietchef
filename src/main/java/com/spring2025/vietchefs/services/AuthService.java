@@ -22,6 +22,7 @@ public interface AuthService {
     String signup(SignupDto signupDto);
     AuthenticationResponse refreshToken(HttpServletRequest request, HttpServletResponse response) throws IOException;
     String verifyEmailCode(String email, String code);
+    String setPasswordAfterVerified(String email, String password);
     String resendVerificationCode(String email);
     String forgotPassword(String email);
     String resetPassword(NewPasswordRequest newPasswordRequest);

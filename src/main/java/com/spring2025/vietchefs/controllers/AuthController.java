@@ -4,6 +4,7 @@ package com.spring2025.vietchefs.controllers;
 import com.spring2025.vietchefs.models.payload.dto.LoginDto;
 import com.spring2025.vietchefs.models.payload.dto.SignupDto;
 import com.spring2025.vietchefs.models.payload.requestModel.NewPasswordRequest;
+import com.spring2025.vietchefs.models.payload.requestModel.SetPasswordDto;
 import com.spring2025.vietchefs.models.payload.responseModel.AuthenticationResponse;
 import com.spring2025.vietchefs.services.AuthService;
 import com.spring2025.vietchefs.services.impl.FacebookOAuth2Service;
@@ -46,6 +47,11 @@ public class AuthController {
     public ResponseEntity<String> signup(@Valid @RequestBody SignupDto signupDto){
         String response = authService.signup(signupDto);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+    @PostMapping("/set-password")
+    public ResponseEntity<String> setPasword(@Valid @RequestBody SetPasswordDto setPasswordDto){
+        String response = authService.setPasswordAfterVerified(setPasswordDto.getEmail(),setPasswordDto.getPassword());
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
     @PostMapping("/refresh-token")
