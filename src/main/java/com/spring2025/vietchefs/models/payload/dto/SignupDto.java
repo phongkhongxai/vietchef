@@ -27,6 +27,7 @@ public class SignupDto {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate dob;
     @NotEmpty(message = "Gender should not be empty!")
+    @Pattern(regexp = "^(Male|Female|Other)$", message = "Gender must be Male, Female, or Other")
     private String gender;
     @NotEmpty(message = "Phone number should not be empty!")
     @Pattern(regexp="(^$|[0-9]{10,11})", message = "Phone number must be 10 or 11 digits!")
