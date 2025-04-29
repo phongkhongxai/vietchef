@@ -28,6 +28,7 @@ import org.springframework.ui.ModelMap;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -57,9 +58,7 @@ public class UserServiceImpl implements UserService {
         }
 
         User user = modelMapper.map(signupDto, User.class);
-
-        user.setPassword(passwordEncoder.encode(signupDto.getPassword()));
-
+        user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
         Role userRole = roleRepository.findByRoleName("ROLE_CHEF")
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User Role not found."));
         user.setRole(userRole);

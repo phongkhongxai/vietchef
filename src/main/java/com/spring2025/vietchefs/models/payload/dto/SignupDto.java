@@ -19,23 +19,15 @@ import java.time.LocalDate;
 public class SignupDto {
     @NotEmpty(message = "Username should not be empty!")
     private String username;
-
     @Email(regexp = ".+@.+\\..+", message = "Email is invalid!")
     private String email;
-
-    @NotEmpty(message = "Password should not be empty!")
-    private String password;
-
     @NotEmpty(message = "Full name should not be empty!")
     private String fullName;
-
     @NotNull(message = "Date of birth should not be empty!")
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate dob;
-
     @NotEmpty(message = "Gender should not be empty!")
     private String gender;
-
     @NotEmpty(message = "Phone number should not be empty!")
     @Pattern(regexp="(^$|[0-9]{10,11})", message = "Phone number must be 10 or 11 digits!")
     private String phone;
