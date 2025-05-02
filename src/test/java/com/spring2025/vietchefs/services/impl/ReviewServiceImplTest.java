@@ -7,6 +7,7 @@ import com.spring2025.vietchefs.models.payload.requestModel.ReviewUpdateRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.ReviewCriteriaResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.ReviewResponse;
 import com.spring2025.vietchefs.repositories.*;
+import com.spring2025.vietchefs.services.ContentFilterService;
 import com.spring2025.vietchefs.services.ReviewCriteriaService;
 import com.spring2025.vietchefs.services.ReviewReactionService;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,8 +29,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -61,6 +61,9 @@ public class ReviewServiceImplTest {
     
     @Mock
     private ImageService imageService;
+
+    @Mock
+    private ContentFilterService contentFilterService;
 
     @InjectMocks
     private ReviewServiceImpl reviewService;
@@ -584,5 +587,80 @@ public class ReviewServiceImplTest {
         verify(chefRepository, times(2)).findById(testChef.getId());
         verify(reviewRepository).countByChef(testChef);
         verify(reviewRepository).findByChefAndIsDeletedFalse(eq(testChef), any(Pageable.class));
+    }
+
+    @Test
+    void createReview_ShouldFilterProfanityFromDescription() throws IOException {
+        // Arrange
+        when(userRepository.findById(testUser.getId())).thenReturn(Optional.of(testUser));
+        when(chefRepository.findById(testChef.getId())).thenReturn(Optional.of(testChef));
+        when(bookingRepository.findById(testBooking.getId())).thenReturn(Optional.of(testBooking));
+        when(reviewCriteriaService.getCriteriaById(1L)).thenReturn(testCriteria);
+        when(reviewRepository.save(any(Review.class))).thenReturn(testReview);
+        when(imageService.uploadImage(any(MultipartFile.class), anyLong(), eq("REVIEW")))
+                .thenReturn("http://example.com/images/test-image.jpg");
+        when(imageRepository.findByEntityTypeAndEntityId("REVIEW", testReview.getId())).thenReturn(testImages);
+        when(reviewReactionService.getReactionCountsByReview(anyLong())).thenReturn(reactionCounts);
+        
+        // Mock content filtering
+        String filteredDescription = "This is a test review with profanity ***";
+        when(contentFilterService.filterText(createRequest.getDescription())).thenReturn(filteredDescription);
+        
+        // Act
+        reviewService.createReview(createRequest, testUser.getId());
+        
+        // Assert
+        verify(contentFilterService).filterText(createRequest.getDescription());
+        verify(reviewRepository).save(argThat(review -> 
+            review.getDescription().equals(filteredDescription)
+        ));
+    }
+    
+    @Test
+    void updateReview_ShouldFilterProfanityFromDescription() throws IOException {
+        // Arrange
+        when(reviewRepository.findById(testReview.getId())).thenReturn(Optional.of(testReview));
+        when(reviewCriteriaService.getCriteriaById(1L)).thenReturn(testCriteria);
+        when(reviewRepository.save(any(Review.class))).thenReturn(testReview);
+        when(imageService.uploadImage(any(MultipartFile.class), anyLong(), eq("REVIEW")))
+                .thenReturn("http://example.com/images/updated-image.jpg");
+        when(imageRepository.findById(1L)).thenReturn(Optional.of(testImage));
+        when(imageRepository.findByEntityTypeAndEntityId("REVIEW", testReview.getId())).thenReturn(testImages);
+        when(reviewReactionService.getReactionCountsByReview(anyLong())).thenReturn(reactionCounts);
+        
+        // Mock content filtering
+        String filteredDescription = "Updated review with *** content";
+        when(contentFilterService.filterText(updateRequest.getDescription())).thenReturn(filteredDescription);
+        
+        // Act
+        reviewService.updateReview(testReview.getId(), updateRequest, testUser.getId());
+        
+        // Assert
+        verify(contentFilterService).filterText(updateRequest.getDescription());
+        verify(reviewRepository).save(argThat(review -> 
+            review.getDescription().equals(filteredDescription)
+        ));
+    }
+    
+    @Test
+    void addChefResponse_ShouldFilterProfanityFromResponse() {
+        // Arrange
+        when(reviewRepository.findById(testReview.getId())).thenReturn(Optional.of(testReview));
+        when(reviewRepository.save(any(Review.class))).thenReturn(testReview);
+        when(imageRepository.findByEntityTypeAndEntityId("REVIEW", testReview.getId())).thenReturn(testImages);
+        when(reviewReactionService.getReactionCountsByReview(anyLong())).thenReturn(reactionCounts);
+        
+        String responseWithProfanity = "Thank you for your review, badword";
+        String filteredResponse = "Thank you for your review, ***";
+        when(contentFilterService.filterText(responseWithProfanity)).thenReturn(filteredResponse);
+        
+        // Act
+        reviewService.addChefResponse(testReview.getId(), responseWithProfanity, testChef.getId());
+        
+        // Assert
+        verify(contentFilterService).filterText(responseWithProfanity);
+        verify(reviewRepository).save(argThat(review -> 
+            review.getResponse().equals(filteredResponse)
+        ));
     }
 } 
