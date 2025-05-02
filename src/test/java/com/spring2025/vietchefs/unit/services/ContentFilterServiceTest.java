@@ -1,4 +1,4 @@
-package com.spring2025.vietchefs.services;
+package com.spring2025.vietchefs.unit.services;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -7,6 +7,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+
+import com.spring2025.vietchefs.services.ContentFilterService;
 
 import java.util.HashSet;
 import java.util.List;
