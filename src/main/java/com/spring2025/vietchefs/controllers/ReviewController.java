@@ -150,6 +150,21 @@ public class ReviewController {
         return ResponseEntity.ok(review);
     }
 
+    // Get a specific review for a booking
+    @GetMapping("/reviews/booking/{bookingId}")
+    public ResponseEntity<?> getReviewByBooking(@PathVariable Long bookingId) {
+        ReviewResponse review = reviewService.getReviewByBooking(bookingId);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("hasReview", review != null);
+        response.put("review", review);
+        response.put("message", review != null ? 
+            "BR-46: Buổi đặt này đã có đánh giá." : 
+            "Buổi đặt này chưa có đánh giá.");
+        
+        return ResponseEntity.ok(response);
+    }
+
     // Create a new review
     @PostMapping("/reviews")
     @PreAuthorize("hasRole('ROLE_CUSTOMER')")
