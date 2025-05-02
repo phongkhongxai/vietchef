@@ -113,6 +113,8 @@ public class ReviewServiceImpl implements ReviewService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + bookingId));
         
+        // Phục vụ cho BR-46: Kiểm tra xem booking đã có review chưa 
+        // Mỗi buổi đặt chỉ cho phép gửi một đánh giá duy nhất từ khách hàng
         Review review = reviewRepository.findByBookingAndIsDeletedFalse(booking)
                 .orElse(null);
                 
@@ -132,6 +134,13 @@ public class ReviewServiceImpl implements ReviewService {
         if (request.getBookingId() != null) {
             booking = bookingRepository.findById(request.getBookingId())
                     .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + request.getBookingId()));
+            
+            // BR-46: Kiểm tra xem buổi đặt này đã có đánh giá chưa
+            Optional<Review> existingReview = reviewRepository.findByBookingAndIsDeletedFalse(booking);
+            if (existingReview.isPresent()) {
+                throw new VchefApiException(HttpStatus.BAD_REQUEST, 
+                    "BR-46: Mỗi buổi đặt chỉ cho phép gửi một đánh giá duy nhất từ khách hàng.");
+            }
         }
         
         // Filter the review description for profanity
@@ -198,6 +207,9 @@ public class ReviewServiceImpl implements ReviewService {
         if (!existingReview.getUser().getId().equals(userId)) {
             throw new IllegalArgumentException("Only the user who created the review can update it");
         }
+        
+        // BR-46: Ghi chú - Việc sửa đổi review không thể thay đổi booking
+        // Booking được gán khi tạo review và không thể thay đổi sau đó
         
         // Filter the review description for profanity
         String filteredDescription = contentFilterService.filterText(request.getDescription());
