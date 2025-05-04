@@ -113,6 +113,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         if (dto.getTotalPrice() == null || dto.getTotalPrice().compareTo(BigDecimal.ZERO) < 0) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "TotalPrice not valid (null or < 0).");
         }
+        detail.setTotalPrice(dto.getTotalPrice());
         return bookingDetailRepository.save(detail);
     }
     private boolean isOverlappingWithExistingBookings(Chef chef, LocalDate sessionDate, LocalTime timeBeginTravel, LocalTime startTime) {
