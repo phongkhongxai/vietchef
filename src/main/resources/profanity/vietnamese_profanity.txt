@@ -1,0 +1,70 @@
+# Danh sách từ ngữ tiếng Việt cần lọc
+# Mỗi từ hoặc cụm từ trên một dòng
+# Dòng bắt đầu bằng # là comment
+
+đụ
+đm
+đmm
+dcm
+đcm
+điếm
+điếm đàng
+con điếm
+thằng điếm
+đĩ
+cave
+cặc
+buồi
+cu
+chim
+dái
+lồn
+bím
+cứt
+lol
+má
+mẹ mày
+cmm
+clm
+cc
+đkm
+địt
+chết mẹ
+fuck
+fucking
+địt mẹ
+vãi
+vãi cả
+vãi lồn
+vcl
+wtf
+súc vật
+ngu
+ngu học
+thằng ngu
+ngu như chó
+óc chó
+thằng óc chó
+mả
+mả mẹ
+mả cha
+bà
+cm
+đéo
+đbh
+đbrr
+phò
+đĩ điếm
+đĩ đào
+phò du
+bitch
+tởm
+kinh tởm
+mọi rợ
+khốn nạn
+dâm
+dâm dục
+dâm ô
+súc sinh
+dở hơi
+mất dạy 
