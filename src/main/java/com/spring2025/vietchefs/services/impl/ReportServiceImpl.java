@@ -109,7 +109,10 @@ public class ReportServiceImpl implements ReportService{
     public ReportDto updateReportStatus(Long id, String status) {
         Report report = reportRepository.findById(id)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Report not found with id: "+id));
-
+        String normalizedStatus = status.toUpperCase();
+        if (!normalizedStatus.equals("HANDLED") && !normalizedStatus.equals("REJECTED")) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Invalid status: " + status + ". Only 'HANDLED' or 'REJECTED' are allowed.");
+        }
         report.setStatus(status.toUpperCase());
         reportRepository.save(report);
 
