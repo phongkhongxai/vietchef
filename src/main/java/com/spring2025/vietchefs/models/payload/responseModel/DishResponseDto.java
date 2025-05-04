@@ -26,4 +26,5 @@ public class DishResponseDto {
     private BigDecimal basePrice;
     private Integer estimatedCookGroup;
     private String imageUrl;
+    private double distance;
 }
