@@ -23,4 +23,5 @@ public class ChefResponseDto {
     private String certification;       // Chứng chỉ nấu ăn
     private String status;              // Trạng thái ("PENDING", "ACTIVE", "INACTIVE")
     private BigDecimal averageRating;   // Đánh giá trung bình của đầu bếp
+    private double distance;
 }

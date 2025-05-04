@@ -94,7 +94,6 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         detail.setTimeBeginTravel(dto.getTimeBeginTravel());
         detail.setTotalChefFeePrice(dto.getTotalChefFeePrice());
         detail.setPlatformFee(dto.getPlatformFee());
-        detail.setTotalCookTime(dto.getTotalCookTime());
         detail.setDiscountAmout(dto.getDiscountAmout() != null ? dto.getDiscountAmout() : BigDecimal.ZERO);
         detail.setMenuId(dto.getMenuId() != null ? dto.getMenuId() : null);
         List<BookingDetailItem> dishes = Optional.ofNullable(dto.getDishes())
@@ -111,7 +110,9 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                 })
                 .collect(Collectors.toList());
         detail.setDishes(dishes);
-        detail.setTotalPrice(dto.getTotalPrice());
+        if (dto.getTotalPrice() == null || dto.getTotalPrice().compareTo(BigDecimal.ZERO) < 0) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "TotalPrice not valid (null or < 0).");
+        }
         return bookingDetailRepository.save(detail);
     }
     private boolean isOverlappingWithExistingBookings(Chef chef, LocalDate sessionDate, LocalTime timeBeginTravel, LocalTime startTime) {
@@ -350,7 +351,6 @@ public class BookingDetailServiceImpl implements BookingDetailService {
 
                 uniqueDishIds.addAll(menuDishIds);
             }
-
             if (dto.getExtraDishIds() != null && !dto.getExtraDishIds().isEmpty()) {
                 for (Long extraDishId : dto.getExtraDishIds()) {
                     Dish dish = dishRepository.findById(extraDishId)
@@ -363,7 +363,6 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                     uniqueDishIds.add(extraDishId);
                 }
             }
-
             List<Long> dishIds = new ArrayList<>(uniqueDishIds);
             if (dto.getMenuId() != null) {
                 totalCookTime = calculateService.calculateTotalCookTimeFromMenu(dto.getMenuId(), dishIds, bookingDetail.getBooking().getGuestCount());
@@ -393,7 +392,6 @@ public class BookingDetailServiceImpl implements BookingDetailService {
             discountAmountDetail = platformFee.multiply(bookingDetail.getBooking().getBookingPackage().getDiscount());
             totalPrice = totalPrice.subtract(discountAmountDetail);
         }
-
         reviewResponse.setChefCookingFee(cookingFee);
         reviewResponse.setTotalCookTime(totalCookTime);
         reviewResponse.setPriceOfDishes(dishPrice);
@@ -420,6 +418,9 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         Booking booking = bookingDetail.getBooking();
         if(bookingDetail.getIsUpdated()){
             throw new VchefApiException(HttpStatus.BAD_REQUEST,"BookingDetail already updated.");
+        }
+        if (bookingDetailUpdateRequest.getDishes() == null || bookingDetailUpdateRequest.getDishes().isEmpty()) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Dishes cannot empty.");
         }
         // Xóa danh sách món ăn cũ
         if (!bookingDetail.getDishes().isEmpty()) {

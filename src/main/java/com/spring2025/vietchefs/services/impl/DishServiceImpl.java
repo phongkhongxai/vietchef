@@ -90,7 +90,6 @@ public class DishServiceImpl implements DishService {
         }
         if (dishRequest.getFoodTypeIds() != null && !dishRequest.getFoodTypeIds().isEmpty()) {
             List<FoodType> foodTypes = foodTypeRepository.findAllByIdInAndIsDeletedFalse(dishRequest.getFoodTypeIds());
-
             if (foodTypes.isEmpty()) {
                 throw new VchefApiException(HttpStatus.NOT_FOUND, "No valid FoodTypes found for the given IDs.");
             }
@@ -185,7 +184,19 @@ public class DishServiceImpl implements DishService {
 
         // Chuyển sang DTO
         List<DishResponseDto> content = filteredDishes.stream()
-                .map(dish -> modelMapper.map(dish, DishResponseDto.class))
+                .map(dish -> {
+                    DishResponseDto dto = modelMapper.map(dish, DishResponseDto.class);
+
+                    Chef chef = dish.getChef();
+                    if (chef != null && chef.getLatitude() != null && chef.getLongitude() != null) {
+                        double chefLat = chef.getLatitude();
+                        double chefLng = chef.getLongitude();
+                        double distanceToCustomer = calculateService.calculateDistance(customerLat, customerLng, chefLat, chefLng);
+                        dto.setDistance(distanceToCustomer);
+                    }
+
+                    return dto;
+                })
                 .collect(Collectors.toList());
 
         DishesResponse response = new DishesResponse();
@@ -311,7 +322,19 @@ public class DishServiceImpl implements DishService {
 
         // Chuyển sang DTO
         List<DishResponseDto> content = filteredDishes.stream()
-                .map(dish -> modelMapper.map(dish, DishResponseDto.class))
+                .map(dish -> {
+                    DishResponseDto dto = modelMapper.map(dish, DishResponseDto.class);
+
+                    Chef chef = dish.getChef();
+                    if (chef != null && chef.getLatitude() != null && chef.getLongitude() != null) {
+                        double chefLat = chef.getLatitude();
+                        double chefLng = chef.getLongitude();
+                        double distanceToCustomer = calculateService.calculateDistance(customerLat, customerLng, chefLat, chefLng);
+                        dto.setDistance(distanceToCustomer);
+                    }
+
+                    return dto;
+                })
                 .collect(Collectors.toList());
         DishesResponse templatesResponse = new DishesResponse();
         templatesResponse.setContent(content);
@@ -372,7 +395,19 @@ public class DishServiceImpl implements DishService {
 
         // Chuyển sang DTO
         List<DishResponseDto> content = filteredDishes.stream()
-                .map(dish -> modelMapper.map(dish, DishResponseDto.class))
+                .map(dish -> {
+                    DishResponseDto dto = modelMapper.map(dish, DishResponseDto.class);
+
+                    Chef chef = dish.getChef();
+                    if (chef != null && chef.getLatitude() != null && chef.getLongitude() != null) {
+                        double chefLat = chef.getLatitude();
+                        double chefLng = chef.getLongitude();
+                        double distanceToCustomer = calculateService.calculateDistance(customerLat, customerLng, chefLat, chefLng);
+                        dto.setDistance(distanceToCustomer);
+                    }
+
+                    return dto;
+                })
                 .collect(Collectors.toList());
 
         DishesResponse response = new DishesResponse();

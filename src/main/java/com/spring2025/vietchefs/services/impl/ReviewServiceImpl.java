@@ -12,6 +12,7 @@ import com.spring2025.vietchefs.repositories.*;
 import com.spring2025.vietchefs.services.ReviewCriteriaService;
 import com.spring2025.vietchefs.services.ReviewReactionService;
 import com.spring2025.vietchefs.services.ReviewService;
+import com.spring2025.vietchefs.services.ContentFilterService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -43,6 +44,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final ChefRepository chefRepository;
     private final ImageRepository imageRepository;
     private final ImageService imageService;
+    private final ContentFilterService contentFilterService;
 
     @Autowired
     public ReviewServiceImpl(
@@ -54,7 +56,8 @@ public class ReviewServiceImpl implements ReviewService {
             UserRepository userRepository,
             ChefRepository chefRepository,
             ImageRepository imageRepository,
-            ImageService imageService) {
+            ImageService imageService,
+            ContentFilterService contentFilterService) {
         this.reviewRepository = reviewRepository;
         this.reviewDetailRepository = reviewDetailRepository;
         this.reviewCriteriaService = reviewCriteriaService;
@@ -64,6 +67,7 @@ public class ReviewServiceImpl implements ReviewService {
         this.chefRepository = chefRepository;
         this.imageRepository = imageRepository;
         this.imageService = imageService;
+        this.contentFilterService = contentFilterService;
     }
 
     @Override
@@ -109,6 +113,8 @@ public class ReviewServiceImpl implements ReviewService {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + bookingId));
         
+        // Phục vụ cho BR-46: Kiểm tra xem booking đã có review chưa 
+        // Mỗi buổi đặt chỉ cho phép gửi một đánh giá duy nhất từ khách hàng
         Review review = reviewRepository.findByBookingAndIsDeletedFalse(booking)
                 .orElse(null);
                 
@@ -128,13 +134,23 @@ public class ReviewServiceImpl implements ReviewService {
         if (request.getBookingId() != null) {
             booking = bookingRepository.findById(request.getBookingId())
                     .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + request.getBookingId()));
+            
+            // BR-46: Kiểm tra xem buổi đặt này đã có đánh giá chưa
+            Optional<Review> existingReview = reviewRepository.findByBookingAndIsDeletedFalse(booking);
+            if (existingReview.isPresent()) {
+                throw new VchefApiException(HttpStatus.BAD_REQUEST, 
+                    "BR-46: Mỗi buổi đặt chỉ cho phép gửi một đánh giá duy nhất từ khách hàng.");
+            }
         }
+        
+        // Filter the review description for profanity
+        String filteredDescription = contentFilterService.filterText(request.getDescription());
         
         Review review = new Review();
         review.setUser(user);
         review.setChef(chef);
         review.setBooking(booking);
-        review.setDescription(request.getDescription());
+        review.setDescription(filteredDescription);
         review.setOverallExperience(request.getOverallExperience());
         review.setCreateAt(LocalDateTime.now());
         review.setIsDeleted(false);
@@ -192,8 +208,14 @@ public class ReviewServiceImpl implements ReviewService {
             throw new IllegalArgumentException("Only the user who created the review can update it");
         }
         
+        // BR-46: Ghi chú - Việc sửa đổi review không thể thay đổi booking
+        // Booking được gán khi tạo review và không thể thay đổi sau đó
+        
+        // Filter the review description for profanity
+        String filteredDescription = contentFilterService.filterText(request.getDescription());
+        
         // Update review details
-        existingReview.setDescription(request.getDescription());
+        existingReview.setDescription(filteredDescription);
         existingReview.setOverallExperience(request.getOverallExperience());
         
         // Handle main image upload
@@ -269,18 +291,19 @@ public class ReviewServiceImpl implements ReviewService {
         Review review = reviewRepository.findById(reviewId)
                 .orElseThrow(() -> new ResourceNotFoundException("Review not found with id: " + reviewId));
         
-        User chefUser = userRepository.findById(chefId)
-                .orElseThrow(() -> new ResourceNotFoundException("Chef user not found with id: " + chefId));
-        
-        // Verify that the chef is the one being reviewed
-        if (!chefUser.getId().equals(review.getChef().getUser().getId())) {
-            throw new IllegalArgumentException("Only the chef who is being reviewed can respond to this review");
+        // Verify the chef is the one being reviewed
+        if (!review.getChef().getId().equals(chefId)) {
+            throw new IllegalArgumentException("Only the chef being reviewed can respond to the review");
         }
         
-        review.setResponse(response);
+        // Filter the chef response for profanity
+        String filteredResponse = contentFilterService.filterText(response);
+        
+        review.setResponse(filteredResponse);
         review.setChefResponseAt(LocalDateTime.now());
         
         Review updatedReview = reviewRepository.save(review);
+        
         return mapToResponse(updatedReview);
     }
 
