@@ -14,4 +14,5 @@ public class NotificationRequest {
     private Long bookingId;
     private Long bookingDetailId;
     private String screen;
+    private String notiType;
 }

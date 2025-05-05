@@ -13,7 +13,7 @@ public class NotificationDto {
     private Long userId;
     private String title;
     private String message;
-    private boolean isRead = false;
+    private boolean isRead;
     private LocalDateTime createdAt;
     private Long bookingId;
     private Long bookingDetailId;
