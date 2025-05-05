@@ -1,5 +1,8 @@
 package com.spring2025.vietchefs.services.impl;
 
+import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.messaging.FirebaseMessagingException;
+import com.google.firebase.messaging.Message;
 import com.spring2025.vietchefs.models.entity.Dish;
 import com.spring2025.vietchefs.models.entity.Notification;
 import com.spring2025.vietchefs.models.entity.User;
@@ -19,6 +22,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.*;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -39,6 +43,8 @@ public class NotificationService {
     private UserRepository userRepository;
     @Autowired
     private ModelMapper modelMapper;
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
     public NotificationsResponse getALlNotificationsOfUser(Long userId, int pageNo, int pageSize, String sortBy, String sortDir){
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
                 : Sort.by(sortBy).descending();
@@ -64,6 +70,18 @@ public class NotificationService {
         templatesResponse.setTotalPages(notifications.getTotalPages());
         templatesResponse.setLast(notifications.isLast());
         return templatesResponse;
+    }
+    public List<NotificationDto> getChatNotificationsOfUser(Long userId) {
+        Optional<User> optionalUser = userRepository.findById(userId);
+        if (optionalUser.isEmpty()) {
+            throw new VchefApiException(HttpStatus.NOT_FOUND, "User not found.");
+        }
+        List<Notification> notifications = notificationRepository.findByUserIdAndNotiType(userId, "CHAT_NOTIFY");
+        List<NotificationDto> notificationDtos = notifications.stream()
+                .map(notification -> modelMapper.map(notification, NotificationDto.class))
+                .collect(Collectors.toList());
+
+        return notificationDtos;
     }
     public void sendPushNotification(NotificationRequest request) {
         Long userId = request.getUserId();
@@ -100,7 +118,6 @@ public class NotificationService {
         if (request.getBookingDetailId() != null) {
             data.put("bookingDetailId", request.getBookingDetailId());
         }
-
         Map<String, Object> message = Map.of(
                 "to", expoToken,
                 "sound", "default",
@@ -108,8 +125,6 @@ public class NotificationService {
                 "body", body,
                 "data", data
         );
-
-
         HttpEntity<Map<String, Object>> httpRequest = new HttpEntity<>(message, headers);
         ResponseEntity<String> response = restTemplate.postForEntity(url, httpRequest, String.class);
         //System.out.println("Expo Response: " + response.getBody());
@@ -127,6 +142,7 @@ public class NotificationService {
             notification.setBookingDetailId(request.getBookingDetailId());
         }
         notificationRepository.save(notification);
+        messagingTemplate.convertAndSendToUser(user.getUsername(), "/queue/notifications", notification);
     }
     public void markAsReadByIds(List<Long> ids) {
         List<Notification> notifications = notificationRepository.findAllById(ids);
@@ -140,11 +156,21 @@ public class NotificationService {
         notificationRepository.saveAll(notifications);
     }
     public void markAllAsReadByUser(Long userId) {
-        List<Notification> notifications = notificationRepository.findByUserIdAndIsReadFalse(userId);
+        List<Notification> notifications = notificationRepository.findByUserIdAndIsReadFalseAndNotiTypeNot(userId, "CHAT_NOTIFY");
         for (Notification n : notifications) {
             n.setRead(true);
         }
         notificationRepository.saveAll(notifications);
     }
+    public void markAllChatAsReadByUser(Long userId) {
+        List<Notification> notifications = notificationRepository.findByUserIdAndIsReadFalseAndNotiType(userId, "CHAT_NOTIFY");
+        for (Notification n : notifications) {
+            n.setRead(true);
+        }
+        notificationRepository.saveAll(notifications);
+    }
+
+
+
 }
 
