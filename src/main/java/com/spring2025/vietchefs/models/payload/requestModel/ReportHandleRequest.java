@@ -1,10 +1,10 @@
 package com.spring2025.vietchefs.models.payload.requestModel;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
-@Getter
-@Setter
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class ReportHandleRequest {
     private String status;
     private Integer deduction;
