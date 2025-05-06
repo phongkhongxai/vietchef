@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -37,9 +38,9 @@ public class ChatMessage {
 
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
-
-    @Column(name = "timestamp", nullable = false)
-    private LocalDateTime timestamp;
+    @CreationTimestamp
+    @Column(updatable = false)
+    private LocalDateTime timestamp = LocalDateTime.now();
 
     @Column(name = "content_type", nullable = false)
     private String contentType;
