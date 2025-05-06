@@ -18,6 +18,7 @@ public class ReportDto {
     private String reasonDetail;
     private String status;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
     private Long reviewId;
     private BookingDetailResponse bookingDetail;
 }
