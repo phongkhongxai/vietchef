@@ -138,6 +138,9 @@ public class NotificationService {
         if (request.getBookingId() != null) {
             notification.setBookingId(request.getBookingId());
         }
+        if (request.getNotiType() != null) {
+            notification.setNotiType(request.getNotiType());
+        }
         if (request.getBookingDetailId() != null) {
             notification.setBookingDetailId(request.getBookingDetailId());
         }
