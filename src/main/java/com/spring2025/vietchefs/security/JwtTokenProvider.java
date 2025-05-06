@@ -34,7 +34,7 @@ public class JwtTokenProvider {
         return token;
     }
     public String generateToken(Authentication authentication, User user, long expiration) {
-        String username = authentication.getName();
+        String username = user.getUsername();
         String userId = user.getId().toString();
         String role = user.getRole().getRoleName();
 
