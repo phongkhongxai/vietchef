@@ -16,41 +16,39 @@ public class ChatRoomServiceImpl implements ChatRoomService {
 
     @Override
     public Optional<String> getChatRoomId(String senderId, String recipientId, boolean createNewRoomIfNotExists) {
-        String chatId = senderId.compareTo(recipientId) < 0
-                ? String.format("%s_%s", senderId, recipientId)
-                : String.format("%s_%s", recipientId, senderId);
+        return chatRoomRepository
+                .findBySenderIdAndRecipientId(senderId, recipientId)
+                .map(ChatRoom::getChatId)
+                .or(() -> {
+                    if (createNewRoomIfNotExists) {
+                        String chatId = createChatId(senderId, recipientId);
+                        return Optional.of(chatId);
+                    }
 
-        Optional<ChatRoom> chatRoom = chatRoomRepository.findByChatId(chatId);
-
-        if (chatRoom.isPresent()) {
-            return Optional.of(chatId);
-        } else if (createNewRoomIfNotExists) {
-            ChatRoom newRoom = ChatRoom.builder()
-                    .chatId(chatId)
-                    .senderId(senderId)
-                    .recipientId(recipientId)
-                    .build();
-            chatRoomRepository.save(newRoom);
-            return Optional.of(chatId);
-        }
-
-        return Optional.empty();
+                    return Optional.empty();
+                });
     }
 
     @Override
     public String createChatId(String senderId, String recipientId) {
-        String chatId = senderId.compareTo(recipientId) < 0
-                ? String.format("%s_%s", senderId, recipientId)
-                : String.format("%s_%s", recipientId, senderId);
+        String chatId = String.format("%s_%s", senderId, recipientId);
 
-        ChatRoom chatRoom = ChatRoom
+        ChatRoom senderRecipient = ChatRoom
                 .builder()
                 .chatId(chatId)
                 .senderId(senderId)
                 .recipientId(recipientId)
                 .build();
 
-        chatRoomRepository.save(chatRoom);
+        ChatRoom recipientSender = ChatRoom
+                .builder()
+                .chatId(chatId)
+                .senderId(recipientId)
+                .recipientId(senderId)
+                .build();
+
+        chatRoomRepository.save(senderRecipient);
+        chatRoomRepository.save(recipientSender);
 
         return chatId;
     }
