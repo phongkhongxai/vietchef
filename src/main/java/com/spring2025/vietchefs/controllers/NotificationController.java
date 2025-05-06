@@ -63,6 +63,14 @@ public class NotificationController {
         notificationService.markAsReadByIds(ids);
         return ResponseEntity.ok("OKE");
     }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_CHEF')")
+    @PutMapping("/my-chat")
+    public ResponseEntity<String> updateNotiReadIds(@AuthenticationPrincipal UserDetails userDetails) {
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        notificationService.markAllChatAsReadByUser(bto.getId());
+        return ResponseEntity.ok("OKE");
+    }
 }
 
 

@@ -77,30 +77,22 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     @Override
     public List<ChatMessageDto> getConversationsOfUser(String username) {
         List<ChatMessage> chatMessages = chatMessageRepository.findByChatIdContainingIgnoreCase(username);
-        Map<String, Optional<ChatMessage>> groupedMessages = chatMessages.stream()
+        return chatMessages.stream()
                 .collect(Collectors.groupingBy(
-                        msg -> {
-                            String[] chatIds = msg.getChatId().split("_");
-                            Arrays.sort(chatIds);
-                            return chatIds[0] + "_" + chatIds[1];  // Chuẩn hóa chatId (alice_bob hoặc bob_alice)
-                        },
-                        Collectors.maxBy(Comparator.comparing(ChatMessage::getTimestamp))  // Lấy tin nhắn mới nhất
-                ));
-
-        // Chuyển đổi thành ChatMessageDto
-        return groupedMessages.values().stream()
+                        ChatMessage::getChatId,
+                        Collectors.maxBy(Comparator.comparing(ChatMessage::getTimestamp))
+                ))
+                .values()
+                .stream()
                 .flatMap(Optional::stream)
                 .map(msg -> {
                     ChatMessageDto dto = modelMapper.map(msg, ChatMessageDto.class);
-                    // Nếu người gửi là chính người dùng, đổi tên thành "Bạn"
                     if (msg.getSenderId().equals(username)) {
                         dto.setSenderName("You");
-                    } else {
-                        dto.setSenderName(msg.getSenderId());  // Gán tên người gửi
                     }
                     return dto;
                 })
-                .collect(Collectors.toList());
+                .toList();
     }
 
     private void validateMessage(ChatMessageDto chatMessage) {
