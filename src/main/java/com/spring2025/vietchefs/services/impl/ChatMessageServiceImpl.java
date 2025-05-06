@@ -39,7 +39,6 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     public void processMessage(ChatMessageDto chatMessage) {
         validateMessage(chatMessage);
         ChatMessage msg = modelMapper.map(chatMessage,ChatMessage.class);
-        msg.setTimestamp(LocalDateTime.now());
         User user = userRepository.findByUsername(chatMessage.getRecipientId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User not found with username."));
         msg = saveMessage(msg);
@@ -116,9 +115,6 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         }
         if (chatMessage.getContentType() == null || chatMessage.getContentType().isEmpty()) {
             throw new VchefApiException(BAD_REQUEST,"error.chat.required.contentType");
-        }
-        if (chatMessage.getTimestamp() == null) {
-            throw new VchefApiException(BAD_REQUEST,"error.notification.required.timestamp");
         }
     }
 }
