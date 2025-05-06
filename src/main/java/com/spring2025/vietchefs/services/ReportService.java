@@ -9,6 +9,7 @@ public interface ReportService {
     ReportDto createReportWithChefNoShow(Long reporterId, ReportRequest request);
     ReportDto createReportWithOtherReason(Long reporterId, ReportRequest request);
     ReportsResponse getAllReports(int pageNo, int pageSize, String sortBy, String sortDir);
+    ReportsResponse getAllMyReports(Long userId,int pageNo, int pageSize, String sortBy, String sortDir);
     ReportsResponse getAllReportsPending(int pageNo, int pageSize, String sortBy, String sortDir);
     ReportDto getReportById(Long id);
     ReportDto updateReportStatus(Long id, ReportHandleRequest request);

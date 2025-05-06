@@ -136,6 +136,32 @@ public class ReportServiceImpl implements ReportService{
     }
 
     @Override
+    public ReportsResponse getAllMyReports(Long userId, int pageNo, int pageSize, String sortBy, String sortDir) {
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name())
+                ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+        User reporter = userRepository.findById(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User not found"));
+
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+        Page<Report> reportsPage = reportRepository.findByReportedByIdAndIsDeletedFalse(reporter.getId(), pageable);
+
+        List<Report> listOfDishes = reportsPage.getContent();
+
+        List<ReportDto> content = listOfDishes.stream().map(bt -> modelMapper.map(bt, ReportDto.class)).collect(Collectors.toList());
+
+        ReportsResponse response = new ReportsResponse();
+        response.setContent(content);
+        response.setPageNo(reportsPage.getNumber());
+        response.setPageSize(reportsPage.getSize());
+        response.setTotalElements(reportsPage.getTotalElements());
+        response.setTotalPages(reportsPage.getTotalPages());
+        response.setLast(reportsPage.isLast());
+
+        return response;
+    }
+
+    @Override
     public ReportsResponse getAllReportsPending(int pageNo, int pageSize, String sortBy, String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name())
                 ? Sort.by(sortBy).ascending()
