@@ -255,7 +255,7 @@ public class ReportServiceImpl implements ReportService{
             notificationService.sendPushNotification(customerNotification);
         }
         report.setStatus(normalizedStatus);
-        reportRepository.save(report);
+        report = reportRepository.save(report);
         return modelMapper.map(report, ReportDto.class);
     }
 
