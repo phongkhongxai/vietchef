@@ -64,6 +64,17 @@ public class ReportController {
         return ResponseEntity.ok(reportService.getAllReports(pageNo, pageSize, sortBy, sortDir));
     }
     @SecurityRequirement(name = "Bearer Authentication")
+    @GetMapping("/my")
+    public ResponseEntity<ReportsResponse> getAllMyReports(@AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(value = "pageNo", defaultValue = "0") int pageNo,
+            @RequestParam(value = "pageSize", defaultValue = "10") int pageSize,
+            @RequestParam(value = "sortBy", defaultValue = "createdAt") String sortBy,
+            @RequestParam(value = "sortDir", defaultValue = "desc") String sortDir
+    ) {
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        return ResponseEntity.ok(reportService.getAllMyReports(bto.getId(),pageNo, pageSize, sortBy, sortDir));
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
     @GetMapping("/pending")
     public ResponseEntity<ReportsResponse> getAllPendingReports(
             @RequestParam(value = "pageNo", defaultValue = "0") int pageNo,

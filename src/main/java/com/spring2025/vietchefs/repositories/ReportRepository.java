@@ -17,5 +17,7 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
     Page<Report> findAllNotDeleted(Pageable pageable);
     Page<Report> findByReasonAndIsDeletedFalse(String reason, Pageable pageable);
     Page<Report> findByStatusAndIsDeletedFalse(String reason, Pageable pageable);
+    Page<Report> findByReportedByIdAndIsDeletedFalse(Long reportedById, Pageable pageable);
+
 
 }
