@@ -78,25 +78,29 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     @Override
     public List<ChatMessageDto> getConversationsOfUser(String username) {
         List<ChatMessage> chatMessages = chatMessageRepository.findByChatIdContainingIgnoreCase(username);
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User not found with username."));
-
-        notificationService.markAllChatAsReadByUser(user.getId());
-        return chatMessages.stream()
+        Map<String, Optional<ChatMessage>> groupedMessages = chatMessages.stream()
                 .collect(Collectors.groupingBy(
-                        ChatMessage::getChatId,
-                        Collectors.maxBy(Comparator.comparing(ChatMessage::getTimestamp))
-                ))
-                .values()
-                .stream()
+                        msg -> {
+                            String[] chatIds = msg.getChatId().split("_");
+                            Arrays.sort(chatIds);
+                            return chatIds[0] + "_" + chatIds[1];  // Chuẩn hóa chatId (alice_bob hoặc bob_alice)
+                        },
+                        Collectors.maxBy(Comparator.comparing(ChatMessage::getTimestamp))  // Lấy tin nhắn mới nhất
+                ));
+
+        // Chuyển đổi thành ChatMessageDto
+        return groupedMessages.values().stream()
                 .flatMap(Optional::stream)
-                .map(msg -> {  // Áp dụng chuyển đổi cho từng tin nhắn
+                .map(msg -> {
                     ChatMessageDto dto = modelMapper.map(msg, ChatMessageDto.class);
+                    // Nếu người gửi là chính người dùng, đổi tên thành "Bạn"
                     if (msg.getSenderId().equals(username)) {
                         dto.setSenderName("You");
+                    } else {
+                        dto.setSenderName(msg.getSenderId());  // Gán tên người gửi
                     }
-                    return dto;}
-                )
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 
