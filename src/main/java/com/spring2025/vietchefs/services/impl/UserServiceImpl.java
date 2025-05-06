@@ -8,6 +8,7 @@ import com.spring2025.vietchefs.models.payload.dto.SignupDto;
 import com.spring2025.vietchefs.models.payload.dto.UserDto;
 import com.spring2025.vietchefs.models.payload.requestModel.ChangePasswordRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.UserRequest;
+import com.spring2025.vietchefs.models.payload.responseModel.UserResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.UsersResponse;
 import com.spring2025.vietchefs.repositories.ChefRepository;
 import com.spring2025.vietchefs.repositories.RoleRepository;
@@ -170,6 +171,13 @@ public class UserServiceImpl implements UserService {
         User existingUser = userRepository.findByUsernameOrEmail(username, email)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.BAD_REQUEST, "User not found"));
         return modelMapper.map(existingUser, UserDto.class);
+    }
+
+    @Override
+    public UserResponse getProfileUserByUsername(String username) {
+        User existingUser = userRepository.findByUsernameOrEmail(username, null)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.BAD_REQUEST, "User not found"));
+        return modelMapper.map(existingUser, UserResponse.class);
     }
 
     @Override
