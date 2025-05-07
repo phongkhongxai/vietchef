@@ -50,5 +50,6 @@ public class CustomerTransaction {
     @Column(nullable = false)
     private String status;
     @Column(nullable = false)
+    @Builder.Default
     private Boolean isDeleted = false;
 }

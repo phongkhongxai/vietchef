@@ -41,6 +41,7 @@ public class ChefTransaction {
     private String description;
 
     @Column(nullable = false)
+    @Builder.Default
     private LocalDateTime transactionDate=LocalDateTime.now();
     @CreationTimestamp
     @Column(updatable = false)
@@ -52,5 +53,6 @@ public class ChefTransaction {
 
     // Đánh dấu xóa mềm nếu cần
     @Column(nullable = false)
+    @Builder.Default
     private Boolean isDeleted = false;
 }

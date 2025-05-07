@@ -49,6 +49,7 @@ public class Review {
     private LocalDateTime createAt;
 
     @Column(nullable = false)
+    @Builder.Default
     private Boolean isDeleted = false;
     
     @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
