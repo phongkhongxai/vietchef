@@ -5,6 +5,7 @@ import com.spring2025.vietchefs.models.payload.dto.UserDto;
 import com.spring2025.vietchefs.models.payload.dto.WalletDto;
 import com.spring2025.vietchefs.models.payload.requestModel.ChangePasswordRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.UserRequest;
+import com.spring2025.vietchefs.models.payload.responseModel.UserResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.WalletPlusResponse;
 import com.spring2025.vietchefs.services.UserService;
 import com.spring2025.vietchefs.services.WalletService;
@@ -31,6 +32,11 @@ public class UserController {
     @GetMapping("/profile")
     public ResponseEntity<UserDto> viewProfile(@AuthenticationPrincipal UserDetails userDetails) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        return new ResponseEntity<>(bto, HttpStatus.OK);
+    }
+    @GetMapping("/{username}")
+    public ResponseEntity<UserResponse> getProfileByUsername(@PathVariable("username") String username) {
+        UserResponse bto = userService.getProfileUserByUsername(username);
         return new ResponseEntity<>(bto, HttpStatus.OK);
     }
     @SecurityRequirement(name = "Bearer Authentication")

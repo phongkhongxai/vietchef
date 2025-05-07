@@ -81,89 +81,6 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
     @Autowired
     private TimeZoneService timeZoneService;
     
-    @Override
-    public List<AvailableTimeSlotResponse> findAvailableTimeSlotsForChef(
-            Long chefId, LocalDate startDate, LocalDate endDate) {
-        
-        // Kiểm tra tham số đầu vào
-        validateInputParameters(startDate, endDate);
-        
-        // Lấy thông tin chef
-        Chef chef = chefRepository.findById(chefId)
-                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, 
-                    "Chef not found with id: " + chefId));
-        
-        // Wrap the result in filterValidTimeSlots
-        return filterValidTimeSlots(findAvailableTimeSlots(chef, startDate, endDate));
-    }
-    
-    @Override
-    public List<AvailableTimeSlotResponse> findAvailableTimeSlotsForCurrentChef(
-            LocalDate startDate, LocalDate endDate) {
-        
-        // Kiểm tra tham số đầu vào
-        validateInputParameters(startDate, endDate);
-        
-        // Lấy thông tin chef hiện tại
-        Chef chef = getCurrentChef();
-        
-        // Wrap the result in filterValidTimeSlots
-        return filterValidTimeSlots(findAvailableTimeSlots(chef, startDate, endDate));
-    }
-    
-    @Override
-    public List<AvailableTimeSlotResponse> findAvailableTimeSlotsForChefByDate(
-            Long chefId, LocalDate date) {
-        
-        // Kiểm tra tham số đầu vào
-        if (date == null) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Date cannot be null");
-        }
-        if (date.isBefore(LocalDate.now())) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot search for dates in the past");
-        }
-        
-        // Lấy thông tin chef
-        Chef chef = chefRepository.findById(chefId)
-                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, 
-                    "Chef not found with id: " + chefId));
-        
-        // Wrap the result in filterValidTimeSlots
-        return filterValidTimeSlots(findAvailableTimeSlots(chef, date, date));
-    }
-    
-    @Override
-    public boolean isTimeSlotAvailable(Long chefId, LocalDate date, LocalTime startTime, LocalTime endTime) {
-        // Kiểm tra tham số đầu vào
-        if (date == null || startTime == null || endTime == null) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Date, start time, and end time cannot be null");
-        }
-        if (date.isBefore(LocalDate.now())) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot check availability for dates in the past");
-        }
-        if (!startTime.isBefore(endTime)) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Start time must be before end time");
-        }
-        
-        // Lấy thông tin chef
-        Chef chef = chefRepository.findById(chefId)
-                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, 
-                    "Chef not found with id: " + chefId));
-        
-        // Kiểm tra xem khung giờ có thuộc lịch làm việc của chef
-        if (!isWithinChefSchedule(chef, date, startTime, endTime)) {
-            return false;
-        }
-        
-        // Kiểm tra xem khung giờ có xung đột với các ngày bị chặn
-        if (hasBlockedDateConflict(chef, date, startTime, endTime)) {
-            return false;
-        }
-        
-        // Kiểm tra xem khung giờ có xung đột với các đơn đặt hàng hiện có
-        return !bookingConflictService.hasBookingConflict(chef, date, startTime, endTime);
-    }
-    
     
     @Override
     public List<AvailableTimeSlotResponse> findAvailableTimeSlotsWithInSingleDate(
@@ -672,15 +589,13 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         LocalTime scheduleStart = schedule.getStartTime();
         LocalTime scheduleEnd = schedule.getEndTime();
         
-        // Check if schedule time is blocked
-        boolean isBlocked = blockedDates.stream()
-                .anyMatch(blockedDate -> 
-                    hasTimeOverlap(scheduleStart, scheduleEnd, 
-                                 blockedDate.getStartTime(), blockedDate.getEndTime()));
+        // Filter blocked dates to only include those matching the given date
+        List<ChefBlockedDate> filteredBlockedDates = blockedDates.stream()
+                .filter(blockedDate -> blockedDate.getBlockedDate().equals(date))
+                .collect(Collectors.toList());
         
-        if (isBlocked) {
-            return availableSlots;
-        }
+        // Sort blocked dates by start time for easier processing
+        filteredBlockedDates.sort(Comparator.comparing(ChefBlockedDate::getStartTime));
         
         // Get all bookings for this date
         List<BookingDetail> bookings = bookingDetailRepository.findByBooking_ChefAndSessionDateAndIsDeletedFalse(chef, date);
@@ -717,72 +632,147 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                 .sorted(Comparator.comparing(BookingDetail::getTimeBeginTravel))
                 .collect(Collectors.toList());
         
-        // Nếu không có booking nào, trả về một slot cho toàn bộ lịch làm việc
+        // If no bookings, process the entire schedule with blocked dates
         if (activeBookings.isEmpty()) {
-            AvailableTimeSlotResponse slot = new AvailableTimeSlotResponse();
-            slot.setChefId(chef.getId());
-            slot.setChefName(chef.getUser().getFullName());
-            slot.setDate(date);
-            slot.setStartTime(scheduleStart);
-            slot.setEndTime(scheduleEnd);
-            slot.setDurationMinutes((int) Duration.between(scheduleStart, scheduleEnd).toMinutes());
-            availableSlots.add(slot);
-            return availableSlots;
-        }
-        
-        // Thời gian hiện tại bắt đầu từ thời gian bắt đầu lịch làm việc
-        LocalTime currentTime = scheduleStart;
-        
-        // Process each booking
-        for (BookingDetail booking : activeBookings) {
-            // Thời gian bắt đầu booking là thời gian bắt đầu di chuyển
-            LocalTime bookingStartTime = booking.getTimeBeginTravel();
+            // Start with the schedule start time
+            LocalTime currentTime = scheduleStart;
             
-            // If there's a gap between current time and booking start, it's a potential slot
-            if (currentTime.isBefore(bookingStartTime)) {
-                // Tạo slot từ currentTime đến bookingStartTime
-                AvailableTimeSlotResponse slot = new AvailableTimeSlotResponse();
-                slot.setChefId(chef.getId());
-                slot.setChefName(chef.getUser().getFullName());
-                slot.setDate(date);
-                slot.setStartTime(currentTime);
-                slot.setEndTime(bookingStartTime);
-                slot.setDurationMinutes((int) Duration.between(currentTime, bookingStartTime).toMinutes());
+            // Process each blocked date to create slots around them
+            for (ChefBlockedDate blockedDate : filteredBlockedDates) {
+                LocalTime blockedStart = blockedDate.getStartTime();
+                LocalTime blockedEnd = blockedDate.getEndTime();
                 
-                // Chỉ thêm slot nếu thời lượng hợp lệ (ít nhất 30 phút)
-                if (slot.getDurationMinutes() >= 30) {
-                    availableSlots.add(slot);
+                // Only process if this blocked date overlaps with our schedule
+                if (hasTimeOverlap(scheduleStart, scheduleEnd, blockedStart, blockedEnd)) {
+                    // Create a slot before the blocked period if there's enough time
+                    if (currentTime.isBefore(blockedStart)) {
+                        createAndAddSlot(availableSlots, chef, date, currentTime, blockedStart);
+                    }
+                    
+                    // Move current time to after this blocked date
+                    currentTime = blockedEnd;
+                    
+                    // If current time is beyond schedule end, we're done
+                    if (currentTime.isAfter(scheduleEnd)) {
+                        break;
+                    }
                 }
             }
             
-            // Move current time to after this booking 
-            // Thời gian kết thúc booking là startTime (thời điểm khách bắt đầu ăn)
-            // Cộng thêm 30 phút làm thời gian nghỉ
-            currentTime = booking.getStartTime().plusMinutes(30);
+            // Add one final slot after the last blocked date (if any remaining time)
+            if (currentTime.isBefore(scheduleEnd)) {
+                createAndAddSlot(availableSlots, chef, date, currentTime, scheduleEnd);
+            }
             
-            // If current time is now beyond the schedule's end time, we're done with this schedule
-            if (currentTime.isAfter(scheduleEnd)) {
-                break;
+            return availableSlots;
+        }
+        
+        // If we have both bookings and blocked dates, process them together
+        // Start with the schedule start time
+        LocalTime currentTime = scheduleStart;
+        
+        // Create a combined timeline of events (both bookings and blocked dates)
+        List<TimelineEvent> timeline = new ArrayList<>();
+        
+        // Add bookings to timeline
+        for (BookingDetail booking : activeBookings) {
+            timeline.add(new TimelineEvent(booking.getTimeBeginTravel(), EventType.BOOKING_START, booking));
+            timeline.add(new TimelineEvent(booking.getStartTime().plusMinutes(30), EventType.BOOKING_END, booking));
+        }
+        
+        // Add blocked dates to timeline
+        for (ChefBlockedDate blockedDate : filteredBlockedDates) {
+            // Only add if it overlaps with our schedule
+            if (hasTimeOverlap(scheduleStart, scheduleEnd, blockedDate.getStartTime(), blockedDate.getEndTime())) {
+                timeline.add(new TimelineEvent(blockedDate.getStartTime(), EventType.BLOCKED_START, blockedDate));
+                timeline.add(new TimelineEvent(blockedDate.getEndTime(), EventType.BLOCKED_END, blockedDate));
             }
         }
         
-        // Check for one last slot after the last booking
-        if (currentTime.isBefore(scheduleEnd)) {
-            AvailableTimeSlotResponse slot = new AvailableTimeSlotResponse();
-            slot.setChefId(chef.getId());
-            slot.setChefName(chef.getUser().getFullName());
-            slot.setDate(date);
-            slot.setStartTime(currentTime);
-            slot.setEndTime(scheduleEnd);
-            slot.setDurationMinutes((int) Duration.between(currentTime, scheduleEnd).toMinutes());
-            
-            // Chỉ thêm slot nếu thời lượng hợp lệ (ít nhất 30 phút)
-            if (slot.getDurationMinutes() >= 30) {
-                availableSlots.add(slot);
+        // Sort timeline by time
+        timeline.sort(Comparator.comparing(TimelineEvent::getTime));
+        
+        // Process timeline to create available slots
+        int blockLevel = 0; // Track how many overlapping blocks we have (booking or blocked date)
+        
+        for (TimelineEvent event : timeline) {
+            // Skip events outside our schedule time
+            if (event.getTime().isBefore(scheduleStart) || !event.getTime().isBefore(scheduleEnd)) {
+                continue;
             }
+            
+            if (event.getType() == EventType.BOOKING_START || event.getType() == EventType.BLOCKED_START) {
+                // If we're going from available to blocked, create a slot
+                if (blockLevel == 0 && currentTime.isBefore(event.getTime())) {
+                    createAndAddSlot(availableSlots, chef, date, currentTime, event.getTime());
+                }
+                blockLevel++;
+            } else { // BOOKING_END or BLOCKED_END
+                blockLevel--;
+                // If we're going back to available, update current time
+                if (blockLevel == 0) {
+                    currentTime = event.getTime();
+                }
+            }
+        }
+        
+        // Add one final slot after the last event (if any remaining time and not blocked)
+        if (blockLevel == 0 && currentTime.isBefore(scheduleEnd)) {
+            createAndAddSlot(availableSlots, chef, date, currentTime, scheduleEnd);
         }
         
         return availableSlots;
+    }
+    
+    // Helper class for timeline processing
+    private class TimelineEvent {
+        private LocalTime time;
+        private EventType type;
+        private Object data; // Either BookingDetail or ChefBlockedDate
+        
+        public TimelineEvent(LocalTime time, EventType type, Object data) {
+            this.time = time;
+            this.type = type;
+            this.data = data;
+        }
+        
+        public LocalTime getTime() {
+            return time;
+        }
+        
+        public EventType getType() {
+            return type;
+        }
+        
+        public Object getData() {
+            return data;
+        }
+    }
+    
+    // Event types for timeline
+    private enum EventType {
+        BOOKING_START,
+        BOOKING_END,
+        BLOCKED_START,
+        BLOCKED_END
+    }
+    
+    // Helper method to create and add a slot if it's long enough
+    private void createAndAddSlot(List<AvailableTimeSlotResponse> slots, Chef chef, LocalDate date, 
+                                LocalTime startTime, LocalTime endTime) {
+        // Create slot
+        AvailableTimeSlotResponse slot = new AvailableTimeSlotResponse();
+        slot.setChefId(chef.getId());
+        slot.setChefName(chef.getUser().getFullName());
+        slot.setDate(date);
+        slot.setStartTime(startTime);
+        slot.setEndTime(endTime);
+        slot.setDurationMinutes((int) Duration.between(startTime, endTime).toMinutes());
+        
+        // Only add slot if it's at least 30 minutes
+        if (slot.getDurationMinutes() >= 30) {
+            slots.add(slot);
+        }
     }
     
     /**

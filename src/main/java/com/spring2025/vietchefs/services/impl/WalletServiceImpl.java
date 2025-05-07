@@ -46,6 +46,9 @@ public class WalletServiceImpl implements WalletService {
         if (walletRepository.existsByUserId(userId)) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Wallet already exists for this user!");
         }
+        if (walletType == null || (!walletType.equalsIgnoreCase("customer") && !walletType.equalsIgnoreCase("chef"))) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Wallet type must be either 'customer' or 'chef'");
+        }
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User not found"));
@@ -61,6 +64,9 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     public void updateWalletType(Long userId, String newType) {
+        if (newType == null || (!newType.equalsIgnoreCase("customer") && !newType.equalsIgnoreCase("chef"))) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Wallet type must be either 'customer' or 'chef'");
+        }
         Wallet wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for user id: " + userId));
 
@@ -70,12 +76,19 @@ public class WalletServiceImpl implements WalletService {
 
     @Override
     public WalletDto updateEmailPaypalForWallet(Long userId, String email) {
+        if (email == null || !isValidEmail(email)) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Invalid email format");
+        }
         Wallet wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for user id: " + userId));
 
         wallet.setPaypalAccountEmail(email);
         walletRepository.save(wallet);
         return modelMapper.map(wallet, WalletDto.class);
+    }
+    private boolean isValidEmail(String email) {
+        String regex = "^[A-Za-z0-9+_.-]+@(.+)$";
+        return email.matches(regex);
     }
 
     @Override

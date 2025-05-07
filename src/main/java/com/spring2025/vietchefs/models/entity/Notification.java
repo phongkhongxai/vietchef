@@ -29,5 +29,6 @@ public class Notification {
     private Long bookingId;
     private Long bookingDetailId;
     private String screen; //nothing, booking, bookingDetail
+    private String notiType;
 
 }

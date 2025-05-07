@@ -1,5 +1,6 @@
 package com.spring2025.vietchefs.controllers;
 
+import com.spring2025.vietchefs.models.payload.dto.NotificationDto;
 import com.spring2025.vietchefs.models.payload.dto.UserDto;
 import com.spring2025.vietchefs.models.payload.requestModel.NotificationRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.NotificationsResponse;
@@ -42,6 +43,11 @@ public class NotificationController {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
         return notificationService.getALlNotificationsOfUser(bto.getId(), pageNo,  pageSize,  sortBy,  sortDir);
     }
+//    @GetMapping("/my/chat")
+//    public ResponseEntity<List<NotificationDto>> getNotiChatOfUser(@AuthenticationPrincipal UserDetails userDetails) {
+//        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+//        return ResponseEntity.ok(notificationService.getChatNotificationsOfUser(bto.getId()));
+//    }
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_CHEF')")
     @PutMapping("/my/all")
@@ -55,6 +61,14 @@ public class NotificationController {
     @PutMapping("/my")
     public ResponseEntity<String> updateNotiReadIds(@RequestParam List<Long> ids) {
         notificationService.markAsReadByIds(ids);
+        return ResponseEntity.ok("OKE");
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_CHEF')")
+    @PutMapping("/my-chat")
+    public ResponseEntity<String> updateNotiReadIds(@AuthenticationPrincipal UserDetails userDetails) {
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        notificationService.markAllChatAsReadByUser(bto.getId());
         return ResponseEntity.ok("OKE");
     }
 }

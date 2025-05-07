@@ -288,11 +288,20 @@ public class ChefServiceImpl implements ChefService {
         List<ChefResponseDto> content = filteredChefs.stream()
                 .map(chef -> {
                     ChefResponseDto dto = modelMapper.map(chef, ChefResponseDto.class);
-                    // Lấy đánh giá trung bình cho chef
+
+                    // Tính khoảng cách từ chef đến customer
+                    double chefLat = chef.getLatitude();
+                    double chefLng = chef.getLongitude();
+                    double distanceToCustomer = calculateService.calculateDistance(customerLat, customerLng, chefLat, chefLng);
+                    dto.setDistance(distanceToCustomer); // set distance vào DTO
+
+                    // Gán đánh giá trung bình
                     dto.setAverageRating(reviewService.getAverageRatingForChef(chef.getId()));
+
                     return dto;
                 })
                 .collect(Collectors.toList());
+
 
         // Sắp xếp theo rating nếu được yêu cầu
         if (sortBy.equals("rating")) {
@@ -339,8 +348,22 @@ public class ChefServiceImpl implements ChefService {
 
         // Chuyển đổi thành DTO để trả về
         List<ChefResponseDto> content = filteredChefs.stream()
-                .map(chef -> modelMapper.map(chef, ChefResponseDto.class))
+                .map(chef -> {
+                    ChefResponseDto dto = modelMapper.map(chef, ChefResponseDto.class);
+
+                    // Tính khoảng cách từ chef đến customer
+                    double chefLat = chef.getLatitude();
+                    double chefLng = chef.getLongitude();
+                    double distanceToCustomer = calculateService.calculateDistance(customerLat, customerLng, chefLat, chefLng);
+                    dto.setDistance(distanceToCustomer); // set distance vào DTO
+
+                    // Gán đánh giá trung bình
+                    dto.setAverageRating(reviewService.getAverageRatingForChef(chef.getId()));
+
+                    return dto;
+                })
                 .collect(Collectors.toList());
+
 
         // Tạo đối tượng response
         ChefsResponse chefsResponse = new ChefsResponse();

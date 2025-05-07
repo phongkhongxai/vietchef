@@ -44,6 +44,8 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     @Autowired
     private UserRepository userRepository;
     @Autowired
+    private PaymentCycleRepository paymentCycleRepository;
+    @Autowired
     private BookingDetailItemRepository bookingDetailItemRepository;
     @Autowired
     private ChefTransactionRepository chefTransactionRepository;
@@ -94,7 +96,6 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         detail.setTimeBeginTravel(dto.getTimeBeginTravel());
         detail.setTotalChefFeePrice(dto.getTotalChefFeePrice());
         detail.setPlatformFee(dto.getPlatformFee());
-        detail.setTotalCookTime(dto.getTotalCookTime());
         detail.setDiscountAmout(dto.getDiscountAmout() != null ? dto.getDiscountAmout() : BigDecimal.ZERO);
         detail.setMenuId(dto.getMenuId() != null ? dto.getMenuId() : null);
         List<BookingDetailItem> dishes = Optional.ofNullable(dto.getDishes())
@@ -111,6 +112,9 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                 })
                 .collect(Collectors.toList());
         detail.setDishes(dishes);
+        if (dto.getTotalPrice() == null || dto.getTotalPrice().compareTo(BigDecimal.ZERO) < 0) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "TotalPrice not valid (null or < 0).");
+        }
         detail.setTotalPrice(dto.getTotalPrice());
         return bookingDetailRepository.save(detail);
     }
@@ -350,7 +354,6 @@ public class BookingDetailServiceImpl implements BookingDetailService {
 
                 uniqueDishIds.addAll(menuDishIds);
             }
-
             if (dto.getExtraDishIds() != null && !dto.getExtraDishIds().isEmpty()) {
                 for (Long extraDishId : dto.getExtraDishIds()) {
                     Dish dish = dishRepository.findById(extraDishId)
@@ -363,7 +366,6 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                     uniqueDishIds.add(extraDishId);
                 }
             }
-
             List<Long> dishIds = new ArrayList<>(uniqueDishIds);
             if (dto.getMenuId() != null) {
                 totalCookTime = calculateService.calculateTotalCookTimeFromMenu(dto.getMenuId(), dishIds, bookingDetail.getBooking().getGuestCount());
@@ -393,7 +395,6 @@ public class BookingDetailServiceImpl implements BookingDetailService {
             discountAmountDetail = platformFee.multiply(bookingDetail.getBooking().getBookingPackage().getDiscount());
             totalPrice = totalPrice.subtract(discountAmountDetail);
         }
-
         reviewResponse.setChefCookingFee(cookingFee);
         reviewResponse.setTotalCookTime(totalCookTime);
         reviewResponse.setPriceOfDishes(dishPrice);
@@ -420,6 +421,9 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         Booking booking = bookingDetail.getBooking();
         if(bookingDetail.getIsUpdated()){
             throw new VchefApiException(HttpStatus.BAD_REQUEST,"BookingDetail already updated.");
+        }
+        if (bookingDetailUpdateRequest.getDishes() == null || bookingDetailUpdateRequest.getDishes().isEmpty()) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Dishes cannot empty.");
         }
         // Xóa danh sách món ăn cũ
         if (!bookingDetail.getDishes().isEmpty()) {
@@ -606,6 +610,114 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         return modelMapper.map(bookingDetail, BookingDetailDto.class);
     }
 
+    @Override
+    public void refundBookingDetail(Long bookingDetailId) {
+        // Tìm BookingDetail
+        BookingDetail bookingDetail = bookingDetailRepository.findById(bookingDetailId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "BookingDetail not found with id: " + bookingDetailId));
+        if (bookingDetail.getStatus().equalsIgnoreCase("LOCKED")) {
+            Booking booking = bookingDetail.getBooking();
+            if ("SINGLE".equalsIgnoreCase(booking.getBookingType())) {
+                refundSingleBooking(bookingDetail);
+            } else if ("LONG_TERM".equalsIgnoreCase(booking.getBookingType())) {
+                refundLongTermBooking(bookingDetail);
+            }
+            bookingDetail.setStatus("REFUNDED");
+            bookingDetailRepository.save(bookingDetail);
+        } else {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "BookingDetail is not in a valid state for refund.");
+        }
+    }
+    private void refundSingleBooking(BookingDetail bookingDetail) {
+        // Nếu là booking SINGLE, hoàn tiền cho booking detail
+        CustomerTransaction depositTransaction = getPaymentTransaction(bookingDetail);
+        Wallet customerWallet = depositTransaction.getWallet();
+        BigDecimal refundAmount = depositTransaction.getAmount();
+        CustomerTransaction refundTransaction = CustomerTransaction.builder()
+                .wallet(customerWallet)
+                .booking(bookingDetail.getBooking())
+                .transactionType("REFUND")
+                .amount(refundAmount)
+                .description("Refund for canceled single booking")
+                .status("COMPLETED")
+                .isDeleted(false)
+                .build();
+        customerTransactionRepository.save(refundTransaction);
+        customerWallet.setBalance(customerWallet.getBalance().add(refundAmount));
+        walletRepository.save(customerWallet);
+        NotificationRequest customerNotification = NotificationRequest.builder()
+                .userId(bookingDetail.getBooking().getCustomer().getId())
+                .title("Refund Successful")
+                .body("Your payment for the single booking has been refunded.")
+                .bookingId(bookingDetail.getBooking().getId())
+                .screen("CustomerWalletScreen")
+                .build();
+        notificationService.sendPushNotification(customerNotification);
+    }
+
+    private void refundLongTermBooking(BookingDetail bookingDetail) {
+        PaymentCycle paymentCycle = getPaymentCycleForBookingDetail(bookingDetail);
+        if (paymentCycle != null && "PAID".equalsIgnoreCase(paymentCycle.getStatus())) {
+            // Hoàn tiền toàn bộ kỳ thanh toán
+            BigDecimal refundAmount = paymentCycle.getAmountDue();
+
+            // Tạo giao dịch hoàn tiền cho toàn bộ kỳ thanh toán
+            CustomerTransaction depositTransaction = getDepositTransaction(bookingDetail);
+            Wallet customerWallet = depositTransaction.getWallet();
+
+            CustomerTransaction refundTransaction = CustomerTransaction.builder()
+                    .wallet(customerWallet)
+                    .booking(bookingDetail.getBooking())
+                    .transactionType("REFUND")
+                    .amount(refundAmount)
+                    .description("Refund for canceled long-term booking cycle")
+                    .status("COMPLETED")
+                    .isDeleted(false)
+                    .build();
+
+            customerTransactionRepository.save(refundTransaction);
+            customerWallet.setBalance(customerWallet.getBalance().add(refundAmount));
+            walletRepository.save(customerWallet);
+            paymentCycle.setStatus("REFUND");
+            paymentCycleRepository.save(paymentCycle);
+            NotificationRequest customerNotification = NotificationRequest.builder()
+                    .userId(bookingDetail.getBooking().getCustomer().getId())
+                    .title("Refund Successful")
+                    .body("Your deposit for the canceled long-term booking and payment for cycle have been refunded.")
+                    .bookingId(bookingDetail.getBooking().getId())
+                    .screen("CustomerWalletScreen")
+                    .build();
+            notificationService.sendPushNotification(customerNotification);
+        } else {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Payment cycle is not PAID, cannot process refund.");
+        }
+    }
+    private CustomerTransaction getDepositTransaction(BookingDetail bookingDetail) {
+        List<CustomerTransaction> depositTransactions = customerTransactionRepository
+                .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(bookingDetail.getBooking().getId(), "INITIAL_PAYMENT", "COMPLETED");
+        if (depositTransactions.isEmpty()) {
+            throw new VchefApiException(HttpStatus.NOT_FOUND, "Deposit transaction not found for this booking.");
+        }
+        return depositTransactions.get(0);
+    }
+    private CustomerTransaction getPaymentTransaction(BookingDetail bookingDetail) {
+        List<CustomerTransaction> depositTransactions = customerTransactionRepository
+                .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(bookingDetail.getBooking().getId(), "PAYMENT", "COMPLETED");
+        if (depositTransactions.isEmpty()) {
+            throw new VchefApiException(HttpStatus.NOT_FOUND, "Payment transaction not found for this booking.");
+        }
+        return depositTransactions.get(0);
+    }
+    private PaymentCycle getPaymentCycleForBookingDetail(BookingDetail bookingDetail) {
+        Booking booking = bookingDetail.getBooking();
+        LocalDate sessionDate = bookingDetail.getSessionDate();
+        return paymentCycleRepository.findByBookingId(booking.getId())
+                .stream()
+                .filter(paymentCycle -> !sessionDate.isBefore(paymentCycle.getStartDate()) && !sessionDate.isAfter(paymentCycle.getEndDate()))
+                .findFirst()
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "No valid payment cycle found for the given session date."));
+    }
+
     @Scheduled(cron = "0 1 0 * * ?") // Mỗi ngày vào lúc nửa đêm 12h01
     public void updateBookingDetailsStatus() {
         LocalDate currentDate = LocalDate.now();
@@ -654,7 +766,6 @@ public class BookingDetailServiceImpl implements BookingDetailService {
             if (sessionDateTime.plusHours(12).isBefore(now)) {
                 try {
                     completeBookingDetail(detail);
-
                 } catch (Exception e) {
                     System.out.println(e.getMessage());
                 }

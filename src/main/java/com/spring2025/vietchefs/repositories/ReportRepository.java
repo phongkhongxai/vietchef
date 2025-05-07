@@ -16,4 +16,8 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
     @Query("SELECT p FROM Report p WHERE p.isDeleted = false")
     Page<Report> findAllNotDeleted(Pageable pageable);
     Page<Report> findByReasonAndIsDeletedFalse(String reason, Pageable pageable);
+    Page<Report> findByStatusAndIsDeletedFalse(String reason, Pageable pageable);
+    Page<Report> findByReportedByIdAndIsDeletedFalse(Long reportedById, Pageable pageable);
+
+
 }

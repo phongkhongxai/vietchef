@@ -8,5 +8,5 @@ public class ReportRequest {
     private String reason;
     private String reasonDetail;
     private Long reviewId;         // Optional - nếu lý do liên quan đến feedback
-    private Long bookingDetailId;  // Bắt buộc trong mọi trường hợp (đặc biệt CHEF_NO_SHOW)
+    private Long bookingDetailId;  // (đặc biệt CHEF_NO_SHOW)
 }

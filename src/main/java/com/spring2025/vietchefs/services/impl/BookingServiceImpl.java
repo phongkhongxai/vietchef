@@ -1062,13 +1062,11 @@ public class BookingServiceImpl implements BookingService {
                 bookingDetail.getSessionDate().isBefore(LocalDate.now().plusDays(2))) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel booking less than 2 days before session date");
         }
-
         if ("PENDING".equalsIgnoreCase(booking.getStatus())) {
             booking.setStatus("CANCELED");
             booking = bookingRepository.save(booking);
             return modelMapper.map(booking, BookingResponseDto.class);
         }
-
         // Nếu booking đã được thanh toán (PAID), kiểm tra giao dịch và hoàn tiền
         if ("PAID".equalsIgnoreCase(booking.getStatus()) || "CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
             List<CustomerTransaction> transactions = customerTransactionRepository
