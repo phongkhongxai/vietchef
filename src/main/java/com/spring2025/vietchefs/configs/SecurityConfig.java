@@ -121,10 +121,10 @@ public class SecurityConfig {
                                         .bearerFormat("JWT")
                         )
                 )
-                .addSecurityItem(new SecurityRequirement().addList("Bearer Authentication"));
-//                .servers(Arrays.asList(
-//                        new Server().url("https://vietchef.ddns.net")  // Đảm bảo Swagger sử dụng HTTPS
-//                ));
+                .addSecurityItem(new SecurityRequirement().addList("Bearer Authentication"))//;
+                .servers(Arrays.asList(
+                        new Server().url("https://vietchef.ddns.net")  // Đảm bảo Swagger sử dụng HTTPS
+                ));
     }
 
 //dang suy ngẵm
