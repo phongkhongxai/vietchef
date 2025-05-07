@@ -87,7 +87,6 @@ public class NotificationService {
         Long userId = request.getUserId();
         String title = request.getTitle();
         String body = request.getBody();
-
         // Lấy user
         Optional<User> optionalUser = userRepository.findById(userId);
         if (optionalUser.isEmpty()) {
