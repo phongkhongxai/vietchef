@@ -210,7 +210,6 @@ public class ChefServiceImpl implements ChefService {
     @Override
     public ChefsResponse getAllChefs(int pageNo, int pageSize, String sortBy, String sortDir) {
         Sort sort;
-        
         // Xử lý trường hợp sắp xếp theo đánh giá
         if (sortBy.equals("rating") || AppConstants.DEFAULT_SORT_RATING_DESC.equals(sortDir)) {
             sort = Sort.by("id").ascending(); // Default sort, we'll handle rating sort later
@@ -258,10 +257,9 @@ public class ChefServiceImpl implements ChefService {
     @Override
     public ChefsResponse getAllChefsNearBy(double customerLat, double customerLng, double distance, int pageNo, int pageSize, String sortBy, String sortDir) {
         Sort sort;
-        
         // Xử lý trường hợp sắp xếp theo đánh giá
-        if (sortBy.equals("rating") || AppConstants.DEFAULT_SORT_RATING_DESC.equals(sortDir)) {
-            sort = Sort.by("id").ascending(); // Default sort, we'll handle rating sort later
+        if (sortBy.equals("rating") || sortBy.equals("distance")|| AppConstants.DEFAULT_SORT_RATING_DESC.equals(sortDir)) {
+            sort = Sort.by("id").ascending();
         } else {
             sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
                     : Sort.by(sortBy).descending();
@@ -269,112 +267,93 @@ public class ChefServiceImpl implements ChefService {
         
         Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
 
-        Page<Chef> chefs = chefRepository.findByStatusAndIsDeletedFalse("ACTIVE", pageable);
-
+        Page<Chef> chefs = chefRepository.findByStatusAndIsDeletedFalseAndDistance("ACTIVE", customerLat, customerLng, distance, pageable);
         // Lấy danh sách các đầu bếp từ kết quả
         List<Chef> listOfChefs = chefs.getContent();
-
-        // Lọc các đầu bếp có khoảng cách gần khách hàng trong bán kính mong muốn
-        List<Chef> filteredChefs = listOfChefs.stream()
-                .filter(chef -> {
-                    double chefLat = chef.getLatitude(); // Giả sử có latitude và longitude trong chef entity
-                    double chefLng = chef.getLongitude();
-                    double distanceToCustomer = calculateService.calculateDistance(customerLat, customerLng, chefLat, chefLng);
-                    return distanceToCustomer <= distance; // Lọc các đầu bếp trong bán kính mong muốn
-                })
-                .toList();
-
-        // Chuyển đổi thành DTO để trả về và thêm đánh giá trung bình
-        List<ChefResponseDto> content = filteredChefs.stream()
+        List<ChefResponseDto> content = listOfChefs.stream()
                 .map(chef -> {
                     ChefResponseDto dto = modelMapper.map(chef, ChefResponseDto.class);
-
                     // Tính khoảng cách từ chef đến customer
                     double chefLat = chef.getLatitude();
                     double chefLng = chef.getLongitude();
                     double distanceToCustomer = calculateService.calculateDistance(customerLat, customerLng, chefLat, chefLng);
-                    dto.setDistance(distanceToCustomer); // set distance vào DTO
-
-                    // Gán đánh giá trung bình
+                    dto.setDistance(distanceToCustomer);
                     dto.setAverageRating(reviewService.getAverageRatingForChef(chef.getId()));
 
                     return dto;
                 })
                 .collect(Collectors.toList());
 
-
-        // Sắp xếp theo rating nếu được yêu cầu
         if (sortBy.equals("rating")) {
             content.sort(sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ?
                     Comparator.comparing(ChefResponseDto::getAverageRating, Comparator.nullsLast(Comparator.naturalOrder())) :
                     Comparator.comparing(ChefResponseDto::getAverageRating, Comparator.nullsLast(Comparator.reverseOrder())));
-        } else if (AppConstants.DEFAULT_SORT_RATING_DESC.equals(sortDir)) {
+        }else if (sortBy.equals("distance")) {
+            content.sort(sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ?
+                    Comparator.comparing(ChefResponseDto::getDistance, Comparator.nullsLast(Comparator.naturalOrder())) :
+                    Comparator.comparing(ChefResponseDto::getDistance, Comparator.nullsLast(Comparator.reverseOrder())));
+        }
+        else if (AppConstants.DEFAULT_SORT_RATING_DESC.equals(sortDir)) {
             content.sort(Comparator.comparing(ChefResponseDto::getAverageRating, Comparator.nullsLast(Comparator.reverseOrder())));
         }
 
-        // Tạo đối tượng response
-        ChefsResponse chefsResponse = new ChefsResponse();
-        chefsResponse.setContent(content);
-        chefsResponse.setPageNo(chefs.getNumber());
-        chefsResponse.setPageSize(chefs.getSize());
-        chefsResponse.setTotalElements(filteredChefs.size());
-        chefsResponse.setTotalPages((int) Math.ceil((double) filteredChefs.size() / pageSize));
-        chefsResponse.setLast(filteredChefs.size() <= pageNo * pageSize);
-
-        return chefsResponse;
+        ChefsResponse templatesResponse = new ChefsResponse();
+        templatesResponse.setContent(content);
+        templatesResponse.setPageNo(chefs.getNumber());
+        templatesResponse.setPageSize(chefs.getSize());
+        templatesResponse.setTotalElements(chefs.getTotalElements());
+        templatesResponse.setTotalPages(chefs.getTotalPages());
+        templatesResponse.setLast(chefs.isLast());
+        return templatesResponse;
     }
 
     @Override
     public ChefsResponse getAllChefsNearBySearch(String keySearch, double customerLat, double customerLng, double distance, int pageNo, int pageSize, String sortBy, String sortDir) {
-        // Tạo đối tượng Sort
-        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
-                : Sort.by(sortBy).descending();
+        Sort sort;
+        // Xử lý trường hợp sắp xếp theo đánh giá
+        if (sortBy.equals("rating") || sortBy.equals("distance")|| AppConstants.DEFAULT_SORT_RATING_DESC.equals(sortDir)) {
+            sort = Sort.by("id").ascending();
+        } else {
+            sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ? Sort.by(sortBy).ascending()
+                    : Sort.by(sortBy).descending();
+        }
         Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
 
-        Page<Chef> chefs = chefRepository.searchByFullNameOrBioAndStatus(keySearch,"ACTIVE", pageable);
-
-        // Lấy danh sách các đầu bếp từ kết quả
+        Page<Chef> chefs = chefRepository.searchChefByKeywordStatusAndDistance(keySearch,"ACTIVE",customerLat, customerLng, distance, pageable);
         List<Chef> listOfChefs = chefs.getContent();
-
-        // Lọc các đầu bếp có khoảng cách gần khách hàng trong bán kính mong muốn
-        List<Chef> filteredChefs = listOfChefs.stream()
-                .filter(chef -> {
-                    double chefLat = chef.getLatitude(); // Giả sử có latitude và longitude trong chef entity
-                    double chefLng = chef.getLongitude();
-                    double distanceToCustomer = calculateService.calculateDistance(customerLat, customerLng, chefLat, chefLng);
-                    return distanceToCustomer <= distance; // Lọc các đầu bếp trong bán kính mong muốn
-                })
-                .toList();
-
-        // Chuyển đổi thành DTO để trả về
-        List<ChefResponseDto> content = filteredChefs.stream()
+        List<ChefResponseDto> content = listOfChefs.stream()
                 .map(chef -> {
                     ChefResponseDto dto = modelMapper.map(chef, ChefResponseDto.class);
-
-                    // Tính khoảng cách từ chef đến customer
                     double chefLat = chef.getLatitude();
                     double chefLng = chef.getLongitude();
                     double distanceToCustomer = calculateService.calculateDistance(customerLat, customerLng, chefLat, chefLng);
-                    dto.setDistance(distanceToCustomer); // set distance vào DTO
-
-                    // Gán đánh giá trung bình
+                    dto.setDistance(distanceToCustomer);
                     dto.setAverageRating(reviewService.getAverageRatingForChef(chef.getId()));
 
                     return dto;
                 })
                 .collect(Collectors.toList());
-
-
+        if (sortBy.equals("rating")) {
+            content.sort(sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ?
+                    Comparator.comparing(ChefResponseDto::getAverageRating, Comparator.nullsLast(Comparator.naturalOrder())) :
+                    Comparator.comparing(ChefResponseDto::getAverageRating, Comparator.nullsLast(Comparator.reverseOrder())));
+        }else if (sortBy.equals("distance")) {
+            content.sort(sortDir.equalsIgnoreCase(Sort.Direction.ASC.name()) ?
+                    Comparator.comparing(ChefResponseDto::getDistance, Comparator.nullsLast(Comparator.naturalOrder())) :
+                    Comparator.comparing(ChefResponseDto::getDistance, Comparator.nullsLast(Comparator.reverseOrder())));
+        }
+        else if (AppConstants.DEFAULT_SORT_RATING_DESC.equals(sortDir)) {
+            content.sort(Comparator.comparing(ChefResponseDto::getAverageRating, Comparator.nullsLast(Comparator.reverseOrder())));
+        }
         // Tạo đối tượng response
-        ChefsResponse chefsResponse = new ChefsResponse();
-        chefsResponse.setContent(content);
-        chefsResponse.setPageNo(chefs.getNumber());
-        chefsResponse.setPageSize(chefs.getSize());
-        chefsResponse.setTotalElements(filteredChefs.size());
-        chefsResponse.setTotalPages((int) Math.ceil((double) filteredChefs.size() / pageSize));
-        chefsResponse.setLast(filteredChefs.size() <= pageNo * pageSize);
-
-        return chefsResponse;
+        ChefsResponse templatesResponse = new ChefsResponse();
+        templatesResponse.setContent(content);
+        templatesResponse.setPageNo(chefs.getNumber());
+        templatesResponse.setPageSize(chefs.getSize());
+        templatesResponse.setTotalElements(chefs.getTotalElements());
+        templatesResponse.setTotalPages(chefs.getTotalPages());
+        templatesResponse.setLast(chefs.isLast());
+        return templatesResponse;
     }
 
     @Override

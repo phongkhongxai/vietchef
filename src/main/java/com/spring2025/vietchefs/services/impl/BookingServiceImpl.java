@@ -420,6 +420,7 @@ public class BookingServiceImpl implements BookingService {
             // 🔹 Tính tổng giá của BookingDetail
             BigDecimal price4 = calculateService.calculateFinalPrice(price1, price2, price3);
             totalBookingPrice = totalBookingPrice.add(price4);
+            reviewSingleBookingResponse.setDistanceKm(price3Of.getDistanceKm());
             reviewSingleBookingResponse.setChefBringIngredients(detailDto.getChefBringIngredients());
             reviewSingleBookingResponse.setTotalChefFeePrice(totalChefFeePrice);
             reviewSingleBookingResponse.setTotalPrice(totalBookingPrice);
@@ -582,6 +583,7 @@ public class BookingServiceImpl implements BookingService {
 
         // Tạo response tổng hợp
         ReviewLongTermBookingResponse reviewResponse = new ReviewLongTermBookingResponse();
+        reviewResponse.setDistanceKm(travelFeeResponse.getDistanceKm());
         reviewResponse.setTotalPrice(totalBookingPrice);
         reviewResponse.setDiscountAmount(discountAmount);
         reviewResponse.setBookingDetails(detailPriceResponses);

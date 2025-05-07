@@ -14,6 +14,7 @@ import java.util.List;
 public class ReviewLongTermBookingResponse {
     private BigDecimal totalPrice;    // Tổng giá của toàn bộ booking dài hạn
     private BigDecimal discountAmount;// Số tiền giảm giá (nếu có)
+    private BigDecimal distanceKm;
     private List<BookingDetailPriceResponse> bookingDetails; // Chi tiết giá của từng buổi
 
 }
