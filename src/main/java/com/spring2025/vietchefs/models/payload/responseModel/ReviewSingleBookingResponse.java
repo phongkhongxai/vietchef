@@ -18,5 +18,6 @@ public class ReviewSingleBookingResponse {
     private Boolean chefBringIngredients;
     private Long menuId;
     private BigDecimal totalChefFeePrice;
+    private BigDecimal distanceKm;
 
 }
