@@ -38,7 +38,6 @@ public class ChatMessage {
 
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
-    @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime timestamp = LocalDateTime.now();
 
