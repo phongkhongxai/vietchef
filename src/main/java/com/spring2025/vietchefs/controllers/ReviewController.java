@@ -19,12 +19,16 @@ import com.spring2025.vietchefs.repositories.ChefRepository;
 import com.spring2025.vietchefs.repositories.UserRepository;
 import com.spring2025.vietchefs.services.BookingService;
 import com.spring2025.vietchefs.services.ChefService;
+import com.spring2025.vietchefs.services.ContentFilterService;
 import com.spring2025.vietchefs.services.ReviewCriteriaService;
 import com.spring2025.vietchefs.services.ReviewReactionService;
 import com.spring2025.vietchefs.services.ReviewReplyService;
 import com.spring2025.vietchefs.services.ReviewService;
 import com.spring2025.vietchefs.services.RoleService;
 import com.spring2025.vietchefs.services.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import jakarta.validation.Valid;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +60,7 @@ public class ReviewController {
     private final UserService userService;
     private final ChefService chefService;
     private final RoleService roleService;
+    private final ContentFilterService contentFilterService;
 
     @Autowired
     public ReviewController(
@@ -65,7 +70,8 @@ public class ReviewController {
             ReviewReactionService reviewReactionService,
             UserService userService,
             ChefService chefService,
-            RoleService roleService) {
+            RoleService roleService,
+            ContentFilterService contentFilterService) {
         this.reviewService = reviewService;
         this.reviewCriteriaService = reviewCriteriaService;
         this.reviewReplyService = reviewReplyService;
@@ -73,6 +79,7 @@ public class ReviewController {
         this.userService = userService;
         this.chefService = chefService;
         this.roleService = roleService;
+        this.contentFilterService = contentFilterService;
     }
 
     // Get current authenticated user
@@ -81,7 +88,7 @@ public class ReviewController {
         String currentUsername = authentication.getName();
         return userService.getProfileUserByUsernameOrEmail(currentUsername, currentUsername);
     }
-
+ 
     // Get all review criteria
     @GetMapping("/review-criteria")
     public ResponseEntity<List<ReviewCriteriaResponse>> getAllCriteria() {
@@ -170,6 +177,17 @@ public class ReviewController {
     @PreAuthorize("hasRole('ROLE_CUSTOMER')")
     public ResponseEntity<ReviewResponse> createReview(@RequestBody ReviewCreateRequest request) {
         UserDto currentUser = getCurrentUser();
+        
+        // Lọc nội dung đánh giá
+        String filteredDescription = contentFilterService.filterText(request.getDescription());
+        request.setDescription(filteredDescription);
+        
+        // Lọc nội dung trải nghiệm tổng thể
+        if (request.getOverallExperience() != null) {
+            String filteredExperience = contentFilterService.filterText(request.getOverallExperience());
+            request.setOverallExperience(filteredExperience);
+        }
+        
         ReviewResponse savedReview = reviewService.createReview(request, currentUser.getId());
         return new ResponseEntity<>(savedReview, HttpStatus.CREATED);
     }
@@ -179,6 +197,17 @@ public class ReviewController {
     @PreAuthorize("hasRole('ROLE_CUSTOMER')")
     public ResponseEntity<ReviewResponse> updateReview(@PathVariable Long id, @RequestBody ReviewUpdateRequest request) {
         UserDto currentUser = getCurrentUser();
+        
+        // Lọc nội dung đánh giá
+        String filteredDescription = contentFilterService.filterText(request.getDescription());
+        request.setDescription(filteredDescription);
+        
+        // Lọc nội dung trải nghiệm tổng thể
+        if (request.getOverallExperience() != null) {
+            String filteredExperience = contentFilterService.filterText(request.getOverallExperience());
+            request.setOverallExperience(filteredExperience);
+        }
+        
         ReviewResponse updatedReview = reviewService.updateReview(id, request, currentUser.getId());
         return ResponseEntity.ok(updatedReview);
     }
@@ -216,7 +245,11 @@ public class ReviewController {
         }
         
         String response = request.get("response");
-        ReviewResponse updatedReview = reviewService.addChefResponse(id, response, currentUser.getId());
+        
+        // Lọc nội dung phản hồi của chef
+        String filteredResponse = contentFilterService.filterText(response);
+        
+        ReviewResponse updatedReview = reviewService.addChefResponse(id, filteredResponse, currentUser.getId());
         
         return ResponseEntity.ok(updatedReview);
     }
@@ -226,8 +259,55 @@ public class ReviewController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ReviewReplyResponse> addReply(@PathVariable Long id, @RequestBody ReviewReplyRequest request) {
         UserDto currentUser = getCurrentUser();
-        ReviewReplyResponse reply = reviewReplyService.addReply(id, currentUser.getId(), request);
+        
+        // Lọc nội dung phản hồi
+        String filteredContent = contentFilterService.filterText(request.getContent());
+        
+        // Tạo request mới với nội dung đã lọc
+        ReviewReplyRequest filteredRequest = new ReviewReplyRequest();
+        filteredRequest.setContent(filteredContent);
+        
+        ReviewReplyResponse reply = reviewReplyService.addReply(id, currentUser.getId(), filteredRequest);
         return new ResponseEntity<>(reply, HttpStatus.CREATED);
+    }
+
+    // Get replies by user
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(
+            summary = "Lấy danh sách phản hồi của người dùng",
+            description = "Trả về danh sách các phản hồi của người dùng hiện tại"
+    )
+    @GetMapping("/reviews/replies/user")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<ReviewReplyResponse>> getRepliesByUser() {
+        UserDto currentUser = getCurrentUser();
+        List<ReviewReplyResponse> replies = reviewReplyService.getRepliesByUser(currentUser.getId());
+        return ResponseEntity.ok(replies);
+    }
+
+    // Delete a reply
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(
+            summary = "Xóa phản hồi",
+            description = "Người dùng chỉ có thể xóa phản hồi của chính họ hoặc admin có thể xóa bất kỳ phản hồi nào"
+    )
+    @DeleteMapping("/reviews/replies/{replyId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> deleteReply(@PathVariable Long replyId) {
+        UserDto currentUser = getCurrentUser();
+        
+        boolean isAdmin = "ROLE_ADMIN".equals(roleService.getRoleNameById(currentUser.getRoleId()));
+        
+        // Kiểm tra quyền xóa từ các phản hồi của người dùng
+        boolean isOwner = reviewReplyService.getRepliesByUser(currentUser.getId()).stream()
+                .anyMatch(reply -> reply.getReplyId().equals(replyId));
+                
+        if (isOwner || isAdmin) {
+            reviewReplyService.deleteReply(replyId);
+            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+        } else {
+            return new ResponseEntity<>(HttpStatus.FORBIDDEN);
+        }
     }
 
     // Add a reaction to a review
