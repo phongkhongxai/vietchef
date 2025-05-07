@@ -52,8 +52,6 @@ public class Report {
     @ManyToOne
     @JoinColumn(name = "booking_detail_id")
     private BookingDetail bookingDetail;
-
-
     @Column(nullable = false)
     private Boolean isDeleted = false;
 }
