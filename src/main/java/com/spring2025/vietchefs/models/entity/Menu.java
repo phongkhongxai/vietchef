@@ -44,6 +44,7 @@ public class Menu {
     private Double discountPercentage;
     @CreationTimestamp
     @Column(updatable = false)
+
     private LocalDateTime createdAt;
     @UpdateTimestamp
     private LocalDateTime updatedAt;

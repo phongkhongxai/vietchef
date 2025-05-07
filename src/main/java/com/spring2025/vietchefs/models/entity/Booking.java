@@ -35,7 +35,6 @@ public class Booking {
 
     @Column(nullable = false)
     private String status; // "pending", "confirmed", "completed", "canceled"
-
     @Column(columnDefinition = "TEXT")
     private String requestDetails;
     @Column(nullable = false)
