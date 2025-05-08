@@ -286,7 +286,7 @@ public class FavoriteChefServiceTest {
         List<FavoriteChef> favoriteChefs = new ArrayList<>();
         favoriteChefs.add(testFavoriteChef);
         
-        // Tạo một page mẫu với 1 favorite chef và pageSize = 10
+        // Create a sample page with 1 favorite chef and pageSize = 10
         Page<FavoriteChef> page = new PageImpl<>(favoriteChefs, 
                 PageRequest.of(0, requestedPageSize, Sort.by("id").ascending()), 1);
         
