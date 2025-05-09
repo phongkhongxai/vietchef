@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 public class ChefResponseDto {
     private Long id;
     private UserDto user;
+    private Integer reputationPoints;
     private String bio;                 // Giới thiệu ngắn
     private String description;         // Mô tả chi tiết
     private String address;
