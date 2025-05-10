@@ -42,6 +42,11 @@ public class AuthController {
         AuthenticationResponse token = authService.login(loginDto);
         return ResponseEntity.ok(token);
     }
+    @GetMapping(value = {"/hello-wrds"})
+    public ResponseEntity<String> login1(){
+        String sadas = "sadas";
+        return ResponseEntity.ok(sadas);
+    }
 
     @PostMapping("/register")
     public ResponseEntity<String> signup(@Valid @RequestBody SignupDto signupDto){
