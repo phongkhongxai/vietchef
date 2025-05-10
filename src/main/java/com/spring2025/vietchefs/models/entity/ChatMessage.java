@@ -41,7 +41,6 @@ public class ChatMessage {
     @Column(updatable = false)
     @Builder.Default
     private LocalDateTime timestamp = LocalDateTime.now();
-
     @Column(name = "content_type", nullable = false)
     private String contentType;
 }
