@@ -26,8 +26,11 @@ public interface BookingService {
     List<PaymentCycleResponse> getPaymentCyclesWithDetails(Long bookingId);
     PaymentCycleResponse payForPaymentCycle(Long paymentCycleId, Long userId);
     ApiResponse<BookingResponseDto> depositBooking(Long bookingId, Long userId);
-    BookingResponseDto cancelSingleBooking(Long bookingId);
+    BookingResponseDto cancelSingleBooking(Long bookingId,Long userId);
+    BookingResponseDto cancelSingleBookingFromChef(Long bookingId, Long userId);
+    BookingResponseDto cancelLongTermBookingFromChef(Long bookingId,Long userId);
     BookingResponseDto cancelLongTermBooking(Long bookingId);
+    BookingResponseDto cancelLongTermBooking2(Long bookingId, Long userId);
     Set<LocalDate> getFullyBookedDates(Long chefId);
 
 

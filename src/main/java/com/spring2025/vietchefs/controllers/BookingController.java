@@ -271,25 +271,43 @@ public class BookingController {
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CUSTOMER')")
     @PutMapping("/single/cancel/{bookingid}")
-    public ResponseEntity<?> cancelSingleBooking(@PathVariable Long bookingid) {
-        BookingResponseDto bookingResponseDto = bookingService.cancelSingleBooking(bookingid);
+    public ResponseEntity<?> cancelSingleBookingFromCustomer(@PathVariable Long bookingid, @AuthenticationPrincipal UserDetails userDetails) {
+        UserDto userDto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(), userDetails.getUsername());
+        BookingResponseDto bookingResponseDto = bookingService.cancelSingleBooking(bookingid,userDto.getId());
         return new ResponseEntity<>(bookingResponseDto, HttpStatus.OK);
     }
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CUSTOMER')")
     @PutMapping("/long-term/cancel/{bookingid}")
-    public ResponseEntity<?> cancelLongTermBooking(@PathVariable Long bookingid) {
-        BookingResponseDto bookingResponseDto = bookingService.cancelLongTermBooking(bookingid);
+    public ResponseEntity<?> cancelLongTermBookingFromCustomer(@PathVariable Long bookingid, @AuthenticationPrincipal UserDetails userDetails) {
+        UserDto userDto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(), userDetails.getUsername());
+        BookingResponseDto bookingResponseDto = bookingService.cancelLongTermBooking2(bookingid,userDto.getId());
+        return new ResponseEntity<>(bookingResponseDto, HttpStatus.OK);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PutMapping("/single/cancel-chef/{bookingid}")
+    public ResponseEntity<?> cancelSingleBookingFromChef(@PathVariable Long bookingid, @AuthenticationPrincipal UserDetails userDetails) {
+        UserDto userDto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(), userDetails.getUsername());
+        BookingResponseDto bookingResponseDto = bookingService.cancelSingleBookingFromChef(bookingid,userDto.getId());
+        return new ResponseEntity<>(bookingResponseDto, HttpStatus.OK);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PutMapping("/long-term/cancel-chef/{bookingid}")
+    public ResponseEntity<?> cancelLongTermBookingFromChef(@PathVariable Long bookingid, @AuthenticationPrincipal UserDetails userDetails) {
+        UserDto userDto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(), userDetails.getUsername());
+        BookingResponseDto bookingResponseDto = bookingService.cancelLongTermBookingFromChef(bookingid,userDto.getId());
         return new ResponseEntity<>(bookingResponseDto, HttpStatus.OK);
     }
 
-    @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
-    @PutMapping("/payment-cycles/cancel/{cycleId}")
-    public ResponseEntity<?> cancelLongTermBookingByPayCycle(@PathVariable Long cycleId) {
-        PaymentCycleResponseDto cancelPaymentCycle = paymentCycleService.cancelPaymentCycle(cycleId);
-        return new ResponseEntity<>(cancelPaymentCycle, HttpStatus.OK);
-    }
+//    @SecurityRequirement(name = "Bearer Authentication")
+//    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+//    @PutMapping("/payment-cycles/cancel/{cycleId}")
+//    public ResponseEntity<?> cancelLongTermBookingByPayCycle(@PathVariable Long cycleId) {
+//        PaymentCycleResponseDto cancelPaymentCycle = paymentCycleService.cancelPaymentCycle(cycleId);
+//        return new ResponseEntity<>(cancelPaymentCycle, HttpStatus.OK);
+//    }
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CHEF')")
     @PutMapping(value = "/booking-details/{bookingDetailId}/complete-chef", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

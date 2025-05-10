@@ -146,10 +146,7 @@ public class ChefServiceImpl implements ChefService {
         if (!chef.getStatus().equals("PENDING")) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef is not in PENDING status.");
         }
-        // Đặt trạng thái thành ACTIVE
         chef.setStatus("ACTIVE");
-
-        // Gán quyền ROLE_CHEF cho User
         Role chefRole = roleRepository.findByRoleName("ROLE_CHEF")
                                   .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Role ROLE_CHEF not found"));
         User user = chef.getUser();
