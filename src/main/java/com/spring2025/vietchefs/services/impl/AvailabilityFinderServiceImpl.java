@@ -612,7 +612,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                     boolean isActive = !booking.getIsDeleted() && 
                            !List.of("CANCELED", "OVERDUE", "REJECTED").contains(booking.getStatus()) &&
                            !detail.getIsDeleted() && 
-                           !List.of("CANCELED", "OVERDUE", "REJECTED").contains(detail.getStatus());
+                           !List.of("CANCELED", "OVERDUE", "REJECTED","REFUNDED").contains(detail.getStatus());
                     
                     if (!isActive) return false;
                     

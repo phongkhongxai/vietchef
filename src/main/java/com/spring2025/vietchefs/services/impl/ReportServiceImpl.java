@@ -243,7 +243,7 @@ public class ReportServiceImpl implements ReportService{
         } else if (normalizedStatus.equals("REJECTED")) {
             if (bookingDetail.getStatus().equalsIgnoreCase("LOCKED")) {
                 bookingDetail.setStatus("WAITING_FOR_CONFIRMATION");
-                bookingDetailRepository.save(bookingDetail);
+                bookingDetail=bookingDetailRepository.save(bookingDetail);
             }
             NotificationRequest customerNotification = NotificationRequest.builder()
                     .userId(report.getReportedBy().getId())
