@@ -105,7 +105,7 @@ public class ChefServiceImpl implements ChefService {
 
         }
         ChefResponseDto result = modelMapper.map(chef.get(), ChefResponseDto.class);
-        result.setAverageRating(reviewService.getAverageRatingForChef(id));
+        result.setAverageRating(reviewService.getAverageRatingForChef(id)); 
         return result;
     }
 
