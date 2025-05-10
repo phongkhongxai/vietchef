@@ -22,7 +22,6 @@ public class ReviewDetailResponse {
     private String chefName;
     private Long bookingId;
     private BigDecimal rating;
-    private String description;
     private String overallExperience;
     private String photos;
     private String response;

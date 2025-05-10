@@ -177,17 +177,6 @@ public class ReviewController {
     @PreAuthorize("hasRole('ROLE_CUSTOMER')")
     public ResponseEntity<ReviewResponse> createReview(@RequestBody ReviewCreateRequest request) {
         UserDto currentUser = getCurrentUser();
-        
-        // Lọc nội dung đánh giá
-        String filteredDescription = contentFilterService.filterText(request.getDescription());
-        request.setDescription(filteredDescription);
-        
-        // Lọc nội dung trải nghiệm tổng thể
-        if (request.getOverallExperience() != null) {
-            String filteredExperience = contentFilterService.filterText(request.getOverallExperience());
-            request.setOverallExperience(filteredExperience);
-        }
-        
         ReviewResponse savedReview = reviewService.createReview(request, currentUser.getId());
         return new ResponseEntity<>(savedReview, HttpStatus.CREATED);
     }
@@ -197,17 +186,6 @@ public class ReviewController {
     @PreAuthorize("hasRole('ROLE_CUSTOMER')")
     public ResponseEntity<ReviewResponse> updateReview(@PathVariable Long id, @RequestBody ReviewUpdateRequest request) {
         UserDto currentUser = getCurrentUser();
-        
-        // Lọc nội dung đánh giá
-        String filteredDescription = contentFilterService.filterText(request.getDescription());
-        request.setDescription(filteredDescription);
-        
-        // Lọc nội dung trải nghiệm tổng thể
-        if (request.getOverallExperience() != null) {
-            String filteredExperience = contentFilterService.filterText(request.getOverallExperience());
-            request.setOverallExperience(filteredExperience);
-        }
-        
         ReviewResponse updatedReview = reviewService.updateReview(id, request, currentUser.getId());
         return ResponseEntity.ok(updatedReview);
     }

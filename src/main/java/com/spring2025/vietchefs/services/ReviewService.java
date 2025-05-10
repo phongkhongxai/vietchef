@@ -12,7 +12,7 @@ import java.util.Map;
 
 public interface ReviewService {
     ReviewResponse getReviewById(Long id);
-    List<ReviewResponse> getReviewsByChef(Long chefId);
+    // List<ReviewResponse> getReviewsByChef(Long chefId);
     Page<ReviewResponse> getReviewsByChef(Long chefId, Pageable pageable);
     List<ReviewResponse> getReviewsByUser(Long userId);
     ReviewResponse getReviewByBooking(Long bookingId);

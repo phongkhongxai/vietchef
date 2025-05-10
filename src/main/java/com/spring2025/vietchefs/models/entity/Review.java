@@ -8,6 +8,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Entity representing a review given by a user to a chef after booking
+ */
 @Entity
 @Table(name = "reviews")
 @Data
@@ -34,8 +37,11 @@ public class Review {
     @Column(nullable = false)
     private BigDecimal rating;
 
-    private String description;
-    
+    /**
+     * The complete review text content written by the user.
+     * Contains the user's full feedback about their experience with the chef,
+     * including details about food quality, service, professionalism, etc.
+     */
     @Column(columnDefinition = "TEXT")
     private String overallExperience;
     

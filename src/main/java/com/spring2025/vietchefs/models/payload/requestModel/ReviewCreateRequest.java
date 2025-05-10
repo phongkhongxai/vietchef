@@ -15,7 +15,6 @@ import java.util.List;
 public class ReviewCreateRequest {
     private Long chefId;
     private Long bookingId;
-    private String description;
     private String overallExperience;
     private MultipartFile mainImage;
     private List<MultipartFile> additionalImages;

@@ -74,19 +74,24 @@ public class ReviewServiceImpl implements ReviewService {
     public ReviewResponse getReviewById(Long id) {
         Review review = reviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Review not found with id: " + id));
+                
+        if (review.getIsDeleted()) {
+            throw new ResourceNotFoundException("Review not found with id: " + id);
+        }
+        
         return mapToResponse(review);
     }
 
-    @Override
-    public List<ReviewResponse> getReviewsByChef(Long chefId) {
-        Chef chef = chefRepository.findById(chefId)
-                .orElseThrow(() -> new ResourceNotFoundException("Chef not found with id: " + chefId));
+    // @Override
+    // public List<ReviewResponse> getReviewsByChef(Long chefId) {
+    //     Chef chef = chefRepository.findById(chefId)
+    //             .orElseThrow(() -> new ResourceNotFoundException("Chef not found with id: " + chefId));
         
-        return reviewRepository.findByChefAndIsDeletedFalseOrderByCreateAtDesc(chef)
-                .stream()
-                .map(this::mapToResponse)
-                .collect(Collectors.toList());
-    }
+    //     return reviewRepository.findByChefAndIsDeletedFalseOrderByCreateAtDesc(chef)
+    //             .stream()
+    //             .map(this::mapToResponse)
+    //             .collect(Collectors.toList());
+    // }
 
     @Override
     public Page<ReviewResponse> getReviewsByChef(Long chefId, Pageable pageable) {
@@ -116,9 +121,9 @@ public class ReviewServiceImpl implements ReviewService {
         // Phục vụ cho BR-46: Kiểm tra xem booking đã có review chưa 
         // Mỗi buổi đặt chỉ cho phép gửi một đánh giá duy nhất từ khách hàng
         Review review = reviewRepository.findByBookingAndIsDeletedFalse(booking)
-                .orElse(null);
+                .orElseThrow(() -> new ResourceNotFoundException("Review not found for booking: " + bookingId));
                 
-        return review != null ? mapToResponse(review) : null;
+        return mapToResponse(review);
     }
 
     @Override
@@ -144,14 +149,13 @@ public class ReviewServiceImpl implements ReviewService {
         }
         
         // Filter the review description for profanity
-        String filteredDescription = contentFilterService.filterText(request.getDescription());
+        String filteredOverallExperience = contentFilterService.filterText(request.getOverallExperience());
         
         Review review = new Review();
         review.setUser(user);
         review.setChef(chef);
         review.setBooking(booking);
-        review.setDescription(filteredDescription);
-        review.setOverallExperience(request.getOverallExperience());
+        review.setOverallExperience(filteredOverallExperience);
         review.setCreateAt(LocalDateTime.now());
         review.setIsDeleted(false);
         
@@ -212,11 +216,10 @@ public class ReviewServiceImpl implements ReviewService {
         // Booking được gán khi tạo review và không thể thay đổi sau đó
         
         // Filter the review description for profanity
-        String filteredDescription = contentFilterService.filterText(request.getDescription());
+        String filteredDescription = contentFilterService.filterText(request.getOverallExperience());
         
         // Update review details
-        existingReview.setDescription(filteredDescription);
-        existingReview.setOverallExperience(request.getOverallExperience());
+        existingReview.setOverallExperience(filteredDescription);
         
         // Handle main image upload
         try {
@@ -292,7 +295,7 @@ public class ReviewServiceImpl implements ReviewService {
                 .orElseThrow(() -> new ResourceNotFoundException("Review not found with id: " + reviewId));
         
         // Verify the chef is the one being reviewed
-        if (!review.getChef().getId().equals(chefId)) {
+        if (!review.getChef().getUser().getId().equals(chefId)) {
             throw new IllegalArgumentException("Only the chef being reviewed can respond to the review");
         }
         
@@ -346,8 +349,11 @@ public class ReviewServiceImpl implements ReviewService {
         Chef chef = chefRepository.findById(chefId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chef not found with id: " + chefId));
                 
-        return reviewRepository.findAverageRatingByChef(chef)
+        BigDecimal avgRating = reviewRepository.findAverageRatingByChef(chef)
                 .orElse(BigDecimal.ZERO);
+        
+        // Làm tròn đến 2 chữ số thập phân
+        return avgRating.setScale(2, RoundingMode.HALF_UP);
     }
 
     @Override
@@ -387,7 +393,6 @@ public class ReviewServiceImpl implements ReviewService {
         response.setChefId(review.getChef().getId());
         response.setBookingId(review.getBooking() != null ? review.getBooking().getId() : null);
         response.setRating(review.getRating());
-        response.setDescription(review.getDescription());
         response.setOverallExperience(review.getOverallExperience());
         response.setMainImageUrl(review.getImageUrl());
         
