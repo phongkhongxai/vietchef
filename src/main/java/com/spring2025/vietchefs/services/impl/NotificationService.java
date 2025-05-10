@@ -158,7 +158,7 @@ public class NotificationService {
         notificationRepository.saveAll(notifications);
     }
     public void markAllAsReadByUser(Long userId) {
-        List<Notification> notifications = notificationRepository.findByUserIdAndIsReadFalseAndNotiTypeNot(userId, "CHAT_NOTIFY");
+        List<Notification> notifications = notificationRepository.findUnreadNonChatNotifications(userId);
         for (Notification n : notifications) {
             n.setRead(true);
         }
