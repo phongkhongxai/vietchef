@@ -44,7 +44,7 @@ public class AuthController {
     }
     @GetMapping(value = {"/hello-wrds"})
     public ResponseEntity<String> login1(){
-        String sadas = "sadas";
+        String sadas = "@lóadsa";
         return ResponseEntity.ok(sadas);
     }
 
