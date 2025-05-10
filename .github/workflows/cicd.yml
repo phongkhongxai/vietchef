@@ -17,12 +17,11 @@ jobs:
           SERVER_IP: ${{ secrets.SERVER_IP }}
           SERVER_USERNAME: ${{ secrets.SERVER_USERNAME }}
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           echo "$SSH_PRIVATE_KEY" > private_key && chmod 600 private_key
           
           ssh -o StrictHostKeyChecking=no -i private_key $SERVER_USERNAME@$SERVER_IP << 'EOF'
-              cd ~/vietchef || { git clone https://$GH_TOKEN@github.com/phongkhongxai/vietchef.git && cd vietchef; }
+              cd ~/vietchef || { git clone git@github.com:phongkhongxai/vietchef.git && cd vietchef; }
               cd vietchef
               git fetch --all
               git reset --hard origin/deploy-gg
