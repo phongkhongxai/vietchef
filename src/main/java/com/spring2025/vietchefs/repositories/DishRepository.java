@@ -35,6 +35,7 @@ public interface DishRepository extends JpaRepository<Dish, Long> {
     JOIN chefs c ON d.chef_id = c.id
     JOIN dish_food_types dft ON d.id = dft.dish_id
     WHERE d.is_deleted = false
+      AND c.status = 'ACTIVE'
       AND dft.food_types_id IN (:foodTypeIds)
       AND c.latitude IS NOT NULL AND c.longitude IS NOT NULL
       AND (6371 * ACOS(
@@ -48,6 +49,7 @@ public interface DishRepository extends JpaRepository<Dish, Long> {
     JOIN chefs c ON d.chef_id = c.id
     JOIN dish_food_types dft ON d.id = dft.dish_id
     WHERE d.is_deleted = false
+      AND c.status = 'ACTIVE'
       AND dft.food_types_id IN (:foodTypeIds)
       AND c.latitude IS NOT NULL AND c.longitude IS NOT NULL
       AND (6371 * ACOS(
@@ -67,6 +69,7 @@ public interface DishRepository extends JpaRepository<Dish, Long> {
 
 
 
+
     @Query("SELECT d FROM Dish d WHERE d.isDeleted = false AND d.chef.id = :chefId AND d.id NOT IN " +
             "(SELECT mi.dish.id FROM MenuItem mi WHERE mi.menu.id = :menuId)")
     Page<Dish> findByNotInMenuAndIsDeletedFalseAndChefId(Long menuId, Long chefId, Pageable pageable);
@@ -79,6 +82,7 @@ public interface DishRepository extends JpaRepository<Dish, Long> {
     SELECT d.* FROM dishes d
     JOIN chefs c ON d.chef_id = c.id
     WHERE d.is_deleted = false
+      AND c.status = 'ACTIVE'
       AND (LOWER(d.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
            OR LOWER(d.description) LIKE LOWER(CONCAT('%', :keyword, '%')))
       AND c.latitude IS NOT NULL AND c.longitude IS NOT NULL
@@ -92,6 +96,7 @@ public interface DishRepository extends JpaRepository<Dish, Long> {
     SELECT COUNT(*) FROM dishes d
     JOIN chefs c ON d.chef_id = c.id
     WHERE d.is_deleted = false
+      AND c.status = 'ACTIVE'
       AND (LOWER(d.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
            OR LOWER(d.description) LIKE LOWER(CONCAT('%', :keyword, '%')))
       AND c.latitude IS NOT NULL AND c.longitude IS NOT NULL
@@ -111,10 +116,12 @@ public interface DishRepository extends JpaRepository<Dish, Long> {
     );
 
 
+
     @Query(value = """
     SELECT d.* FROM dishes d
     JOIN chefs c ON d.chef_id = c.id
     WHERE d.is_deleted = false
+      AND c.status = 'ACTIVE'
       AND c.latitude IS NOT NULL AND c.longitude IS NOT NULL
       AND (6371 * ACOS(
             COS(RADIANS(:lat)) * COS(RADIANS(c.latitude)) *
@@ -126,6 +133,7 @@ public interface DishRepository extends JpaRepository<Dish, Long> {
     SELECT COUNT(*) FROM dishes d
     JOIN chefs c ON d.chef_id = c.id
     WHERE d.is_deleted = false
+      AND c.status = 'ACTIVE'
       AND c.latitude IS NOT NULL AND c.longitude IS NOT NULL
       AND (6371 * ACOS(
             COS(RADIANS(:lat)) * COS(RADIANS(c.latitude)) *
@@ -140,6 +148,7 @@ public interface DishRepository extends JpaRepository<Dish, Long> {
             @Param("distance") double distance,
             Pageable pageable
     );
+
 
 
 }

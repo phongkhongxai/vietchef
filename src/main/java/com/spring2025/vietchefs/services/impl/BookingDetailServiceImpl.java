@@ -604,7 +604,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                 .screen("ChefEarningsScreen")
                 .build();
         notificationService.sendPushNotification(notification);
-        chefService.updateReputation(chef, 1);
+        chefService.updateReputation(chef, 3);
 
 
         return modelMapper.map(bookingDetail, BookingDetailDto.class);
@@ -619,17 +619,17 @@ public class BookingDetailServiceImpl implements BookingDetailService {
             Booking booking = bookingDetail.getBooking();
             if ("SINGLE".equalsIgnoreCase(booking.getBookingType())) {
                 refundSingleBooking(bookingDetail);
+                bookingDetail.setStatus("REFUNDED");
+                bookingDetailRepository.save(bookingDetail);
             } else if ("LONG_TERM".equalsIgnoreCase(booking.getBookingType())) {
                 refundLongTermBooking(bookingDetail);
             }
-            bookingDetail.setStatus("REFUNDED");
-            bookingDetailRepository.save(bookingDetail);
         } else {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "BookingDetail is not in a valid state for refund.");
         }
     }
     private void refundSingleBooking(BookingDetail bookingDetail) {
-        // Nếu là booking SINGLE, hoàn tiền cho booking detail
+        Booking booking = bookingDetail.getBooking();
         CustomerTransaction depositTransaction = getPaymentTransaction(bookingDetail);
         Wallet customerWallet = depositTransaction.getWallet();
         BigDecimal refundAmount = depositTransaction.getAmount();
@@ -645,6 +645,8 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         customerTransactionRepository.save(refundTransaction);
         customerWallet.setBalance(customerWallet.getBalance().add(refundAmount));
         walletRepository.save(customerWallet);
+        booking.setStatus("CANCELED");
+        bookingRepository.save(booking);
         NotificationRequest customerNotification = NotificationRequest.builder()
                 .userId(bookingDetail.getBooking().getCustomer().getId())
                 .title("Refund Successful")
@@ -656,49 +658,90 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     }
 
     private void refundLongTermBooking(BookingDetail bookingDetail) {
+        Booking booking = bookingDetail.getBooking();
         PaymentCycle paymentCycle = getPaymentCycleForBookingDetail(bookingDetail);
-        if (paymentCycle != null && "PAID".equalsIgnoreCase(paymentCycle.getStatus())) {
-            // Hoàn tiền toàn bộ kỳ thanh toán
-            BigDecimal refundAmount = paymentCycle.getAmountDue();
+        List<BookingDetail> allBookingDetails = bookingDetailRepository.findByBookingId(bookingDetail.getBooking().getId());
 
-            // Tạo giao dịch hoàn tiền cho toàn bộ kỳ thanh toán
-            CustomerTransaction depositTransaction = getDepositTransaction(bookingDetail);
-            Wallet customerWallet = depositTransaction.getWallet();
+        List<PaymentCycle> afterCycles = getPaymentCycleAfter(paymentCycle);
 
-            CustomerTransaction refundTransaction = CustomerTransaction.builder()
-                    .wallet(customerWallet)
-                    .booking(bookingDetail.getBooking())
-                    .transactionType("REFUND")
-                    .amount(refundAmount)
-                    .description("Refund for canceled long-term booking cycle")
-                    .status("COMPLETED")
-                    .isDeleted(false)
-                    .build();
-
-            customerTransactionRepository.save(refundTransaction);
-            customerWallet.setBalance(customerWallet.getBalance().add(refundAmount));
-            walletRepository.save(customerWallet);
-            paymentCycle.setStatus("REFUND");
-            paymentCycleRepository.save(paymentCycle);
-            NotificationRequest customerNotification = NotificationRequest.builder()
-                    .userId(bookingDetail.getBooking().getCustomer().getId())
-                    .title("Refund Successful")
-                    .body("Your deposit for the canceled long-term booking and payment for cycle have been refunded.")
-                    .bookingId(bookingDetail.getBooking().getId())
-                    .screen("CustomerWalletScreen")
-                    .build();
-            notificationService.sendPushNotification(customerNotification);
+        List<PaymentCycle> cyclesToRefund = new ArrayList<>();
+        if ("PAID".equalsIgnoreCase(paymentCycle.getStatus())) {
+            cyclesToRefund.add(paymentCycle);
         } else {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Payment cycle is not PAID, cannot process refund.");
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Current payment cycle is not PAID, cannot process refund.");
         }
+        // Thêm các afterCycles nếu đã thanh toán
+        for (PaymentCycle cycle : afterCycles) {
+            if ("PAID".equalsIgnoreCase(cycle.getStatus())) {
+                cyclesToRefund.add(cycle);
+            }else{
+                cycle.setStatus("CANCELED");
+                paymentCycleRepository.save(cycle);
+            }
+        }
+        CustomerTransaction depositTransaction = getDepositTransaction(bookingDetail);
+        Wallet customerWallet = depositTransaction.getWallet();
+        BigDecimal totalRefund = depositTransaction.getAmount();
+
+        for (PaymentCycle cycle : cyclesToRefund) {
+            BigDecimal refundAmount = cycle.getAmountDue();
+            totalRefund = totalRefund.add(refundAmount);
+            cycle.setStatus("REFUNDED");
+            paymentCycleRepository.save(cycle);
+            List<BookingDetail> detailsInCycle = allBookingDetails.stream()
+                    .filter(detail -> {
+                        LocalDate sessionDate = detail.getSessionDate();
+                        return !sessionDate.isBefore(cycle.getStartDate()) && !sessionDate.isAfter(cycle.getEndDate());
+                    })
+                    .toList();
+
+            for (BookingDetail detail : detailsInCycle) {
+                detail.setStatus("REFUNDED");
+                bookingDetailRepository.save(detail);
+            }
+        }
+        CustomerTransaction refundTransaction = CustomerTransaction.builder()
+                .wallet(customerWallet)
+                .booking(booking)
+                .transactionType("REFUND")
+                .amount(totalRefund)
+                .description("Refund for canceled long-term booking cycle")
+                .status("COMPLETED")
+                .isDeleted(false)
+                .build();
+        customerTransactionRepository.save(refundTransaction);
+        customerWallet.setBalance(customerWallet.getBalance().add(totalRefund));
+
+        boolean hasCompletedDetail = allBookingDetails.stream()
+                .anyMatch(detail -> "COMPLETED".equalsIgnoreCase(detail.getStatus()));
+        if (hasCompletedDetail) {
+            booking.setStatus("COMPLETED");
+            booking.setTotalPrice(booking.getTotalPrice().subtract(totalRefund));
+            booking.setDepositPaid(BigDecimal.ZERO);
+        } else {
+            booking.setStatus("CANCELED");
+        }
+        booking =bookingRepository.save(booking);
+        walletRepository.save(customerWallet);
+        // Gửi thông báo cho khách
+        NotificationRequest customerNotification = NotificationRequest.builder()
+                .userId(bookingDetail.getBooking().getCustomer().getId())
+                .title("Refund Successful")
+                .body("Your payment for the canceled long-term booking cycles has been refunded.")
+                .bookingId(booking.getId())
+                .screen("CustomerWalletScreen")
+                .build();
+
+        notificationService.sendPushNotification(customerNotification);
     }
     private CustomerTransaction getDepositTransaction(BookingDetail bookingDetail) {
-        List<CustomerTransaction> depositTransactions = customerTransactionRepository
-                .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(bookingDetail.getBooking().getId(), "INITIAL_PAYMENT", "COMPLETED");
-        if (depositTransactions.isEmpty()) {
+        Optional<CustomerTransaction> depositTransaction = customerTransactionRepository
+                .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(bookingDetail.getBooking().getId(), "INITIAL_PAYMENT", "COMPLETED")
+                .stream().findFirst();
+        if (depositTransaction.isEmpty()) {
             throw new VchefApiException(HttpStatus.NOT_FOUND, "Deposit transaction not found for this booking.");
         }
-        return depositTransactions.get(0);
+        return depositTransaction.get();
     }
     private CustomerTransaction getPaymentTransaction(BookingDetail bookingDetail) {
         List<CustomerTransaction> depositTransactions = customerTransactionRepository
@@ -716,6 +759,9 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                 .filter(paymentCycle -> !sessionDate.isBefore(paymentCycle.getStartDate()) && !sessionDate.isAfter(paymentCycle.getEndDate()))
                 .findFirst()
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "No valid payment cycle found for the given session date."));
+    }
+    private List<PaymentCycle> getPaymentCycleAfter(PaymentCycle paymentCycle){
+        return paymentCycleRepository.findByBookingAndDueDateAfter(paymentCycle.getBooking(), paymentCycle.getDueDate());
     }
 
     @Scheduled(cron = "0 1 0 * * ?") // Mỗi ngày vào lúc nửa đêm 12h01
