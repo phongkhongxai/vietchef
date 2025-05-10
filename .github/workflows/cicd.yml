@@ -20,13 +20,15 @@ jobs:
         run: |
           echo "$SSH_PRIVATE_KEY" > private_key && chmod 600 private_key
 
-          ssh -o StrictHostKeyChecking=no -i private_key $SERVER_USERNAME@$SERVER_IP << 'EOF'
-              cd ~/vietchef || {git clone https://x-access-token:${{ secrets.GH_PAT }}@github.com/phongkhongxai/vietchef.git && cd vietchef;}
-              cd vietchef
-              git fetch --all
-              git reset --hard origin/deploy-gg
-              git pull origin deploy-gg
-              mvn clean package -DskipTests   
-              sudo docker-compose down
-              sudo docker-compose up -d --build
+          ssh -o StrictHostKeyChecking=no -i private_key $SERVER_USERNAME@$SERVER_IP << EOF
+            cd ~/vietchef || {
+              git clone https://x-access-token:${{ secrets.GH_PAT }}@github.com/phongkhongxai/vietchef.git && cd vietchef;
+            }
+            cd vietchef
+            git fetch --all
+            git reset --hard origin/deploy-gg
+            git pull origin deploy-gg
+            mvn clean package -DskipTests   
+            sudo docker-compose down
+            sudo docker-compose up -d --build
           EOF
