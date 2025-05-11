@@ -63,4 +63,8 @@ public class BookingDetail {
     private Boolean isUpdated = false;
     @Column(nullable = false)
     private Boolean chefBringIngredients = true;
+    @Column(nullable = true)
+    private Double chefLatitude;
+    @Column(nullable = true)
+    private Double chefLongitude;
 }
