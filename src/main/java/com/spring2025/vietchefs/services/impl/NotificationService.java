@@ -11,6 +11,7 @@ import com.spring2025.vietchefs.models.payload.dto.DishDto;
 import com.spring2025.vietchefs.models.payload.dto.NotificationDto;
 import com.spring2025.vietchefs.models.payload.requestModel.NotificationRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.DishesResponse;
+import com.spring2025.vietchefs.models.payload.responseModel.NotificationCountResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.NotificationsResponse;
 import com.spring2025.vietchefs.repositories.NotificationRepository;
 import com.spring2025.vietchefs.repositories.UserRepository;
@@ -71,6 +72,21 @@ public class NotificationService {
         templatesResponse.setLast(notifications.isLast());
         return templatesResponse;
     }
+    public NotificationCountResponse countUnreadNotifications(Long userId) {
+        Optional<User> optionalUser = userRepository.findById(userId);
+        if (optionalUser.isEmpty()) {
+            throw new VchefApiException(HttpStatus.NOT_FOUND, "User not found.");
+        }
+        int allUnread = notificationRepository.countByUserIdAndIsReadFalse(userId);
+        int chatUnread = notificationRepository.countByUserIdAndIsReadFalseAndNotiType(userId, "CHAT_NOTIFY");
+
+        NotificationCountResponse response = new NotificationCountResponse();
+        response.setAllNoti(allUnread);
+        response.setChatNoti(chatUnread);
+        response.setNotiNotChat(allUnread-chatUnread);
+        return response;
+    }
+
     public List<NotificationDto> getChatNotificationsOfUser(Long userId) {
         Optional<User> optionalUser = userRepository.findById(userId);
         if (optionalUser.isEmpty()) {
