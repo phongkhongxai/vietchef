@@ -1079,6 +1079,8 @@ public class BookingServiceImpl implements BookingService {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel booking less than 1 days before session date");
         }
         if ("PENDING".equalsIgnoreCase(booking.getStatus())) {
+            bookingDetail.setStatus("CANCELED");
+            bookingDetailRepository.save(bookingDetail);
             booking.setStatus("CANCELED");
             booking = bookingRepository.save(booking);
             return modelMapper.map(booking, BookingResponseDto.class);
@@ -1113,9 +1115,6 @@ public class BookingServiceImpl implements BookingService {
                 bookingDetail.setStatus("REFUNDED");
                 bookingDetailRepository.save(bookingDetail);
             }
-        } else{
-            bookingDetail.setStatus("CANCELED");
-            bookingDetailRepository.save(bookingDetail);
         }
         booking.setStatus("CANCELED");
         booking = bookingRepository.save(booking);
