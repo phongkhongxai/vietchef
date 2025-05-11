@@ -60,7 +60,7 @@ public class FavoriteChefController {
         return new ResponseEntity<>(favoriteChefService.getFavoriteChefs(userId, pageNo, pageSize, sortBy, sortDir), HttpStatus.OK);
     }
     @Operation(summary = "Get list of favorite chefs for a user nearby")
-    @GetMapping("/nearby/{userId}")
+    @GetMapping("/nearby")
     @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<FavoriteChefsResponse> getFavoriteChefsNearBy(
             @AuthenticationPrincipal UserDetails userDetails,
