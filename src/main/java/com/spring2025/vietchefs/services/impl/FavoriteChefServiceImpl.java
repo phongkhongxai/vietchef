@@ -137,6 +137,35 @@ public class FavoriteChefServiceImpl implements FavoriteChefService {
     }
 
     @Override
+    public FavoriteChefsResponse getFavoriteChefsNearBy(Long userId, double customerLat, double customerLng,double distance, int pageNo, int pageSize, String sortBy, String sortDir) {
+        User user = userRepository.findExistUserById(userId);
+        if (user == null) {
+            throw new VchefApiException(HttpStatus.NOT_FOUND, "User not found with id: " + userId);
+        }
+        Sort sort = sortDir.equalsIgnoreCase(Sort.Direction.ASC.name())
+                ? Sort.by(sortBy).ascending()
+                : Sort.by(sortBy).descending();
+
+        Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
+
+        Page<FavoriteChef> favorites = favoriteChefRepository.findFavoriteChefsNearBy(userId,"ACTIVE", customerLat, customerLng, distance,  pageable);
+        List<FavoriteChef> listOfFavorites = favorites.getContent();
+        List<FavoriteChefDto> content = listOfFavorites.stream()
+                .map(this::mapToFavoriteChefDto)
+                .collect(Collectors.toList());
+
+        FavoriteChefsResponse favoriteChefsResponse = new FavoriteChefsResponse();
+        favoriteChefsResponse.setContent(content);
+        favoriteChefsResponse.setPageNo(favorites.getNumber());
+        favoriteChefsResponse.setPageSize(favorites.getSize());
+        favoriteChefsResponse.setTotalElements(favorites.getTotalElements());
+        favoriteChefsResponse.setTotalPages(favorites.getTotalPages());
+        favoriteChefsResponse.setLast(favorites.isLast());
+
+        return favoriteChefsResponse;
+    }
+
+    @Override
     public boolean isChefFavorite(Long userId, Long chefId) {
         User user = userRepository.findExistUserById(userId);
         if (user == null) {
