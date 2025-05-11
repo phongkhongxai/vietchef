@@ -12,7 +12,8 @@ public interface FavoriteChefService {
     
     // Lấy danh sách đầu bếp yêu thích của một user
     FavoriteChefsResponse getFavoriteChefs(Long userId, int pageNo, int pageSize, String sortBy, String sortDir);
-    
+    FavoriteChefsResponse getFavoriteChefsNearBy(Long userId,double customerLat, double customerLng, double distance, int pageNo, int pageSize, String sortBy, String sortDir);
+
     // Kiểm tra một đầu bếp có nằm trong danh sách yêu thích của user không
     boolean isChefFavorite(Long userId, Long chefId);
 } 

@@ -311,9 +311,10 @@ public class BookingController {
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CHEF')")
     @PutMapping(value = "/booking-details/{bookingDetailId}/complete-chef", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> updateWaitingCustomer(@AuthenticationPrincipal UserDetails userDetails, @PathVariable Long bookingDetailId, @RequestParam("files") List<MultipartFile> files) {
+    public ResponseEntity<?> updateWaitingCustomer(@AuthenticationPrincipal UserDetails userDetails, @PathVariable Long bookingDetailId, @RequestParam("files") List<MultipartFile> files, @RequestParam(value = "chefLat") Double chefLat,
+                                                   @RequestParam(value = "chefLng") Double chefLng) {
         UserDto userDto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(), userDetails.getUsername());
-        BookingDetailDto bookingDetail = bookingDetailService.updateStatusBookingDetailWatingCompleted(bookingDetailId, userDto.getId(), files);
+        BookingDetailDto bookingDetail = bookingDetailService.updateStatusBookingDetailWatingCompleted(bookingDetailId, userDto.getId(), files, chefLat, chefLng);
         return new ResponseEntity<>(bookingDetail, HttpStatus.OK);
     }
     @SecurityRequirement(name = "Bearer Authentication")

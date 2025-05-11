@@ -26,7 +26,7 @@ public interface BookingDetailService {
     BookingDetailsResponse getBookingDetailByBooking(Long bookingId,int pageNo, int pageSize, String sortBy, String sortDir);
     ReviewBookingDetailResponse calculateUpdatedBookingDetail(Long bookingDetailId, BookingDetailUpdateDto dto);
     BookingDetailDto updateBookingDetail(Long bookingDetailId, BookingDetailUpdateRequest bookingDetailUpdateRequest);
-    BookingDetailDto updateStatusBookingDetailWatingCompleted(Long bookingDetailId,Long userId,List<MultipartFile> files);
+    BookingDetailDto updateStatusBookingDetailWatingCompleted(Long bookingDetailId,Long userId,List<MultipartFile> files, Double chefLat, Double chefLng);
     BookingDetailDto confirmBookingCompletionByCustomer(Long bookingDetailId,Long userId );
     void refundBookingDetail(Long bookingDetailId);
 
