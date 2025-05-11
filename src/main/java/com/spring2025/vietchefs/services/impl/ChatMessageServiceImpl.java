@@ -39,10 +39,10 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     public void processMessage(ChatMessageDto chatMessage) {
         validateMessage(chatMessage);
         ChatMessage msg = modelMapper.map(chatMessage,ChatMessage.class);
-        ZoneId hoChiMinhZone = ZoneId.of("Asia/Ho_Chi_Minh");
-        ZonedDateTime zonedTime = chatMessage.getTimestamp().atZone(hoChiMinhZone);
-        OffsetDateTime utcTime = zonedTime.withZoneSameInstant(ZoneOffset.UTC).toOffsetDateTime();
-        msg.setTimestamp(utcTime.toLocalDateTime());
+//        ZoneId hoChiMinhZone = ZoneId.of("Asia/Ho_Chi_Minh");
+//        ZonedDateTime zonedTime = chatMessage.getTimestamp().atZone(hoChiMinhZone);
+//        OffsetDateTime utcTime = zonedTime.withZoneSameInstant(ZoneOffset.UTC).toOffsetDateTime();
+//        msg.setTimestamp(utcTime.toLocalDateTime());
         User user = userRepository.findByUsername(chatMessage.getRecipientId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User not found with username."));
         msg = saveMessage(msg);
