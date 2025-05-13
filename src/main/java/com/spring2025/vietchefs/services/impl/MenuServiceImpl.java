@@ -9,15 +9,13 @@ import com.spring2025.vietchefs.models.payload.dto.DishDto;
 import com.spring2025.vietchefs.models.payload.requestModel.MenuItemRequestDto;
 import com.spring2025.vietchefs.models.payload.requestModel.MenuRequestDto;
 import com.spring2025.vietchefs.models.payload.requestModel.MenuUpdateDto;
-import com.spring2025.vietchefs.models.payload.responseModel.ApiResponse;
-import com.spring2025.vietchefs.models.payload.responseModel.DishesResponse;
-import com.spring2025.vietchefs.models.payload.responseModel.MenuPagingResponse;
-import com.spring2025.vietchefs.models.payload.responseModel.MenuResponseDto;
+import com.spring2025.vietchefs.models.payload.responseModel.*;
 import com.spring2025.vietchefs.repositories.ChefRepository;
 import com.spring2025.vietchefs.repositories.DishRepository;
 import com.spring2025.vietchefs.repositories.MenuItemRepository;
 import com.spring2025.vietchefs.repositories.MenuRepository;
 import com.spring2025.vietchefs.services.MenuService;
+import com.spring2025.vietchefs.services.ReviewService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -31,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -49,6 +48,8 @@ public class MenuServiceImpl implements MenuService {
     private CalculateService calculateService;
     @Autowired
     private ImageService imageService;
+    @Autowired
+    private ReviewService reviewService;
     @Autowired
     private ModelMapper modelMapper;
     @Override
@@ -300,6 +301,68 @@ public class MenuServiceImpl implements MenuService {
                 .message("Menu hợp lệ.")
                 .build();
     }
+
+    @Override
+    public List<MenuResponseDto> searchMenuByNameNearBy(double customerLat, double customerLng, double distance, String keyword, String sortBy, String sortDir) {
+        List<Menu> listOfMenu = menuRepository.searchMenusByKeywordAndDistance(keyword, customerLat,customerLng,distance);
+        List<MenuResponseDto>  menuResponseDtos = listOfMenu.stream().map(meu -> {
+            MenuResponseDto dto = modelMapper.map(meu, MenuResponseDto.class);
+            dto.setBeforePrice(calculateMenuPrice(meu, false));
+            dto.setAfterPrice(calculateMenuPrice(meu, true));
+            Chef chef = meu.getChef();
+            if (chef != null && chef.getLatitude() != null && chef.getLongitude() != null) {
+                double dist = calculateService.calculateDistance(customerLat, customerLng, chef.getLatitude(), chef.getLongitude());
+                if (dto.getChef() != null) {
+                    dto.getChef().setDistance(dist);
+                    dto.getChef().setAverageRating(reviewService.getAverageRatingForChef(chef.getId()));
+                }
+            }
+            return dto;
+        }).toList();
+        return sortMenuList(menuResponseDtos, sortBy, sortDir);
+    }
+
+    @Override
+    public List<MenuResponseDto> getMenusNearBy(double customerLat, double customerLng, double distance, String sortBy, String sortDir) {
+        List<Menu> listOfMenu = menuRepository.findMenusNearCustomer(customerLat,customerLng,distance);
+        List<MenuResponseDto>  menuResponseDtos = listOfMenu.stream().map(meu -> {
+            MenuResponseDto dto = modelMapper.map(meu, MenuResponseDto.class);
+            dto.setBeforePrice(calculateMenuPrice(meu, false));
+            dto.setAfterPrice(calculateMenuPrice(meu, true));
+            Chef chef = meu.getChef();
+            if (chef != null && chef.getLatitude() != null && chef.getLongitude() != null) {
+                double dist = calculateService.calculateDistance(customerLat, customerLng, chef.getLatitude(), chef.getLongitude());
+                if (dto.getChef() != null) {
+                    dto.getChef().setDistance(dist);
+                    dto.getChef().setAverageRating(reviewService.getAverageRatingForChef(chef.getId()));
+                }
+            }
+            return dto;
+        }).toList();
+        return sortMenuList(menuResponseDtos, sortBy, sortDir);
+    }
+    private List<MenuResponseDto> sortMenuList(List<MenuResponseDto> menus, String sortBy, String sortDir) {
+        Comparator<MenuResponseDto> comparator = switch (sortBy) {
+            case "afterPrice" ->
+                    Comparator.comparing(MenuResponseDto::getAfterPrice, Comparator.nullsLast(BigDecimal::compareTo));
+            case "beforePrice" ->
+                    Comparator.comparing(MenuResponseDto::getBeforePrice, Comparator.nullsLast(BigDecimal::compareTo));
+            case "name" ->
+                    Comparator.comparing(MenuResponseDto::getName, Comparator.nullsLast(String::compareToIgnoreCase));
+            case "distance" ->
+                    Comparator.comparing(dto -> dto.getChef() != null ? dto.getChef().getDistance() : Double.MAX_VALUE);
+            case "rating" ->
+                    Comparator.comparing(dto -> dto.getChef() != null ? dto.getChef().getAverageRating() : BigDecimal.ZERO);
+            default -> Comparator.comparing(MenuResponseDto::getName);
+        };
+
+        if ("desc".equalsIgnoreCase(sortDir)) {
+            comparator = comparator.reversed();
+        }
+
+        return menus.stream().sorted(comparator).toList();
+    }
+
 
 
 }
