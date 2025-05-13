@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
@@ -28,4 +29,5 @@ public class WalletRequestDto {
     private String status;
 
     private String note;
+    private LocalDateTime createdAt;
 }
