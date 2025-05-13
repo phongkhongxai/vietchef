@@ -58,9 +58,21 @@ public class WalletRequestController {
     @Operation(
             summary = "PENDING, APPROVED, REJECTED"
     )
-    @GetMapping("/status/{status}")
-    public ResponseEntity<List<WalletRequestDto>> getRequestsByStatus(@PathVariable String status) {
+    @GetMapping("/status")
+    public ResponseEntity<List<WalletRequestDto>> getRequestsByStatus(@RequestParam String status) {
         List<WalletRequestDto> requests = walletRequestService.getRequestsByStatus(status);
         return ResponseEntity.ok(requests);
     }
+    @GetMapping
+    public ResponseEntity<List<WalletRequestDto>> getAllRequests() {
+        List<WalletRequestDto> requests = walletRequestService.getAllRequests();
+        return ResponseEntity.ok(requests);
+    }
+    @GetMapping("/users/{userId}")
+    public ResponseEntity<List<WalletRequestDto>> getAllRequestsOfUser(@PathVariable Long userId) {
+        List<WalletRequestDto> requests = walletRequestService.getAllRequestsOfUser(userId);
+        return ResponseEntity.ok(requests);
+    }
+
+
 }

@@ -47,11 +47,11 @@ public class WalletRequestServiceImpl implements WalletRequestService {
         if (wallet.getPaypalAccountEmail()==null){
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Email Paypal cannot empty.");
         }
-        LocalDateTime cutoffTime = LocalDateTime.now().minusHours(12);
+        LocalDateTime cutoffTime = LocalDateTime.now().minusHours(3);
 
         List<WalletRequest> recentRequests = walletRequestRepository.findRecentRequestsByUserId(user.getId(), cutoffTime);
         if (!recentRequests.isEmpty()) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "You can only create one withdrawal request every 12 hours.");
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "You can only create one withdrawal request every 3 hours.");
         }
         if(dto.getNote().isEmpty()){
             dto.setNote("Withdrawal from wallet.");
@@ -116,6 +116,24 @@ public class WalletRequestServiceImpl implements WalletRequestService {
     @Override
     public List<WalletRequestDto> getRequestsByStatus(String status) {
         return walletRequestRepository.findAllByStatus(status)
+                .stream()
+                .map(request -> modelMapper.map(request, WalletRequestDto.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<WalletRequestDto> getAllRequests() {
+        return walletRequestRepository.findAll()
+                .stream()
+                .map(request -> modelMapper.map(request, WalletRequestDto.class))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<WalletRequestDto> getAllRequestsOfUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"User not found."));
+        return walletRequestRepository.findAllByUser(user)
                 .stream()
                 .map(request -> modelMapper.map(request, WalletRequestDto.class))
                 .collect(Collectors.toList());
