@@ -19,6 +19,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -47,6 +48,11 @@ public class AdminController {
         ChefDto chefDt = chefService.createChef(chefDto);
         return new ResponseEntity<>(chefDt, HttpStatus.CREATED);
     }
+    @GetMapping("/server-time")
+    public String getServerTime() {
+        return "Server time: " + LocalDateTime.now();
+    }
+
 
 //    @SecurityRequirement(name = "Bearer Authentication")
 //    @PreAuthorize("hasRole('ROLE_ADMIN')")
