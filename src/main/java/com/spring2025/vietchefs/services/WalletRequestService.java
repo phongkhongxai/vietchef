@@ -11,6 +11,8 @@ public interface WalletRequestService {
     WalletRequestDto approveRequest(Long requestId);
     WalletRequestDto rejectRequest(Long requestId, String reason);
     List<WalletRequestDto> getRequestsByStatus(String status);
+    List<WalletRequestDto> getAllRequests();
+    List<WalletRequestDto> getAllRequestsOfUser(Long userId);
     WalletRequestDto getWalletRequestById(Long id);
     String deleteWalletRequestById(Long id);
 
