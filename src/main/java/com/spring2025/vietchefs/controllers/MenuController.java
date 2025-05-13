@@ -9,6 +9,8 @@ import com.spring2025.vietchefs.models.payload.responseModel.MenuPagingResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.MenuResponseDto;
 import com.spring2025.vietchefs.services.MenuService;
 import com.spring2025.vietchefs.utils.AppConstants;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -52,7 +54,32 @@ public class MenuController {
         }
         return menuService.getAllMenus(pageNo, pageSize, sortBy, sortDir);
     }
+    @GetMapping("/nearby")
+    public ResponseEntity<List<MenuResponseDto>> getMenuNearby(
+            @Parameter(description = "Vĩ độ của khách hàng") @RequestParam Double customerLat,
+            @Parameter(description = "Kinh độ của khách hàng") @RequestParam Double customerLng,
+            @Parameter(description = "Bán kính tìm kiếm (đơn vị km)") @RequestParam Double distance,
+            @Parameter(description = "Tiêu chí sắp xếp (name, beforePrice, afterPrice, distance, rating)") @RequestParam(defaultValue = "name") String sortBy,
+            @Parameter(description = "Thứ tự sắp xếp: asc (tăng dần), desc (giảm dần)") @RequestParam(defaultValue = "asc") String sortDir){
+        List<MenuResponseDto> result = menuService.getMenusNearBy(customerLat, customerLng, distance, sortBy, sortDir);
+        return ResponseEntity.ok(result);
+    }
+    @Operation(
+            summary = "Tìm kiếm menu gần vị trí khách hàng theo từ khóa",
+            description = "Trả về danh sách menu nằm trong bán kính chỉ định, tên chứa từ khóa. Hỗ trợ sắp xếp theo tên, giá, khoảng cách, đánh giá."
+    )
+    @GetMapping("/nearby/search")
+    public ResponseEntity<List<MenuResponseDto>> searchNearbyMenus(
+            @Parameter(description = "Từ khóa tìm kiếm trong tên menu") @RequestParam String keyword,
+            @Parameter(description = "Vĩ độ của khách hàng") @RequestParam Double customerLat,
+            @Parameter(description = "Kinh độ của khách hàng") @RequestParam Double customerLng,
+            @Parameter(description = "Bán kính tìm kiếm (đơn vị km)") @RequestParam Double distance,
+            @Parameter(description = "Tiêu chí sắp xếp (name, beforePrice, afterPrice, distance, rating)") @RequestParam(defaultValue = "name") String sortBy,
+            @Parameter(description = "Thứ tự sắp xếp: asc (tăng dần), desc (giảm dần)") @RequestParam(defaultValue = "asc") String sortDir) {
 
+        List<MenuResponseDto> result = menuService.searchMenuByNameNearBy(customerLat, customerLng, distance, keyword, sortBy, sortDir);
+        return ResponseEntity.ok(result);
+    }
     @GetMapping("/{id}")
     public ResponseEntity<?> getMenuById(@PathVariable("id") Long id) {
         MenuResponseDto menuResponseDto = menuService.getMenuById(id);
