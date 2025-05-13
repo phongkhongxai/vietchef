@@ -1244,16 +1244,40 @@ public class BookingServiceImpl implements BookingService {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel booking with a session happening today.");
         }
 
+//        List<BookingDetail> futureDetails = allDetails.stream()
+//                .filter(detail -> detail.getSessionDate().isAfter(LocalDate.now()))
+//                .toList();
+//
+//        BigDecimal totalRefund = BigDecimal.ZERO;
+//        for (BookingDetail detail : futureDetails) {
+//            PaymentCycle paymentCycle = getPaymentCycleForBookingDetail(detail);
+//            if (paymentCycle!=null) {
+//                if ("PAID".equalsIgnoreCase(paymentCycle.getStatus())) {
+//                    if(!detail.getStatus().equalsIgnoreCase("COMPLETED")){
+//                        detail.setStatus("REFUNDED");
+//                        totalRefund = totalRefund.add(detail.getTotalPrice());
+//                    }
+//                } else {
+//                    paymentCycle.setStatus("CANCELED");
+//                    paymentCycleRepository.save(paymentCycle);
+//                    detail.setStatus("CANCELED");
+//                }
+//                bookingDetailRepository.save(detail);
+//
+//            }
+//        }
         List<BookingDetail> futureDetails = allDetails.stream()
                 .filter(detail -> detail.getSessionDate().isAfter(LocalDate.now()))
                 .toList();
 
         BigDecimal totalRefund = BigDecimal.ZERO;
+        Set<PaymentCycle> updatedCycles = new HashSet<>();
+
         for (BookingDetail detail : futureDetails) {
             PaymentCycle paymentCycle = getPaymentCycleForBookingDetail(detail);
-            if (paymentCycle!=null) {
+            if (paymentCycle != null) {
                 if ("PAID".equalsIgnoreCase(paymentCycle.getStatus())) {
-                    if(!detail.getStatus().equalsIgnoreCase("COMPLETED")){
+                    if (!"COMPLETED".equalsIgnoreCase(detail.getStatus())) {
                         detail.setStatus("REFUNDED");
                         totalRefund = totalRefund.add(detail.getTotalPrice());
                     }
@@ -1264,8 +1288,45 @@ public class BookingServiceImpl implements BookingService {
                 }
                 bookingDetailRepository.save(detail);
 
+                // Thêm PaymentCycle vào danh sách các PaymentCycle đã được cập nhật
+                updatedCycles.add(paymentCycle);
             }
         }
+
+// Cập nhật trạng thái PaymentCycle sau khi đã xử lý tất cả BookingDetail
+        for (PaymentCycle paymentCycle : updatedCycles) {
+            List<BookingDetail> detailsInCycle = bookingDetailRepository.findByBookingId(bookingId).stream()
+                    .filter(detail -> {
+                        LocalDate sessionDate = detail.getSessionDate();
+                        return !sessionDate.isBefore(paymentCycle.getStartDate()) && !sessionDate.isAfter(paymentCycle.getEndDate());
+                    })
+                    .toList();
+
+            boolean hasRefunded = false;
+            boolean hasCompleted = false;
+            boolean allRefunded = true;
+
+            for (BookingDetail d : detailsInCycle) {
+                if ("REFUNDED".equalsIgnoreCase(d.getStatus())) {
+                    hasRefunded = true;
+                } else if ("COMPLETED".equalsIgnoreCase(d.getStatus())) {
+                    hasCompleted = true;
+                    allRefunded = false;
+                } else {
+                    allRefunded = false;
+                }
+            }
+
+            // Cập nhật trạng thái của PaymentCycle
+            if (allRefunded) {
+                paymentCycle.setStatus("REFUNDED");
+            } else if (hasRefunded && hasCompleted) {
+                paymentCycle.setStatus("REFUNDED_PARTLY");
+            }
+
+            paymentCycleRepository.save(paymentCycle);
+        }
+
         Wallet customerWallet = walletRepository.findByUserId(booking.getCustomer().getId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for customer."));
         if(booking.getDepositPaid()!=null){
@@ -1538,21 +1599,52 @@ public class BookingServiceImpl implements BookingService {
 
             case "CONFIRMED_PARTIALLY_PAID":
             case "CONFIRMED_PAID":
+                Map<PaymentCycle, List<BookingDetail>> cycleToDetails = new HashMap<>();
+                Set<PaymentCycle> updatedCycles = new HashSet<>();
+
                 for (BookingDetail detail : futureDetails) {
                     PaymentCycle paymentCycle = getPaymentCycleForBookingDetail(detail);
-                    if (paymentCycle!=null) {
+                    if (paymentCycle != null) {
+                        cycleToDetails.computeIfAbsent(paymentCycle, k -> new ArrayList<>()).add(detail);
+
                         if ("PAID".equalsIgnoreCase(paymentCycle.getStatus())) {
-                            if(!detail.getStatus().equalsIgnoreCase("COMPLETED")){
+                            if (!"COMPLETED".equalsIgnoreCase(detail.getStatus())) {
                                 detail.setStatus("REFUNDED");
                                 totalRefund = totalRefund.add(detail.getTotalPrice());
                             }
+                            updatedCycles.add(paymentCycle);
                         } else {
                             paymentCycle.setStatus("CANCELED");
                             paymentCycleRepository.save(paymentCycle);
                             detail.setStatus("CANCELED");
                         }
+
                         bookingDetailRepository.save(detail);
                     }
+                }
+                for (PaymentCycle paymentCycle : updatedCycles) {
+                    List<BookingDetail> detailsInCycle = cycleToDetails.get(paymentCycle);
+                    boolean hasRefunded = false;
+                    boolean hasCompleted = false;
+                    boolean allRefunded = true;
+                    for (BookingDetail d : detailsInCycle) {
+                        if ("REFUNDED".equalsIgnoreCase(d.getStatus())) {
+                            hasRefunded = true;
+                        } else if ("COMPLETED".equalsIgnoreCase(d.getStatus())) {
+                            hasCompleted = true;
+                            allRefunded = false;
+                        } else {
+                            allRefunded = false;
+                        }
+                    }
+
+                    if (allRefunded) {
+                        paymentCycle.setStatus("REFUNDED");
+                    } else if (hasRefunded && hasCompleted) {
+                        paymentCycle.setStatus("REFUNDED_PARTLY");
+                    }
+
+                    paymentCycleRepository.save(paymentCycle);
                 }
                 break;
         }

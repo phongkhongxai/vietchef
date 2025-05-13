@@ -52,7 +52,6 @@ public class Chef {
     private Boolean providesIngredients = false; // Có thể tự mua nguyên liệu không?
     @Column(nullable = true)
     private String preferredDishes; // Các món Việt Nam sở trường (VD: "Phở, Bún Bò, Cơm Tấm")
-
     @OneToMany(mappedBy = "chef", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ChefSchedule> schedules;
     @ManyToMany
@@ -67,4 +66,7 @@ public class Chef {
     private Double longitude;
     @Column(nullable = false)
     private Integer reputationPoints = 100;
+    @Column(nullable = true)
+    private BigDecimal penaltyFee;
+
 }
