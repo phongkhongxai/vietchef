@@ -1268,13 +1268,14 @@ public class BookingServiceImpl implements BookingService {
         }
         Wallet customerWallet = walletRepository.findByUserId(booking.getCustomer().getId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for customer."));
+        if(booking.getDepositPaid()!=null){
+            totalRefund= totalRefund.add(booking.getDepositPaid());
+        }else{
+            booking.setStatus("CANCELED");
+        }
 
         if (totalRefund.compareTo(BigDecimal.ZERO) > 0) {
-            if(booking.getDepositPaid()!=null){
-                customerWallet.setBalance(customerWallet.getBalance().add(totalRefund).add(booking.getDepositPaid()));
-            }else{
-                customerWallet.setBalance(customerWallet.getBalance().add(totalRefund));
-            }
+            customerWallet.setBalance(totalRefund);
             CustomerTransaction refundTransaction = CustomerTransaction.builder()
                     .wallet(customerWallet)
                     .booking(booking)
@@ -1477,6 +1478,10 @@ public class BookingServiceImpl implements BookingService {
                 for (BookingDetail detail : allDetails) {
                     detail.setStatus("CANCELED");
                     bookingDetailRepository.save(detail);
+                }
+                if (booking.getDepositPaid()!=null){
+                    totalRefund = totalRefund.add(booking.getDepositPaid());
+                    booking.setDepositPaid(BigDecimal.ZERO);
                 }
                 booking.setStatus("CANCELED");
                 break;

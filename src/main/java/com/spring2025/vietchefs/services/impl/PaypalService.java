@@ -360,7 +360,6 @@ public class PaypalService{
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             return Mono.error(new IllegalArgumentException("Amount must be greater than zero"));
         }
-
         // Lấy ví theo ID
         Wallet wallet = walletRepository.findById(walletId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found with id: " + walletId));
@@ -370,15 +369,8 @@ public class PaypalService{
             return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Số dư trong ví không đủ"));
         }
         Optional<Payment> payment = paymentRepository.findTopByWalletAndPaymentTypeOrderByCreatedAtDesc(wallet, "PAYOUT");
-        if (payment.isPresent() && payment.get().getCreatedAt() != null) {
-            // Kiểm tra xem thời gian tạo giao dịch có trong vòng 24 giờ qua không
-            LocalDateTime createdAt = payment.get().getCreatedAt();
-            if (createdAt.isAfter(LocalDateTime.now().minusDays(1))) {
-                return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Bạn không thể thực hiện rút tiền trong vòng 24 giờ sau lần rút gần nhất."));
-            }
-        }
         if (wallet.getPaypalAccountEmail()==null){
-            return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Email Paypal đang null."));
+            return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Email Paypal cannot empty."));
 
         }
         String receiverEmail = wallet.getPaypalAccountEmail();
