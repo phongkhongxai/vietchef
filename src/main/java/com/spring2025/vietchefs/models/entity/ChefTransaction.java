@@ -35,11 +35,9 @@ public class ChefTransaction {
     private String transactionType = "CREDIT";
 
     @Column(nullable = false)
-
     private BigDecimal amount;
     @Column(columnDefinition = "TEXT")
     private String description;
-
     @Column(nullable = false)
     @Builder.Default
     private LocalDateTime transactionDate=LocalDateTime.now();
@@ -50,8 +48,6 @@ public class ChefTransaction {
     private LocalDateTime updatedAt;
     @Column(nullable = false)
     private String status;
-
-    // Đánh dấu xóa mềm nếu cần
     @Column(nullable = false)
     @Builder.Default
     private Boolean isDeleted = false;

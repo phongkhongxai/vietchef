@@ -1,19 +1,12 @@
 package com.spring2025.vietchefs.services.impl;
 
-import com.spring2025.vietchefs.models.entity.Chef;
-import com.spring2025.vietchefs.models.entity.Dish;
-import com.spring2025.vietchefs.models.entity.Role;
-import com.spring2025.vietchefs.models.entity.User;
+import com.spring2025.vietchefs.models.entity.*;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.dto.ChefDto;
-import com.spring2025.vietchefs.models.payload.dto.DishDto;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefRequestDto;
 import com.spring2025.vietchefs.models.payload.responseModel.ChefResponseDto;
 import com.spring2025.vietchefs.models.payload.responseModel.ChefsResponse;
-import com.spring2025.vietchefs.models.payload.responseModel.DishesResponse;
-import com.spring2025.vietchefs.repositories.ChefRepository;
-import com.spring2025.vietchefs.repositories.RoleRepository;
-import com.spring2025.vietchefs.repositories.UserRepository;
+import com.spring2025.vietchefs.repositories.*;
 import com.spring2025.vietchefs.services.ChefService;
 import com.spring2025.vietchefs.services.ReviewService;
 import com.spring2025.vietchefs.services.WalletService;
@@ -26,6 +19,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Comparator;
@@ -45,6 +39,10 @@ public class ChefServiceImpl implements ChefService {
     private RoleRepository roleRepository;
     @Autowired
     private WalletService walletService;
+    @Autowired
+    private WalletRepository walletRepository;
+    @Autowired
+    private ChefTransactionRepository chefTransactionRepository;
     @Autowired
     private DistanceService distanceService;
     @Autowired
@@ -391,5 +389,41 @@ public class ChefServiceImpl implements ChefService {
         chef.setStatus("BLOCKED");
         chef.setIsDeleted(true);
         chefRepository.save(chef);
+    }
+
+    @Override
+    @Transactional
+    public String unlockChefByPayment(Long userId) {
+        Chef chef = chefRepository.findByUserId(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found."));
+
+        if (!"LOCKED".equalsIgnoreCase(chef.getStatus())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef status not block.");
+        }
+        Wallet wallet = walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found."));
+        BigDecimal unlockFee = new BigDecimal("25.00");
+        if (chef.getPenaltyFee() != null && chef.getPenaltyFee().compareTo(BigDecimal.ZERO) > 0) {
+            unlockFee = chef.getPenaltyFee();
+            chef.setPenaltyFee(BigDecimal.ZERO);
+            chefRepository.save(chef);
+        }
+        if (wallet.getBalance().compareTo(unlockFee) < 0) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Insufficient wallet balance to unlock.");
+        }
+        wallet.setBalance(wallet.getBalance().subtract(unlockFee));
+        walletRepository.save(wallet);
+        chef.setReputationPoints(75);
+        chef.setStatus("ACTIVE");
+        chefRepository.save(chef);
+        ChefTransaction transaction = ChefTransaction.builder()
+                .wallet(wallet)
+                .amount(unlockFee)
+                .transactionType("PAYMENT")
+                .description("Chef account unlock payment.")
+                .status("COMPLETED")
+                .build();
+        chefTransactionRepository.save(transaction);
+        return "Unlock payment successful. Chef account is now active.";
     }
 }
