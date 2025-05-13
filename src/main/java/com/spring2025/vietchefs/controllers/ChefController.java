@@ -72,6 +72,13 @@ public class ChefController {
         ChefResponseDto dto = chefService.getChefById(chefId);
         return new ResponseEntity<>(dto, HttpStatus.OK);
     }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PutMapping("/unlock")
+    public ResponseEntity<String> unlockChef(@AuthenticationPrincipal UserDetails userDetails){
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        return ResponseEntity.ok(chefService.unlockChefByPayment(bto.getId()));
+    }
     
     @Operation(summary = "Get all active chefs with pagination and sorting", 
             description = "Returns all active chefs. The results can be sorted by rating using sortDir='rating_desc'")
@@ -109,18 +116,6 @@ public class ChefController {
             @RequestParam(value = "sortDir", defaultValue = AppConstants.DEFAULT_SORT_DIRECTION, required = false) String sortDir){
         return chefService.getAllChefsNearBySearch(keyword,customerLat,customerLng,distance,pageNo, pageSize, sortBy, sortDir);
     }
-//    @PostMapping("/reputation/recharge")
-//    public ResponseEntity<?> rechargeReputation(@RequestBody RechargeDto dto) {
-//
-//        // Kiểm tra thanh toán thành công
-//        if (paymentService.verify(dto.getPaymentToken())) {
-//            chef.setReputationPoints(70);
-//            chef.setStatus("ACTIVE");
-//            chefRepository.save(chef);
-//            return ResponseEntity.ok("Phục hồi thành công!");
-//        }
-//
-//        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Thanh toán thất bại!");
-//    }
+
 
 }

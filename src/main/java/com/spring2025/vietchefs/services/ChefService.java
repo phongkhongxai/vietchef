@@ -22,6 +22,7 @@ public interface ChefService {
     ChefResponseDto updateChef(Long chefId, ChefRequestDto requestDto); // Cập nhật thông tin đầu bếp
     ChefResponseDto updateChefBySelf(Long userId, ChefRequestDto requestDto);
     void deleteChef(Long chefId); // Xóa đầu bếp (Chỉ Admin)
+    String unlockChefByPayment(Long userId);
 
 
 }

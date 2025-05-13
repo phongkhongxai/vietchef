@@ -235,7 +235,8 @@ public class ReportServiceImpl implements ReportService{
             }
             chefRepository.save(chef);
             if(request.isRefundBooking()){
-                bookingDetailService.refundBookingDetail(bookingDetail.getId());
+                chef.setPenaltyFee(bookingDetailService.refundBookingDetail(bookingDetail.getId()));
+                chef = chefRepository.save(chef);
             }
             NotificationRequest chefNotification = NotificationRequest.builder()
                     .userId(chef.getUser().getId())
@@ -254,7 +255,7 @@ public class ReportServiceImpl implements ReportService{
                     .screen("BookingDetail")
                     .build();
             notificationService.sendPushNotification(customerNotification);
-        } else if (normalizedStatus.equals("REJECTED")) {
+        } else {
             if (bookingDetail.getStatus().equalsIgnoreCase("LOCKED")) {
                 bookingDetail.setStatus("WAITING_FOR_CONFIRMATION");
                 bookingDetail=bookingDetailRepository.save(bookingDetail);

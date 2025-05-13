@@ -28,7 +28,7 @@ public interface BookingDetailService {
     BookingDetailDto updateBookingDetail(Long bookingDetailId, BookingDetailUpdateRequest bookingDetailUpdateRequest);
     BookingDetailDto updateStatusBookingDetailWatingCompleted(Long bookingDetailId,Long userId,List<MultipartFile> files, Double chefLat, Double chefLng);
     BookingDetailDto confirmBookingCompletionByCustomer(Long bookingDetailId,Long userId );
-    void refundBookingDetail(Long bookingDetailId);
+    BigDecimal refundBookingDetail(Long bookingDetailId);
 
 
 

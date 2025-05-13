@@ -615,8 +615,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     }
 
     @Override
-    public void refundBookingDetail(Long bookingDetailId) {
-        // Tìm BookingDetail
+    public BigDecimal refundBookingDetail(Long bookingDetailId) {
         BookingDetail bookingDetail = bookingDetailRepository.findById(bookingDetailId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "BookingDetail not found with id: " + bookingDetailId));
         if (bookingDetail.getStatus().equalsIgnoreCase("LOCKED")) {
@@ -625,12 +624,14 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                 refundSingleBooking(bookingDetail);
                 bookingDetail.setStatus("REFUNDED");
                 bookingDetailRepository.save(bookingDetail);
+                return BigDecimal.ZERO;
             } else if ("LONG_TERM".equalsIgnoreCase(booking.getBookingType())) {
-                refundLongTermBooking(bookingDetail);
+                return refundLongTermBooking(bookingDetail);
             }
         } else {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "BookingDetail is not in a valid state for refund.");
         }
+        return BigDecimal.ZERO;
     }
     private void refundSingleBooking(BookingDetail bookingDetail) {
         Booking booking = bookingDetail.getBooking();
@@ -661,16 +662,29 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         notificationService.sendPushNotification(customerNotification);
     }
 
-    private void refundLongTermBooking(BookingDetail bookingDetail) {
+    private BigDecimal refundLongTermBooking(BookingDetail bookingDetail) {
         Booking booking = bookingDetail.getBooking();
         PaymentCycle paymentCycle = getPaymentCycleForBookingDetail(bookingDetail);
         List<BookingDetail> allBookingDetails = bookingDetailRepository.findByBookingId(bookingDetail.getBooking().getId());
 
         List<PaymentCycle> afterCycles = getPaymentCycleAfter(paymentCycle);
 
+        BigDecimal penaltyFee = BigDecimal.ZERO;
         List<PaymentCycle> cyclesToRefund = new ArrayList<>();
         if ("PAID".equalsIgnoreCase(paymentCycle.getStatus())) {
             cyclesToRefund.add(paymentCycle);
+            List<BookingDetail> detailsInCycle = allBookingDetails.stream()
+                    .filter(detail -> {
+                        LocalDate sessionDate = detail.getSessionDate();
+                        return !sessionDate.isBefore(paymentCycle.getStartDate()) && !sessionDate.isAfter(paymentCycle.getEndDate());
+                    })
+                    .toList();
+            for (BookingDetail detail : detailsInCycle){
+                if(detail.getStatus().equalsIgnoreCase("COMPLETED")){
+                    penaltyFee = penaltyFee.add(detail.getChefCookingFee());
+                    detail.setStatus("REFUNDED");
+                }
+            }
         } else {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Current payment cycle is not PAID, cannot process refund.");
         }
@@ -737,6 +751,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                 .build();
 
         notificationService.sendPushNotification(customerNotification);
+        return penaltyFee;
     }
     private CustomerTransaction getDepositTransaction(BookingDetail bookingDetail) {
         Optional<CustomerTransaction> depositTransaction = customerTransactionRepository
