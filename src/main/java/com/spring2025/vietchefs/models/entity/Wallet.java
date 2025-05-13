@@ -30,4 +30,6 @@ public class Wallet {
     private String walletType; //CUSTOMER or CHEF
     @OneToMany(mappedBy = "wallet", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<CustomerTransaction> customerTransactions;
+    @Column(nullable = true)
+    private String password;
 }
