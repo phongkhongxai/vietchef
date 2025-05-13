@@ -13,8 +13,10 @@ import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -41,6 +43,15 @@ public class WalletRequestServiceImpl implements WalletRequestService {
 
         if (wallet.getBalance().compareTo(dto.getAmount()) < 0) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Insufficient wallet balance.");
+        }
+        if (wallet.getPaypalAccountEmail()==null){
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Email Paypal cannot empty.");
+        }
+        LocalDateTime cutoffTime = LocalDateTime.now().minusHours(12);
+
+        List<WalletRequest> recentRequests = walletRequestRepository.findRecentRequestsByUserId(user.getId(), cutoffTime);
+        if (!recentRequests.isEmpty()) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "You can only create one withdrawal request every 12 hours.");
         }
         if(dto.getNote().isEmpty()){
             dto.setNote("Withdrawal from wallet.");
