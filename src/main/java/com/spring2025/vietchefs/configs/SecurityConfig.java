@@ -123,10 +123,7 @@ public class SecurityConfig {
                 )
                 .addSecurityItem(new SecurityRequirement().addList("Bearer Authentication"))//;
                 .servers(Arrays.asList(
-                        new Server().url("https://vietchef.ddns.net")  // Đảm bảo Swagger sử dụng HTTPS
+                        new Server().url("https://vietchef-api.ddns.net")  // Đảm bảo Swagger sử dụng HTTPS
                 ));
     }
-
-//dang suy ngẵm
-
 }
