@@ -1468,7 +1468,6 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for customer."));
 
         switch (status.toUpperCase()) {
-            case "CONFIRMED":
             case "PENDING":
             case "PENDING_FIRST_CYCLE":
                 for (PaymentCycle cycle : allCycles) {
@@ -1479,13 +1478,22 @@ public class BookingServiceImpl implements BookingService {
                     detail.setStatus("CANCELED");
                     bookingDetailRepository.save(detail);
                 }
+                booking.setStatus("CANCELED");
+                break;
+            case "CONFIRMED":
+                for (PaymentCycle cycle : allCycles) {
+                    cycle.setStatus("CANCELED");
+                    paymentCycleRepository.save(cycle);
+                }
+                for (BookingDetail detail : allDetails) {
+                    detail.setStatus("CANCELED");
+                    bookingDetailRepository.save(detail);
+                }
                 if (booking.getDepositPaid()!=null){
                     totalRefund = totalRefund.add(booking.getDepositPaid());
-                    booking.setDepositPaid(BigDecimal.ZERO);
                 }
                 booking.setStatus("CANCELED");
                 break;
-
             case "PAID_FIRST_CYCLE":
                 Optional<PaymentCycle> paidCycleOpt = allCycles.stream()
                         .filter(cycle -> "PAID".equalsIgnoreCase(cycle.getStatus()))

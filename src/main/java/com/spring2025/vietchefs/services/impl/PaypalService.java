@@ -406,12 +406,14 @@ public class PaypalService{
                                         String errorName = jsonNode.get("name").asText();
                                         String errorMessage = jsonNode.get("message").asText();
 
-                                        if ("RECEIVER_UNREGISTERED".equals(errorName)) {
-                                            return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Email chưa đăng ký tài khoản PayPal."));
-                                        }
-
-                                        // Các lỗi khác
-                                        return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "PayPal payout error: " + errorMessage));
+                                        return switch (errorName) {
+                                            case "RECEIVER_UNREGISTERED" ->
+                                                    Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Email chưa đăng ký tài khoản PayPal."));
+                                            case "INSUFFICIENT_FUNDS" ->
+                                                    Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Tài khoản PayPal hệ thống không đủ tiền để chi trả."));
+                                            default ->
+                                                    Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "PayPal payout error: " + errorMessage));
+                                        };
                                     }
 
                                     // ✅ Xử lý thành công
@@ -434,7 +436,7 @@ public class PaypalService{
                                     if (wallet.getWalletType().equalsIgnoreCase("CUSTOMER")) {
                                         customerTransactionRepository.save(CustomerTransaction.builder()
                                                 .wallet(wallet)
-                                                .transactionType("WITHDRAWL")
+                                                .transactionType("WITHDRAWAL")
                                                 .amount(amount)
                                                 .description("Successful withdrawal")
                                                 .status("COMPLETED")
@@ -443,7 +445,7 @@ public class PaypalService{
                                     } else {
                                         chefTransactionRepository.save(ChefTransaction.builder()
                                                 .wallet(wallet)
-                                                .transactionType("WITHDRAWL")
+                                                .transactionType("WITHDRAWAL")
                                                 .amount(amount)
                                                 .description("Successful withdrawal")
                                                 .status("COMPLETED")
