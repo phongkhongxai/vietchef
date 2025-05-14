@@ -325,7 +325,7 @@ public class ReviewController {
             summary = "Admin: Lấy đánh giá của người dùng theo ID",
             description = "Trả về danh sách các đánh giá mà người dùng đã thực hiện. Chỉ admin mới có quyền sử dụng API này."
     )
-    @GetMapping("/admin/reviews/user/{userId}")
+    @GetMapping("/reviews/user/{userId}")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<Map<String, Object>> getReviewsByUserId(@PathVariable Long userId) {
         // No need to verify user exists as reviewService will throw exception if user is not found
