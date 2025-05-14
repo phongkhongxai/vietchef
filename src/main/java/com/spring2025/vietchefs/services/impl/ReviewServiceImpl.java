@@ -146,7 +146,7 @@ public class ReviewServiceImpl implements ReviewService {
                 throw new VchefApiException(HttpStatus.BAD_REQUEST, 
                     "BR-46: Mỗi buổi đặt chỉ cho phép gửi một đánh giá duy nhất từ khách hàng.");
             }
-        }
+        } 
         
         // Filter the review description for profanity
         String filteredOverallExperience = contentFilterService.filterText(request.getOverallExperience());

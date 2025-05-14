@@ -13,7 +13,6 @@ classDiagram
         -Chef chef
         -Booking booking
         -BigDecimal rating
-        -String description
         -String overallExperience
         -String imageUrl
         -String response
@@ -294,7 +293,7 @@ flowchart TD
     L1 --> L2{Has review?}
     L2 -->|Yes| L3[Return error: booking already reviewed]
     L3 --> End3a([End])
-    L2 -->|No| L4[Filter review description with ContentFilterService]
+    L2 -->|No| L4[Filter review overAllExperience with ContentFilterService]
     L4 --> L5[Create Review entity]
     H -->|No| L4
     L5 --> M[Set basic review data]

@@ -38,10 +38,9 @@ public class ChatMessage {
 
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
-    @CreationTimestamp
     @Column(updatable = false)
+    @Builder.Default
     private LocalDateTime timestamp = LocalDateTime.now();
-
     @Column(name = "content_type", nullable = false)
     private String contentType;
 }

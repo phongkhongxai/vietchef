@@ -16,7 +16,7 @@ import java.util.List;
 @Setter
 public class DishResponseDto {
     private Long id;
-    private ChefDto chef;
+    private ChefResponseDto chef;
     private List<FoodTypeDto> foodTypes;
     private String name;
     private String description;
@@ -26,5 +26,4 @@ public class DishResponseDto {
     private BigDecimal basePrice;
     private Integer estimatedCookGroup;
     private String imageUrl;
-    private double distance;
 }

@@ -31,10 +31,6 @@ classDiagram
     }
     
     class AvailabilityFinderController {
-        +findAvailableTimeSlotsForChef(Long chefId, LocalDate startDate, LocalDate endDate) : List~AvailableTimeSlotResponse~
-        +findAvailableTimeSlotsForCurrentChef(LocalDate startDate, LocalDate endDate) : List~AvailableTimeSlotResponse~
-        +findAvailableTimeSlotsForChefByDate(Long chefId, LocalDate date) : List~AvailableTimeSlotResponse~
-        +checkTimeSlotAvailability(Long chefId, LocalDate date, LocalTime startTime, LocalTime endTime) : Boolean
         +findAvailableTimeSlotsInSingleDate(Long chefId, LocalDate date, String customerLocation, Long menuId, List~Long~ dishIds, int guestCount, int maxDishesPerMeal) : List~AvailableTimeSlotResponse~
         +findAvailableTimeSlotsInMultipleDates(Long chefId, String customerLocation, int guestCount, int maxDishesPerMeal, List~AvailableTimeSlotRequest~ requests) : List~AvailableTimeSlotResponse~
     }

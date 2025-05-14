@@ -87,7 +87,6 @@ public class NotificationService {
         Long userId = request.getUserId();
         String title = request.getTitle();
         String body = request.getBody();
-
         // Lấy user
         Optional<User> optionalUser = userRepository.findById(userId);
         if (optionalUser.isEmpty()) {
@@ -159,7 +158,7 @@ public class NotificationService {
         notificationRepository.saveAll(notifications);
     }
     public void markAllAsReadByUser(Long userId) {
-        List<Notification> notifications = notificationRepository.findByUserIdAndIsReadFalseAndNotiTypeNot(userId, "CHAT_NOTIFY");
+        List<Notification> notifications = notificationRepository.findUnreadNonChatNotifications(userId);
         for (Notification n : notifications) {
             n.setRead(true);
         }

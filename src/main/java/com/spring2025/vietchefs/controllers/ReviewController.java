@@ -288,6 +288,69 @@ public class ReviewController {
         }
     }
 
+    // Get reviews by the current authenticated user
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(
+            summary = "Lấy đánh giá của người dùng",
+            description = "Trả về danh sách các đánh giá mà người dùng hiện tại đã thực hiện"
+    )
+    @GetMapping("/reviews/user")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Object>> getCurrentUserReviews() {
+        UserDto currentUser = getCurrentUser();
+        
+        // Get user reviews from service
+        List<ReviewResponse> userReviews = reviewService.getReviewsByUser(currentUser.getId());
+        
+        // Calculate total helpful reactions across all reviews
+        long totalHelpful = userReviews.stream()
+                .mapToLong(review -> {
+                    Map<String, Long> reactionCounts = reviewReactionService.getReactionCountsByReview(review.getId());
+                    return reactionCounts.getOrDefault("helpful", 0L);
+                })
+                .sum();
+        
+        // Create response object
+        Map<String, Object> response = new HashMap<>();
+        response.put("reviews", userReviews);
+        response.put("totalReviews", userReviews.size());
+        response.put("totalLikes", totalHelpful);
+        
+        return ResponseEntity.ok(response);
+    }
+    
+    // Admin: Get reviews by user ID
+    @SecurityRequirement(name = "Bearer Authentication")
+    @Operation(
+            summary = "Admin: Lấy đánh giá của người dùng theo ID",
+            description = "Trả về danh sách các đánh giá mà người dùng đã thực hiện. Chỉ admin mới có quyền sử dụng API này."
+    )
+    @GetMapping("/admin/reviews/user/{userId}")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<Map<String, Object>> getReviewsByUserId(@PathVariable Long userId) {
+        // No need to verify user exists as reviewService will throw exception if user is not found
+        
+        // Get user reviews from service
+        List<ReviewResponse> userReviews = reviewService.getReviewsByUser(userId);
+        
+        // Calculate total helpful reactions across all reviews
+        long totalHelpful = userReviews.stream()
+                .mapToLong(review -> {
+                    Map<String, Long> reactionCounts = reviewReactionService.getReactionCountsByReview(review.getId());
+                    return reactionCounts.getOrDefault("helpful", 0L);
+                })
+                .sum();
+        
+        // Create response object
+        Map<String, Object> response = new HashMap<>();
+        response.put("reviews", userReviews);
+        response.put("totalReviews", userReviews.size());
+        response.put("totalLikes", totalHelpful);
+        response.put("userId", userId);
+        
+        return ResponseEntity.ok(response);
+    }
+
     // Add a reaction to a review
     @PostMapping("/reviews/{id}/reaction")
     @PreAuthorize("isAuthenticated()")
