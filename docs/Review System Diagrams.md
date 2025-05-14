@@ -13,7 +13,6 @@ classDiagram
         -Chef chef
         -Booking booking
         -BigDecimal rating
-        -String description
         -String overallExperience
         -String imageUrl
         -String response
@@ -92,12 +91,23 @@ classDiagram
         +findByReviewAndUser(Review review, User user)
         +countByReviewAndReactionType(Review review, String reactionType)
     }
+    
+    class ContentFilterService {
+        -Set~String~ profanityWords
+        -String REPLACEMENT
+        +ContentFilterService()
+        -loadProfanityWords()
+        +filterText(String text) : String
+        +containsProfanity(String text) : boolean
+        +findProfanityWords(String text) : List~String~
+    }
 
     class ReviewController {
         -ReviewService reviewService
         -ReviewCriteriaService reviewCriteriaService
         -ReviewReplyService reviewReplyService
         -ReviewReactionService reviewReactionService
+        -ContentFilterService contentFilterService
         +createReview(ReviewCreateRequest request, Long userId)
         +updateReview(Long reviewId, ReviewUpdateRequest request, Long userId)
         +deleteReview(Long reviewId)
@@ -137,6 +147,7 @@ classDiagram
         -ChefRepository chefRepository
         -ImageRepository imageRepository
         -ImageService imageService
+        -ContentFilterService contentFilterService
         +getReviewById(Long id)
         +getReviewsByChef(Long chefId)
         +getReviewsByChef(Long chefId, Pageable pageable)
@@ -232,6 +243,8 @@ classDiagram
     ReviewController --> ReviewCriteriaService : uses
     ReviewController --> ReviewReplyService : uses
     ReviewController --> ReviewReactionService : uses
+    ReviewController --> ContentFilterService : uses
+    
     ReviewService <|.. ReviewServiceImpl : implements
     ReviewCriteriaService <|.. ReviewCriteriaServiceImpl : implements
     ReviewReplyService <|.. ReviewReplyServiceImpl : implements
@@ -246,6 +259,7 @@ classDiagram
     ReviewServiceImpl --> BookingRepository : uses
     ReviewServiceImpl --> ImageRepository : uses
     ReviewServiceImpl --> ImageService : uses
+    ReviewServiceImpl --> ContentFilterService : uses
     
     ReviewCriteriaServiceImpl --> ReviewCriteriaRepository : uses
     ReviewReplyServiceImpl --> ReviewReplyRepository : uses
@@ -275,9 +289,14 @@ flowchart TD
     I --> J{Booking exists?}
     J -->|No| K[Return 404 Not Found]
     K --> End3([End])
-    J -->|Yes| L[Create Review entity]
-    H -->|No| L
-    L --> M[Set basic review data]
+    J -->|Yes| L1[Check if booking already has a review]
+    L1 --> L2{Has review?}
+    L2 -->|Yes| L3[Return error: booking already reviewed]
+    L3 --> End3a([End])
+    L2 -->|No| L4[Filter review overAllExperience with ContentFilterService]
+    L4 --> L5[Create Review entity]
+    H -->|No| L4
+    L5 --> M[Set basic review data]
     M --> N[Calculate weighted rating]
     N --> O[Save review]
     O --> P[Upload main image if provided]
@@ -302,8 +321,9 @@ flowchart TD
     F -->|Yes| H{Chef is review recipient?}
     H -->|No| I[Return 403 Forbidden]
     I --> End3([End])
-    H -->|Yes| J[Add chef response]
-    J --> K[Set chefResponseAt = now]
+    H -->|Yes| J1[Filter response text with ContentFilterService]
+    J1 --> J2[Add chef response]
+    J2 --> K[Set chefResponseAt = now]
     K --> L[Save updated review]
     L --> M[Return updated review response]
     M --> End4([End])
@@ -321,8 +341,9 @@ flowchart TD
     E --> F{User exists?}
     F -->|No| G[Return 404 Not Found]
     G --> End2([End])
-    F -->|Yes| H[Create review reply entity]
-    H --> I[Set review, user, content]
+    F -->|Yes| H1[Filter reply content with ContentFilterService]
+    H1 --> H2[Create review reply entity]
+    H2 --> I[Set review, user, content]
     I --> J[Set createdAt = now, isDeleted = false]
     J --> K[Save reply to database]
     K --> L[Map to response DTO]
@@ -388,30 +409,57 @@ sequenceDiagram
     participant DetailRepo as ReviewDetailRepository
     participant ReviewRepo as ReviewRepository
     participant ImageService as ImageService
+    participant ContentFilter as ContentFilterService
+    participant DB as Database
     
     Client->>Controller: POST /api/v1/reviews (with JWT Authorization header)
     Controller->>Controller: getCurrentUser() from SecurityContext
     Controller->>Service: createReview(request, currentUser.getId())
+    
     Service->>UserRepo: findById(userId)
+    UserRepo->>DB: SELECT * FROM users WHERE id = userId
+    DB-->>UserRepo: User data
     UserRepo-->>Service: User
+    
     Service->>ChefRepo: findById(chefId)
+    ChefRepo->>DB: SELECT * FROM chef WHERE id = chefId
+    DB-->>ChefRepo: Chef data
     ChefRepo-->>Service: Chef
     
     alt bookingId provided
         Service->>BookingRepo: findById(bookingId)
+        BookingRepo->>DB: SELECT * FROM booking WHERE id = bookingId
+        DB-->>BookingRepo: Booking data
         BookingRepo-->>Service: Booking
+        
+        Service->>ReviewRepo: findByBookingAndIsDeletedFalse(booking)
+        ReviewRepo->>DB: SELECT * FROM review WHERE booking_id = bookingId AND is_deleted = false
+        DB-->>ReviewRepo: Review data (if exists)
+        ReviewRepo-->>Service: Optional<Review>
+        
+        alt review exists for booking
+            Service-->>Controller: VchefApiException (BR-46: One booking can only have one review)
+            Controller-->>Client: HTTP 400 Bad Request
+        end
     end
     
+    Service->>ContentFilter: filterText(request.getOverallExperience())
+    ContentFilter-->>Service: Filtered text content
+    
     Service->>Service: Create Review entity
-    Service->>Service: Set user, chef, booking, description, etc.
+    Service->>Service: Set user, chef, booking, filtered description, etc.
     Service->>Service: Calculate weighted rating
     Service->>ReviewRepo: save(review)
+    ReviewRepo->>DB: INSERT INTO review (...)
+    DB-->>ReviewRepo: Saved review ID
     ReviewRepo-->>Service: Saved Review
     
     alt mainImage provided
         Service->>ImageService: uploadImage(image, reviewId, "REVIEW")
         ImageService-->>Service: imageUrl
         Service->>ReviewRepo: save(review with imageUrl)
+        ReviewRepo->>DB: UPDATE review SET image_url = ? WHERE id = ?
+        DB-->>ReviewRepo: Updated review
     end
     
     alt additionalImages provided
@@ -425,6 +473,8 @@ sequenceDiagram
         CriteriaService-->>Service: ReviewCriteriaResponse
         Service->>Service: Create ReviewDetail entity
         Service->>DetailRepo: save(reviewDetail)
+        DetailRepo->>DB: INSERT INTO review_detail (...)
+        DB-->>DetailRepo: Saved detail
     end
     
     Service->>Service: Map to ReviewResponse
@@ -442,11 +492,15 @@ sequenceDiagram
     participant ChefRepo as ChefRepository
     participant UserService as UserService
     participant ChefService as ChefService
+    participant ContentFilter as ContentFilterService
+    participant DB as Database
     
     Chef->>Controller: POST /api/v1/reviews/{id}/response (with JWT Authorization)
     Controller->>Controller: getCurrentUser() from SecurityContext
     Controller->>Service: getReviewById(id)
     Service->>ReviewRepo: findById(id)
+    ReviewRepo->>DB: SELECT * FROM review WHERE id = ? AND is_deleted = false
+    DB-->>ReviewRepo: Review data
     ReviewRepo-->>Service: Review
     Service-->>Controller: ReviewResponse
     
@@ -457,8 +511,13 @@ sequenceDiagram
         Controller-->>Chef: HTTP 403 Forbidden
     end
     
-    Controller->>Service: addChefResponse(id, response, currentUser.getId())
+    Controller->>ContentFilter: filterText(response)
+    ContentFilter-->>Controller: Filtered response text
+    
+    Controller->>Service: addChefResponse(id, filteredResponse, currentUser.getId())
     Service->>ReviewRepo: findById(reviewId)
+    ReviewRepo->>DB: SELECT * FROM review WHERE id = ? AND is_deleted = false
+    DB-->>ReviewRepo: Review data
     ReviewRepo-->>Service: Review
     
     alt Review not found
@@ -466,9 +525,14 @@ sequenceDiagram
         Controller-->>Chef: HTTP 404 Not Found
     end
     
-    Service->>Service: Set review.response = response
+    Service->>ContentFilter: filterText(response)
+    ContentFilter-->>Service: Filtered response text
+    
+    Service->>Service: Set review.response = filteredResponse
     Service->>Service: Set review.chefResponseAt = now()
     Service->>ReviewRepo: save(review)
+    ReviewRepo->>DB: UPDATE review SET response = ?, chef_response_at = ? WHERE id = ?
+    DB-->>ReviewRepo: Updated review
     ReviewRepo-->>Service: Updated Review
     Service->>Service: Map to ReviewResponse
     Service-->>Controller: ReviewResponse
@@ -484,11 +548,21 @@ sequenceDiagram
     participant ReviewRepo as ReviewRepository
     participant UserRepo as UserRepository
     participant ReplyRepo as ReviewReplyRepository
+    participant ContentFilter as ContentFilterService
+    participant DB as Database
     
     Client->>Controller: POST /api/v1/reviews/{id}/reply (with JWT Authorization)
     Controller->>Controller: getCurrentUser() from SecurityContext
-    Controller->>ReplyService: addReply(id, currentUser.getId(), request)
+    
+    Controller->>ContentFilter: filterText(request.getContent())
+    ContentFilter-->>Controller: Filtered content text
+    
+    Controller->>Controller: Create new request with filtered content
+    
+    Controller->>ReplyService: addReply(id, currentUser.getId(), filteredRequest)
     ReplyService->>ReviewRepo: findById(reviewId)
+    ReviewRepo->>DB: SELECT * FROM review WHERE id = ? AND is_deleted = false
+    DB-->>ReviewRepo: Review data
     ReviewRepo-->>ReplyService: Review
     
     alt Review not found
@@ -497,6 +571,8 @@ sequenceDiagram
     end
     
     ReplyService->>UserRepo: findById(userId)
+    UserRepo->>DB: SELECT * FROM users WHERE id = ?
+    DB-->>UserRepo: User data
     UserRepo-->>ReplyService: User
     
     alt User not found
@@ -508,6 +584,8 @@ sequenceDiagram
     ReplyService->>ReplyService: Set review, user, content
     ReplyService->>ReplyService: Set createdAt = now(), isDeleted = false
     ReplyService->>ReplyRepo: save(reply)
+    ReplyRepo->>DB: INSERT INTO review_reply (...)
+    DB-->>ReplyRepo: Saved reply ID
     ReplyRepo-->>ReplyService: Saved ReviewReply
     ReplyService->>ReplyService: Map to ReviewReplyResponse
     ReplyService-->>Controller: ReviewReplyResponse
@@ -523,11 +601,14 @@ sequenceDiagram
     participant ReviewRepo as ReviewRepository
     participant UserRepo as UserRepository
     participant ReactionRepo as ReviewReactionRepository
+    participant DB as Database
     
     Client->>Controller: POST /api/v1/reviews/{id}/reaction (with JWT Authorization)
     Controller->>Controller: getCurrentUser() from SecurityContext
     Controller->>ReactionService: addReaction(id, currentUser.getId(), request)
     ReactionService->>ReviewRepo: findById(reviewId)
+    ReviewRepo->>DB: SELECT * FROM review WHERE id = ? AND is_deleted = false
+    DB-->>ReviewRepo: Review data
     ReviewRepo-->>ReactionService: Review
     
     alt Review not found
@@ -536,6 +617,8 @@ sequenceDiagram
     end
     
     ReactionService->>UserRepo: findById(userId)
+    UserRepo->>DB: SELECT * FROM users WHERE id = ?
+    DB-->>UserRepo: User data
     UserRepo-->>ReactionService: User
     
     alt User not found
@@ -544,6 +627,8 @@ sequenceDiagram
     end
     
     ReactionService->>ReactionRepo: findByReviewAndUser(review, user)
+    ReactionRepo->>DB: SELECT * FROM review_reaction WHERE review_id = ? AND user_id = ?
+    DB-->>ReactionRepo: Reaction data (if exists)
     ReactionRepo-->>ReactionService: Optional<ReviewReaction>
     
     alt Reaction exists
@@ -555,11 +640,19 @@ sequenceDiagram
     end
     
     ReactionService->>ReactionRepo: save(reaction)
+    ReactionRepo->>DB: INSERT/UPDATE review_reaction (...)
+    DB-->>ReactionRepo: Saved reaction
     ReactionRepo-->>ReactionService: Saved ReviewReaction
     ReactionService->>ReactionService: Map to ReviewReactionResponse
     ReactionService-->>Controller: ReviewReactionResponse
     
     Controller->>ReactionService: getReactionCountsByReview(id)
+    ReactionService->>ReactionRepo: countByReviewAndReactionType(review, "helpful")
+    ReactionRepo->>DB: SELECT COUNT(*) FROM review_reaction WHERE review_id = ? AND reaction_type = 'helpful'
+    DB-->>ReactionRepo: Count
+    ReactionService->>ReactionRepo: countByReviewAndReactionType(review, "not_helpful")
+    ReactionRepo->>DB: SELECT COUNT(*) FROM review_reaction WHERE review_id = ? AND reaction_type = 'not_helpful'
+    DB-->>ReactionRepo: Count
     ReactionService-->>Controller: Map<String, Long> counts
     
     Controller->>Controller: Create response with reaction and counts
@@ -574,10 +667,13 @@ sequenceDiagram
     participant Service as ReviewServiceImpl
     participant ChefRepo as ChefRepository
     participant ReviewRepo as ReviewRepository
+    participant DB as Database
     
     Client->>Controller: GET /api/v1/reviews/chef/{chefId}?page=0&size=10&sort=newest
     Controller->>Service: getReviewsByChef(chefId, pageable)
     Service->>ChefRepo: findById(chefId)
+    ChefRepo->>DB: SELECT * FROM chef WHERE id = ?
+    DB-->>ChefRepo: Chef data
     ChefRepo-->>Service: Chef
     
     alt Chef not found
@@ -586,20 +682,40 @@ sequenceDiagram
     end
     
     Service->>ReviewRepo: findByChefAndIsDeletedFalse(chef, pageable)
+    ReviewRepo->>DB: SELECT * FROM review WHERE chef_id = ? AND is_deleted = false ORDER BY create_at DESC LIMIT ? OFFSET ?
+    DB-->>ReviewRepo: Page<Review>
     ReviewRepo-->>Service: Page<Review>
     Service->>Service: Map to Page<ReviewResponse>
     Service-->>Controller: Page<ReviewResponse>
     
     Controller->>Service: getReviewCountForChef(chefId)
     Service->>ReviewRepo: countByChef(chef)
+    ReviewRepo->>DB: SELECT COUNT(*) FROM review WHERE chef_id = ? AND is_deleted = false
+    DB-->>ReviewRepo: Count
     ReviewRepo-->>Service: Count
     
     Controller->>Service: getAverageRatingForChef(chefId)
     Service->>ReviewRepo: findAverageRatingByChef(chef)
+    ReviewRepo->>DB: SELECT AVG(rating) FROM review WHERE chef_id = ? AND is_deleted = false
+    DB-->>ReviewRepo: Average Rating
     ReviewRepo-->>Service: Average Rating
     
     Controller->>Service: getRatingDistributionForChef(chefId)
-    Service->>Service: Calculate ratings distribution
+    Service->>ReviewRepo: countByChefAndRatingGreaterThanEqual(chef, 5.0)
+    ReviewRepo->>DB: SELECT COUNT(*) FROM review WHERE chef_id = ? AND rating >= 5.0 AND is_deleted = false
+    DB-->>ReviewRepo: Count
+    Service->>ReviewRepo: countByChefAndRatingGreaterThanEqual(chef, 4.0)
+    ReviewRepo->>DB: SELECT COUNT(*) FROM review WHERE chef_id = ? AND rating >= 4.0 AND is_deleted = false
+    DB-->>ReviewRepo: Count
+    Service->>ReviewRepo: countByChefAndRatingGreaterThanEqual(chef, 3.0)
+    ReviewRepo->>DB: SELECT COUNT(*) FROM review WHERE chef_id = ? AND rating >= 3.0 AND is_deleted = false
+    DB-->>ReviewRepo: Count
+    Service->>ReviewRepo: countByChefAndRatingGreaterThanEqual(chef, 2.0)
+    ReviewRepo->>DB: SELECT COUNT(*) FROM review WHERE chef_id = ? AND rating >= 2.0 AND is_deleted = false
+    DB-->>ReviewRepo: Count
+    Service->>ReviewRepo: countByChefAndRatingGreaterThanEqual(chef, 1.0)
+    ReviewRepo->>DB: SELECT COUNT(*) FROM review WHERE chef_id = ? AND rating >= 1.0 AND is_deleted = false
+    DB-->>ReviewRepo: Count
     Service-->>Controller: Map<String, Long> distribution
     
     Controller->>Controller: Build response Map with reviews, counts, ratings, etc.
@@ -611,3 +727,4 @@ sequenceDiagram
 - **API**: Application Programming Interface
 - **CRUD**: Create, Read, Update, Delete
 - **JPA**: Java Persistence API 
+- **DB**: Database 

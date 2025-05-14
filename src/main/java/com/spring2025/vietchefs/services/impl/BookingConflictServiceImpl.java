@@ -19,8 +19,8 @@ import java.util.stream.Collectors;
 @Service
 public class BookingConflictServiceImpl implements BookingConflictService {
 
-    private static final List<String> ACTIVE_BOOKING_STATUSES = List.of("PENDING", "CONFIRMED", "IN_PROGRESS");
-    private static final List<String> ACTIVE_DETAIL_STATUSES = List.of("PENDING", "CONFIRMED", "IN_PROGRESS");
+    private static final List<String> NOT_ACTIVE_BOOKING_STATUSES = List.of("OVERDUE", "CANCELED", "REJECTED");
+    private static final List<String> NOT_ACTIVE_DETAIL_STATUSES = List.of("OVERDUE", "CANCELED");
     
     @Autowired
     private BookingRepository bookingRepository;
@@ -61,10 +61,15 @@ public class BookingConflictServiceImpl implements BookingConflictService {
                 })
                 .collect(Collectors.toList());
         
-        // Kiểm tra từng ngày
+        // Kiểm tra xem có booking detail nào trùng giờ vào các ngày này không
         for (LocalDate date : datesToCheck) {
-            if (hasBookingConflict(chef, date, startTime, endTime)) {
-                return true;
+            List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking_ChefAndSessionDateAndIsDeletedFalse(chef, date);
+            List<BookingDetail> activeDetails = filterActiveBookingDetails(bookingDetails);
+            
+            for (BookingDetail detail : activeDetails) {
+                if (timeRangesOverlap(startTime, endTime, detail.getTimeBeginTravel(), detail.getStartTime())) {
+                    return true;
+                }
             }
         }
         
@@ -110,14 +115,14 @@ public class BookingConflictServiceImpl implements BookingConflictService {
     private List<BookingDetail> filterActiveBookingDetails(List<BookingDetail> bookingDetails) {
         return bookingDetails.stream()
                 .filter(detail -> {
-                    // Booking vẫn còn active
+                    // Booking vẫn còn active (không nằm trong danh sách NOT_ACTIVE)
                     Booking booking = detail.getBooking();
-                    if (booking.getIsDeleted() || !ACTIVE_BOOKING_STATUSES.contains(booking.getStatus())) {
+                    if (booking.getIsDeleted() || NOT_ACTIVE_BOOKING_STATUSES.contains(booking.getStatus())) {
                         return false;
                     }
                     
-                    // BookingDetail vẫn còn active
-                    return !detail.getIsDeleted() && ACTIVE_DETAIL_STATUSES.contains(detail.getStatus());
+                    // BookingDetail vẫn còn active (không nằm trong danh sách NOT_ACTIVE)
+                    return !detail.getIsDeleted() && !NOT_ACTIVE_DETAIL_STATUSES.contains(detail.getStatus());
                 })
                 .collect(Collectors.toList());
     }

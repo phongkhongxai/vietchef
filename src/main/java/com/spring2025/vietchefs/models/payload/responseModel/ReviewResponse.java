@@ -20,7 +20,6 @@ public class ReviewResponse {
     private Long chefId;
     private Long bookingId;
     private BigDecimal rating;
-    private String description;
     private String overallExperience;
     private String mainImageUrl;
     private List<String> additionalImageUrls;

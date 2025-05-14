@@ -217,14 +217,19 @@ sequenceDiagram
     participant FCR as FavoriteChefRepository
     participant UR as UserRepository
     participant CR as ChefRepository
+    participant DB as Database
     
     Customer->>FC: POST /api/v1/favorite-chefs/{userId}/chefs/{chefId}
     FC->>FS: addFavoriteChef(userId, chefId)
     
     FS->>UR: findExistUserById(userId)
+    UR->>DB: SELECT * FROM users WHERE id = ? AND is_deleted = false
+    DB-->>UR: Return user data
     UR-->>FS: Return User
     
     FS->>CR: findById(chefId)
+    CR->>DB: SELECT * FROM chef WHERE id = ? AND is_deleted = false
+    DB-->>CR: Return chef data
     CR-->>FS: Return Chef
     
     Note over FS: Check if chef status is ACTIVE
@@ -232,6 +237,8 @@ sequenceDiagram
         FS-->>FC: Throw VchefApiException: "Chef is not active"
     else Chef status is ACTIVE
         FS->>FCR: findByUserAndChef(user, chef)
+        FCR->>DB: SELECT * FROM favorite_chef WHERE user_id = ? AND chef_id = ?
+        DB-->>FCR: Return favorite_chef data
         FCR-->>FS: Return Optional<FavoriteChef>
         
         alt FavoriteChef exists
@@ -241,12 +248,16 @@ sequenceDiagram
             else isDeleted = true (was deleted before)
                 FS->>FS: Set isDeleted = false
                 FS->>FCR: save(favoriteChef)
+                FCR->>DB: UPDATE favorite_chef SET is_deleted = false WHERE id = ?
+                DB-->>FCR: Return success
                 FCR-->>FS: Return reactivated FavoriteChef
             end
         else FavoriteChef doesn't exist
             FS->>FS: Create new FavoriteChef
             FS->>FS: Set user, chef, isDeleted=false
             FS->>FCR: save(favoriteChef)
+            FCR->>DB: INSERT INTO favorite_chef (user_id, chef_id, created_at, is_deleted) VALUES (?, ?, ?, false)
+            DB-->>FCR: Return generated ID
             FCR-->>FS: Return saved FavoriteChef
         end
         
@@ -268,22 +279,31 @@ sequenceDiagram
     participant FCR as FavoriteChefRepository
     participant UR as UserRepository
     participant CR as ChefRepository
+    participant DB as Database
     
     Customer->>FC: DELETE /api/v1/favorite-chefs/{userId}/chefs/{chefId}
     FC->>FS: removeFavoriteChef(userId, chefId)
     
     FS->>UR: findExistUserById(userId)
+    UR->>DB: SELECT * FROM users WHERE id = ? AND is_deleted = false
+    DB-->>UR: Return user data
     UR-->>FS: Return User
     
     FS->>CR: findById(chefId)
+    CR->>DB: SELECT * FROM chef WHERE id = ? AND is_deleted = false
+    DB-->>CR: Return chef data
     CR-->>FS: Return Chef
     
     FS->>FCR: findByUserAndChefAndIsDeletedFalse(user, chef)
+    FCR->>DB: SELECT * FROM favorite_chef WHERE user_id = ? AND chef_id = ? AND is_deleted = false
+    DB-->>FCR: Return favorite_chef data
     FCR-->>FS: Return Optional<FavoriteChef>
     
     alt FavoriteChef exists and is active
         FS->>FS: Set isDeleted = true
         FS->>FCR: save(favoriteChef)
+        FCR->>DB: UPDATE favorite_chef SET is_deleted = true WHERE id = ?
+        DB-->>FCR: Return success
         FCR-->>FS: Return updated FavoriteChef
         FS-->>FC: No return value (void)
     else FavoriteChef doesn't exist or is already removed
@@ -303,17 +323,27 @@ sequenceDiagram
     participant FS as FavoriteChefServiceImpl
     participant FCR as FavoriteChefRepository
     participant UR as UserRepository
+    participant DB as Database
     
     Customer->>FC: GET /api/v1/favorite-chefs/{userId}?pageNo=0&pageSize=10&sortBy=createdAt&sortDir=desc
     FC->>FS: getFavoriteChefs(userId, pageNo, pageSize, sortBy, sortDir)
     
     FS->>UR: findExistUserById(userId)
+    UR->>DB: SELECT * FROM users WHERE id = ? AND is_deleted = false
+    DB-->>UR: Return user data
     UR-->>FS: Return User
     
     FS->>FS: Create Sort object
     FS->>FS: Create Pageable object
     
     FS->>FCR: findByUserIdAndIsDeletedFalse(userId, pageable)
+    FCR->>DB: SELECT f.*, c.*, u.* FROM favorite_chef f 
+              JOIN chef c ON f.chef_id = c.id 
+              JOIN users u ON c.user_id = u.id 
+              WHERE f.user_id = ? AND f.is_deleted = false 
+              ORDER BY f.created_at DESC 
+              LIMIT ? OFFSET ?
+    DB-->>FCR: Return paginated favorite_chef data with chef details
     FCR-->>FS: Return Page<FavoriteChef>
     
     FS->>FS: Convert each FavoriteChef to FavoriteChefDto
@@ -334,17 +364,24 @@ sequenceDiagram
     participant FCR as FavoriteChefRepository
     participant UR as UserRepository
     participant CR as ChefRepository
+    participant DB as Database
     
     Client->>FC: GET /api/v1/favorite-chefs/{userId}/chefs/{chefId}
     FC->>FS: isChefFavorite(userId, chefId)
     
     FS->>UR: findExistUserById(userId)
+    UR->>DB: SELECT * FROM users WHERE id = ? AND is_deleted = false
+    DB-->>UR: Return user data
     UR-->>FS: Return User
     
     FS->>CR: findById(chefId)
+    CR->>DB: SELECT * FROM chef WHERE id = ? AND is_deleted = false
+    DB-->>CR: Return chef data
     CR-->>FS: Return Chef
     
     FS->>FCR: existsByUserAndChefAndIsDeletedFalse(user, chef)
+    FCR->>DB: SELECT COUNT(*) > 0 FROM favorite_chef WHERE user_id = ? AND chef_id = ? AND is_deleted = false
+    DB-->>FCR: Return boolean result
     FCR-->>FS: Return boolean
     
     FS-->>FC: Return boolean
