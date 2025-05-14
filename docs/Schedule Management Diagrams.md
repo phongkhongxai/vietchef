@@ -31,10 +31,6 @@ classDiagram
     }
     
     class AvailabilityFinderController {
-        +findAvailableTimeSlotsForChef(Long chefId, LocalDate startDate, LocalDate endDate) : List~AvailableTimeSlotResponse~
-        +findAvailableTimeSlotsForCurrentChef(LocalDate startDate, LocalDate endDate) : List~AvailableTimeSlotResponse~
-        +findAvailableTimeSlotsForChefByDate(Long chefId, LocalDate date) : List~AvailableTimeSlotResponse~
-        +checkTimeSlotAvailability(Long chefId, LocalDate date, LocalTime startTime, LocalTime endTime) : Boolean
         +findAvailableTimeSlotsInSingleDate(Long chefId, LocalDate date, String customerLocation, Long menuId, List~Long~ dishIds, int guestCount, int maxDishesPerMeal) : List~AvailableTimeSlotResponse~
         +findAvailableTimeSlotsInMultipleDates(Long chefId, String customerLocation, int guestCount, int maxDishesPerMeal, List~AvailableTimeSlotRequest~ requests) : List~AvailableTimeSlotResponse~
     }
@@ -92,12 +88,9 @@ classDiagram
     
     %% Services
     class AvailabilityFinderService {
-        +findAvailableTimeSlotsForChef(Long chefId, LocalDate startDate, LocalDate endDate) : List~AvailableTimeSlotResponse~
-        +findAvailableTimeSlotsForCurrentChef(LocalDate startDate, LocalDate endDate) : List~AvailableTimeSlotResponse~
-        +findAvailableTimeSlotsForChefByDate(Long chefId, LocalDate date) : List~AvailableTimeSlotResponse~
-        +isTimeSlotAvailable(Long chefId, LocalDate date, LocalTime startTime, LocalTime endTime) : boolean
+        <<interface>>
         +findAvailableTimeSlotsWithInSingleDate(Long chefId, LocalDate date, String customerLocation, Long menuId, List~Long~ dishIds, int guestCount, int maxDishesPerMeal) : List~AvailableTimeSlotResponse~
-        +findAvailableTimeSlotsWithInMultipleDates(Long chefId, String customerLocation, int guestCount, int maxDishesPerMeal, List~AvailableTimeSlotRequest~) : List~AvailableTimeSlotResponse~
+        +findAvailableTimeSlotsWithInMultipleDates(Long chefId, String customerLocation, int guestCount, int maxDishesPerMeal, List~AvailableTimeSlotRequest~ requests) : List~AvailableTimeSlotResponse~
     }
     
     class ChefScheduleService {
@@ -127,6 +120,11 @@ classDiagram
         +hasActiveBookingsForDayOfWeek(Long chefId, Integer dayOfWeek) : boolean
     }
     
+    class TimeZoneService {
+        +getTimezoneFromAddress(String address) : String
+        +convertBetweenTimezones(LocalDateTime localDateTime, String sourceTimezone, String targetTimezone) : LocalDateTime
+    }
+    
     %% DTOs
     class AvailableTimeSlotResponse {
         +Long chefId
@@ -135,6 +133,7 @@ classDiagram
         +LocalTime startTime
         +LocalTime endTime
         +Integer durationMinutes
+        +String note
     }
 
     class AvailableTimeSlotRequest {
@@ -159,6 +158,7 @@ classDiagram
     AvailabilityFinderService ..> BookingDetail: uses
     AvailabilityFinderService ..> DistanceService: uses
     AvailabilityFinderService ..> CalculateService: uses
+    AvailabilityFinderService ..> TimeZoneService: uses
     ChefScheduleService ..> BookingConflictService: uses
     ChefBlockedDateService ..> BookingConflictService: uses
 ```
@@ -188,7 +188,10 @@ flowchart TD
     K --> L[ChefScheduleController receives update]
     L --> M[Call ChefScheduleService]
     M --> N[Find existing schedule]
-    N --> O[Validate time constraints]
+    N --> N1[Verify chef owns the schedule]
+    N1 -->|Not owner| N2[Return permission error]
+    N2 --> Z
+    N1 -->|Is owner| O[Validate time constraints]
     O --> P[Validate no conflicts]
     P --> Q[Update and save schedule]
     Q --> Z
@@ -197,7 +200,10 @@ flowchart TD
     B -->|Delete Schedule| R[Chef requests to delete schedule]
     R --> S[ChefScheduleController receives delete request]
     S --> T[Call ChefScheduleService]
-    T --> U[Check for active bookings]
+    T --> T1[Verify chef owns the schedule]
+    T1 -->|Not owner| T2[Return permission error]
+    T2 --> Z
+    T1 -->|Is owner| U[Check for active bookings]
     U --> V{Has active bookings?}
     V -->|Yes| W[Return error: cannot delete with active bookings]
     V -->|No| X[Soft delete schedule]
@@ -235,81 +241,93 @@ flowchart TD
     E --> F{Time valid?}
     F -->|No| G[Display time constraint error]
     G --> D
-    F -->|Yes| H[Check for conflicts with existing schedules]
-    H --> I{Schedule conflict?}
-    I -->|Yes| J[Display schedule conflict error]
+    F -->|Yes| H[Check for conflicts with existing blocked dates]
+    H --> I{Blocked date conflict?}
+    I -->|Yes| J[Display blocked date conflict error]
     J --> D
-    I -->|No| K[Check for conflicts with bookings]
-    K --> L{Booking conflict?}
-    L -->|Yes| M[Display booking conflict error]
+    I -->|No| K[Check for conflicts with schedules]
+    K --> L{Schedule conflict?}
+    L -->|Yes| M[Display schedule conflict error]
     M --> D
-    L -->|No| N[Create and save ChefBlockedDate]
-    N --> O[Display success message]
+    L -->|No| N[Check for conflicts with bookings]
+    N --> O{Booking conflict?}
+    O -->|Yes| P[Display booking conflict error]
+    P --> D
+    O -->|No| Q[Create and save ChefBlockedDate]
+    Q --> R[Display success message]
     
     %% Date Range Block Path
-    C -->|Date Range| P[Enter blocked date range: start date, end date, times, reason]
-    P --> Q[Validate date range and time constraints]
-    Q --> R{Valid range and times?}
-    R -->|No| S[Display validation error]
-    S --> P
-    R -->|Yes| T[Process each date in range]
+    C -->|Date Range| S[Enter blocked date range: start date, end date, times, reason]
+    S --> T[Validate date range and time constraints]
+    T --> U{Valid range and times?}
+    U -->|No| V[Display validation error]
+    V --> S
+    U -->|Yes| W[Process each date in range]
     
-    T --> U[Determine start/end times for current date]
-    U --> V[Check conflicts with existing blocked dates]
-    V --> W{Blocked date conflict?}
-    W -->|Yes| X[Display blocked date conflict error]
-    X --> P
-    W -->|No| Y[Check conflicts with schedules]
-    Y --> Z{Schedule conflict?}
-    Z -->|Yes| AA[Display schedule conflict error]
-    AA --> P
-    Z -->|No| AB[Check conflicts with bookings]
-    AB --> AC{Booking conflict?}
-    AC -->|Yes| AD[Display booking conflict error]
-    AD --> P
-    AC -->|No| AE[Create and save ChefBlockedDate for current date]
+    W --> X[Determine start/end times for current date]
+    X --> Y[Check conflicts with existing blocked dates]
+    Y --> Z{Blocked date conflict?}
+    Z -->|Yes| AA[Display blocked date conflict error]
+    AA --> S
+    Z -->|No| AB[Check conflicts with schedules]
+    AB --> AC{Schedule conflict?}
+    AC -->|Yes| AD[Display schedule conflict error]
+    AD --> S
+    AC -->|No| AE[Check conflicts with bookings]
+    AE --> AF{Booking conflict?}
+    AF -->|Yes| AG[Display booking conflict error]
+    AG --> S
+    AF -->|No| AH[Create and save ChefBlockedDate for current date]
     
-    AE --> AF{More dates in range?}
-    AF -->|Yes| U
-    AF -->|No| AG[Display success message]
+    AH --> AI{More dates in range?}
+    AI -->|Yes| W
+    AI -->|No| AJ[Display success message]
     
-    O --> AH[End]
-    AG --> AH
+    R --> AK[End]
+    AJ --> AK
     
     %% Delete Blocked Date Path
-    C -->|Delete| AI[Select blocked date to delete]
-    AI --> AJ[Soft delete blocked date]
-    AJ --> AK[Display success message]
-    AK --> AH
+    C -->|Delete| AL[Select blocked date to delete]
+    AL --> AM[Check if chef owns the blocked date]
+    AM --> AN{Is owner?}
+    AN -->|No| AO[Display permission error]
+    AO --> AK
+    AN -->|Yes| AP[Soft delete blocked date]
+    AP --> AQ[Display success message]
+    AQ --> AK
     
     %% Update Blocked Date Path
-    C -->|Update| AL[Select blocked date to update]
-    AL --> AM[Modify blocked date details]
-    AM --> AN[Validate time constraints]
-    AN --> AO{Time valid?}
-    AO -->|No| AP[Display time constraint error]
-    AP --> AM
-    AO -->|Yes| AQ[Check for conflicts with schedules, bookings, and other blocked dates]
-    AQ --> AR{Any conflicts?}
-    AR -->|Yes| AS[Display conflict error]
-    AS --> AM
-    AR -->|No| AT[Update and save ChefBlockedDate]
-    AT --> AU[Display success message]
-    AU --> AH
+    C -->|Update| AR[Select blocked date to update]
+    AR --> AS[Check if chef owns the blocked date]
+    AS --> AT{Is owner?}
+    AT -->|No| AU[Display permission error]
+    AU --> AK
+    AT -->|Yes| AV[Modify blocked date details]
+    AV --> AW[Validate time constraints]
+    AW --> AX{Time valid?}
+    AX -->|No| AY[Display time constraint error]
+    AY --> AV
+    AX -->|Yes| AZ[Check for conflicts with schedules, bookings, and other blocked dates]
+    AZ --> BA{Any conflicts?}
+    BA -->|Yes| BB[Display conflict error]
+    BB --> AV
+    BA -->|No| BC[Update and save ChefBlockedDate]
+    BC --> BD[Display success message]
+    BD --> AK
     
     %% View Blocked Dates Path
-    C -->|View| AV[Select view option]
-    AV --> AW{View option?}
-    AW -->|All| AX[Retrieve all non-deleted blocked dates]
-    AW -->|By Date Range| AY[Enter date range]
-    AY --> AZ[Retrieve blocked dates within range]
-    AW -->|By Specific Date| BA[Enter specific date]
-    BA --> BB[Retrieve blocked dates for specific date]
+    C -->|View| BE[Select view option]
+    BE --> BF{View option?}
+    BF -->|All| BG[Retrieve all non-deleted blocked dates]
+    BF -->|By Date Range| BH[Enter date range]
+    BH --> BI[Retrieve blocked dates within range]
+    BF -->|By Specific Date| BJ[Enter specific date]
+    BJ --> BK[Retrieve blocked dates for specific date]
     
-    AX --> BC[Display blocked dates]
-    AZ --> BC
-    BB --> BC
-    BC --> AH
+    BG --> BL[Display blocked dates]
+    BI --> BL
+    BK --> BL
+    BL --> AK
 ```
 
 ## Sequence Diagrams
@@ -328,6 +346,8 @@ sequenceDiagram
     participant BDR as BookingDetailRepository
     participant DS as DistanceService
     participant CS as CalculateService
+    participant TS as TimeZoneService
+    participant DB as Database
 
     Client->>AC: GET /api/v1/availability/chef/{chefId}/single-date
     Note over Client,AC: Query params: date, customerLocation, menuId/dishIds, guestCount, maxDishesPerMeal
@@ -335,58 +355,64 @@ sequenceDiagram
     AC->>AFS: findAvailableTimeSlotsWithInSingleDate(chefId, date, customerLocation, menuId, dishIds, guestCount, maxDishesPerMeal)
     
     AFS->>CR: findById(chefId)
-    CR-->>AFS: Return Chef
+    CR->>DB: SELECT * FROM chef WHERE id = chefId
+    DB-->>CR: chef data
+    CR-->>AFS: Chef entity
+    
+    AFS->>TS: getTimezoneFromAddress(chefAddress)
+    TS-->>AFS: Chef timezone ID
+    
+    AFS->>TS: getTimezoneFromAddress(customerLocation)
+    TS-->>AFS: Customer timezone ID
     
     AFS->>DS: calculateDistance(chefLocation, customerLocation)
     DS-->>AFS: Return travel time & distance
     
     alt If menuId is provided
-        AFS->>AFS: Lookup menu dishes
+        AFS->>DB: SELECT * FROM menu_dish WHERE menu_id = menuId
+        DB-->>AFS: menu dishes data
     else If dishIds is provided
-        AFS->>AFS: Lookup individual dishes
+        AFS->>DB: SELECT * FROM dish WHERE id IN (dishIds)
+        DB-->>AFS: dishes data
     end
     
     AFS->>CS: calculateCookingTime(dishes, guestCount)
     CS-->>AFS: Return cooking time
     
     AFS->>CSR: findByChefAndDayOfWeekAndIsDeletedFalse(chef, dayOfWeek)
-    CSR-->>AFS: Return schedules for day
+    CSR->>DB: SELECT * FROM chef_schedule WHERE chef_id = ? AND day_of_week = ? AND is_deleted = false
+    DB-->>CSR: schedules data
+    CSR-->>AFS: List of schedules
     
     AFS->>CBDR: findByChefAndBlockedDateAndIsDeletedFalse(chef, date)
-    CBDR-->>AFS: Return blocked dates
+    CBDR->>DB: SELECT * FROM chef_blocked_date WHERE chef_id = ? AND blocked_date = ? AND is_deleted = false
+    DB-->>CBDR: blocked dates data
+    CBDR-->>AFS: List of blocked dates
     
     AFS->>BDR: findByBooking_ChefAndSessionDateAndIsDeletedFalse(chef, date)
-    BDR-->>AFS: Return bookings
+    BDR->>DB: SELECT * FROM booking_detail bd JOIN booking b ON bd.booking_id = b.id WHERE b.chef_id = ? AND bd.session_date = ? AND bd.is_deleted = false
+    DB-->>BDR: booking details data
+    BDR-->>AFS: List of bookings
     
     loop For each schedule
-        AFS->>AFS: Check if schedule overlaps with any blocked date
-        Note over AFS: If overlaps, skip this schedule
+        AFS->>AFS: Filter blocked dates for current date
         
-        AFS->>AFS: Initialize currentTime = schedule.startTime
+        AFS->>AFS: Create timeline of events (bookings and blocked periods)
         
-        loop For each booking sorted by startTime
-            AFS->>AFS: Check if gap between currentTime and booking.startTime
-            Note over AFS: If gap is sufficient (considering travel + cooking + recovery time)
-            
-            Alt If sufficient gap exists
-                AFS->>AFS: Create available slot
-                AFS->>AFS: Add to availableSlots list
-            End
-            
-            AFS->>AFS: Update currentTime = booking.endTime
-        end
+        AFS->>AFS: Process timeline to find available time slots
+        Note over AFS: Create slots where no overlap with blocked dates or bookings
         
-        AFS->>AFS: Check if gap between currentTime and schedule.endTime
-        Note over AFS: If gap is sufficient (considering constraints)
+        AFS->>AFS: Apply minimum slot duration filtering
         
-        Alt If sufficient gap exists
-            AFS->>AFS: Create final available slot
-            AFS->>AFS: Add to availableSlots list
-        End
+        AFS->>AFS: Add valid slots to availableSlots list
     end
     
-    AFS->>AFS: Filter slots by minimum duration requirements
+    AFS->>AFS: Filter slots requiring 24h advance notice
+    AFS->>AFS: Filter slots that fit within a schedule
     AFS->>AFS: Sort slots by date and time
+    
+    AFS->>TS: Convert slots from chef timezone to customer timezone
+    TS-->>AFS: Return converted time slots
     
     AFS-->>AC: Return List<AvailableTimeSlotResponse>
     AC-->>Client: Return available time slots JSON
@@ -406,6 +432,8 @@ sequenceDiagram
     participant BDR as BookingDetailRepository
     participant DS as DistanceService
     participant CS as CalculateService
+    participant TS as TimeZoneService
+    participant DB as Database
 
     Client->>AC: POST /api/v1/availability/chef/{chefId}/multiple-dates
     Note over Client,AC: Query params: customerLocation, guestCount, maxDishesPerMeal
@@ -414,7 +442,15 @@ sequenceDiagram
     AC->>AFS: findAvailableTimeSlotsWithInMultipleDates(chefId, customerLocation, guestCount, maxDishesPerMeal, availableTimeSlotRequests)
     
     AFS->>CR: findById(chefId)
-    CR-->>AFS: Return Chef
+    CR->>DB: SELECT * FROM chef WHERE id = chefId
+    DB-->>CR: chef data
+    CR-->>AFS: Chef entity
+    
+    AFS->>TS: getTimezoneFromAddress(chefAddress)
+    TS-->>AFS: Chef timezone ID
+    
+    AFS->>TS: getTimezoneFromAddress(customerLocation)
+    TS-->>AFS: Customer timezone ID
     
     AFS->>DS: calculateDistance(chefLocation, customerLocation)
     DS-->>AFS: Return travel time & distance
@@ -423,53 +459,51 @@ sequenceDiagram
         Note over AFS: Each request contains date, menuId/dishIds
         
         alt If request has menuId
-            AFS->>AFS: Lookup menu dishes
+            AFS->>DB: SELECT * FROM menu_dish WHERE menu_id = menuId
+            DB-->>AFS: menu dishes data
         else If request has dishIds
-            AFS->>AFS: Lookup individual dishes
+            AFS->>DB: SELECT * FROM dish WHERE id IN (dishIds)
+            DB-->>AFS: dishes data
         end
         
         AFS->>CS: calculateCookingTime(dishes, guestCount)
         CS-->>AFS: Return cooking time
         
         AFS->>CSR: findByChefAndDayOfWeekAndIsDeletedFalse(chef, dayOfWeek)
-        CSR-->>AFS: Return schedules for day
+        CSR->>DB: SELECT * FROM chef_schedule WHERE chef_id = ? AND day_of_week = ? AND is_deleted = false
+        DB-->>CSR: schedules data
+        CSR-->>AFS: List of schedules
         
         AFS->>CBDR: findByChefAndBlockedDateAndIsDeletedFalse(chef, request.date)
-        CBDR-->>AFS: Return blocked dates
+        CBDR->>DB: SELECT * FROM chef_blocked_date WHERE chef_id = ? AND blocked_date = ? AND is_deleted = false
+        DB-->>CBDR: blocked dates data
+        CBDR-->>AFS: List of blocked dates
         
         AFS->>BDR: findByBooking_ChefAndSessionDateAndIsDeletedFalse(chef, request.date)
-        BDR-->>AFS: Return bookings
+        BDR->>DB: SELECT * FROM booking_detail bd JOIN booking b ON bd.booking_id = b.id WHERE b.chef_id = ? AND bd.session_date = ? AND bd.is_deleted = false
+        DB-->>BDR: booking details data
+        BDR-->>AFS: List of bookings
         
         loop For each schedule
-            AFS->>AFS: Check if schedule overlaps with any blocked date
-            Note over AFS: If overlaps, skip this schedule
+            AFS->>AFS: Filter blocked dates for current date
             
-            AFS->>AFS: Initialize currentTime = schedule.startTime
+            AFS->>AFS: Create timeline of events (bookings and blocked periods)
             
-            loop For each booking sorted by startTime
-                AFS->>AFS: Check if gap between currentTime and booking.startTime
-                Note over AFS: If gap is sufficient (considering travel + cooking + recovery time)
-                
-                Alt If sufficient gap exists
-                    AFS->>AFS: Create available slot
-                    AFS->>AFS: Add to availableSlots list
-                End
-                
-                AFS->>AFS: Update currentTime = booking.endTime
-            end
+            AFS->>AFS: Process timeline to find available time slots
+            Note over AFS: Create slots where no overlap with blocked dates or bookings
             
-            AFS->>AFS: Check if gap between currentTime and schedule.endTime
-            Note over AFS: If gap is sufficient (considering constraints)
+            AFS->>AFS: Apply minimum slot duration filtering
             
-            Alt If sufficient gap exists
-                AFS->>AFS: Create final available slot
-                AFS->>AFS: Add to availableSlots list
-            End
+            AFS->>AFS: Add valid slots to availableSlots list
         end
     end
     
-    AFS->>AFS: Filter slots by minimum duration requirements
+    AFS->>AFS: Filter slots requiring 24h advance notice
+    AFS->>AFS: Filter slots that fit within a schedule
     AFS->>AFS: Sort slots by date and time
+    
+    AFS->>TS: Convert slots from chef timezone to customer timezone
+    TS-->>AFS: Return converted time slots
     
     AFS-->>AC: Return List<AvailableTimeSlotResponse>
     AC-->>Client: Return available time slots JSON
@@ -513,3 +547,5 @@ sequenceDiagram
 - BDR: BookingDetailRepository
 - DS: DistanceService
 - CS: CalculateService
+- DB: Database
+- TS: TimeZoneService
