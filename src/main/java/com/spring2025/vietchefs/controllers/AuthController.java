@@ -126,18 +126,16 @@ public class AuthController {
     public void handleGoogleCallback(@RequestParam("code") String code, HttpServletResponse response) throws Exception {
         Map<String, Object> userInfo = googleOAuth2Service.getUserInfoFromCode(code);
         AuthenticationResponse authResponse = authService.authenticateWithOAuth2("google", userInfo);
-        String fullNameEncoded = URLEncoder.encode(authResponse.getFullName(), StandardCharsets.UTF_8);
-        String redirectUrl = "https://vietchef.ddns.net/no-auth/oauth-redirect"
+        String redirectUrl = "https://vietchef-api.ddns.net/no-auth/oauth-redirect"
                 + "?access_token=" + authResponse.getAccessToken()
-                + "&refresh_token=" + authResponse.getRefreshToken() +"&full_name="+fullNameEncoded;
+                + "&refresh_token=" + authResponse.getRefreshToken();
         response.sendRedirect(redirectUrl);
     }
     @GetMapping("/oauth-redirect")
     public String handleOAuthRedirect(@RequestParam("access_token") String accessToken,
-                                      @RequestParam("refresh_token") String refreshToken,
-                                      @RequestParam("full_name") String fullName) {
+                                      @RequestParam("refresh_token") String refreshToken) {
 
-        return "Đăng nhập thành công với " + fullName;
+        return "Login successfully.";
     }
     @PutMapping("/save-device-token")
     public ResponseEntity<Void> saveTokenDevice(@RequestParam String email, @RequestParam String token) {
