@@ -78,7 +78,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     @Override
     public BookingDetail createBookingDetail(Booking booking, BookingDetailRequestDto dto) {
         if (isOverlappingWithExistingBookings(booking.getChef(), dto.getSessionDate(), dto.getTimeBeginTravel(), dto.getStartTime())) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef đã có lịch trong khoảng thời gian này cho ngày "+dto.getSessionDate()+". Vui lòng chọn khung giờ khác.");
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "The chef already has a booking during this time on " + dto.getSessionDate() + ". Please choose a different time slot.");
         }
         BookingDetail detail =  new BookingDetail();
         detail.setBooking(booking);
