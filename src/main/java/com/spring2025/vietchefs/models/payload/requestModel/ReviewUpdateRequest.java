@@ -13,7 +13,6 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ReviewUpdateRequest {
-    private String description;
     private String overallExperience;
     // Replace string-based photos with file uploads
     // private String photos;

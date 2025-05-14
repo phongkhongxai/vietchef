@@ -23,7 +23,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -190,7 +189,7 @@ public class BookingServiceImpl implements BookingService {
         Chef chef = chefRepository.findById(dto.getChefId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found"));
         if (chef.getReputationPoints() < 60 && chef.getStatus().equalsIgnoreCase("LOCKED")) {
-            throw new VchefApiException(HttpStatus.FORBIDDEN, "Chef không đủ uy tín để nhận booking dài hạn.");
+                throw new VchefApiException(HttpStatus.FORBIDDEN, "The chef does not have enough reputation points and valid status to accept bookings.");
         }
         if (dto.getGuestCount()>chef.getMaxServingSize()) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef just can serving max is "+chef.getMaxServingSize()+".");
@@ -238,12 +237,23 @@ public class BookingServiceImpl implements BookingService {
         Package selectedPackage = packageRepository.findById(dto.getPackageId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Package not found"));
         if (chef.getReputationPoints() < 80) {
-            throw new VchefApiException(HttpStatus.FORBIDDEN, "Chef không đủ uy tín để nhận booking dài hạn.");
+            throw new VchefApiException(HttpStatus.FORBIDDEN, "The chef does not have enough reputation points to accept long-term bookings.");
         }
         if (dto.getGuestCount()>chef.getMaxServingSize()) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef just can serving max is "+chef.getMaxServingSize()+".");
         }
-        // Kiểm tra xem đầu bếp có hỗ trợ package này không
+        boolean hasCompletedSingleBookingWithChef = bookingRepository
+                .existsByCustomerIdAndChefIdAndBookingTypeIgnoreCaseAndStatusIgnoreCase(
+                        dto.getCustomerId(),
+                        dto.getChefId(),
+                        "SINGLE",
+                        "COMPLETED"
+                );
+
+        if (!hasCompletedSingleBookingWithChef) {
+            throw new VchefApiException(HttpStatus.FORBIDDEN,
+                    "You must have completed at least one SINGLE booking with this chef before making a long-term booking.");
+        }
         if (!chef.getPackages().contains(selectedPackage)) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Selected package is not available for this chef.");
         }
@@ -253,7 +263,6 @@ public class BookingServiceImpl implements BookingService {
         }
         BigDecimal totalPrice = BigDecimal.ZERO;
 
-        // Tạo Booking chính
         Booking booking = new Booking();
         booking.setCustomer(customer);
         booking.setChef(chef);
@@ -269,9 +278,8 @@ public class BookingServiceImpl implements BookingService {
         List<BookingDetail> bookingDetailList = new ArrayList<>();
         List<String> overlapMessages = new ArrayList<>();
         for (BookingDetailRequestDto detailDto : dto.getBookingDetails()) {
-            // Kiểm tra trùng lịch cho từng ngày
             if (isOverlappingWithExistingBookings(chef, detailDto.getSessionDate(), detailDto.getTimeBeginTravel(), detailDto.getStartTime())) {
-                String overlapMessage = "Chef đã có lịch trong khoảng thời gian này cho ngày " + detailDto.getSessionDate() + ". Vui lòng chọn khung giờ khác.";
+                String overlapMessage = "The chef already has a booking during this time on " + detailDto.getSessionDate() + ". Please choose a different time slot.";
                 overlapMessages.add(overlapMessage);
             } else {
                 BookingDetail detail = bookingDetailService.createBookingDetail(booking, detailDto);

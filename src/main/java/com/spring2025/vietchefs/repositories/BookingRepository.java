@@ -25,6 +25,10 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     List<Booking> findByStatusIn(List<String> statuses);
     // Tìm booking có status trong danh sách AND createdAt < thời điểm now
     List<Booking> findByStatusInAndCreatedAtBefore(List<String> statuses, LocalDateTime dateTime);
+    boolean existsByCustomerIdAndChefIdAndBookingTypeIgnoreCaseAndStatusIgnoreCase(
+            Long customerId, Long chefId, String bookingType, String status
+    );
+
 
 
 }
