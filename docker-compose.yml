@@ -26,8 +26,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/vietchef?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: vietchef_user
       SPRING_DATASOURCE_PASSWORD: vietchef_pass
-      VIRTUAL_HOST: vietchef.ddns.net
-      LETSENCRYPT_HOST: vietchef.ddns.net
+      VIRTUAL_HOST: vietchef-api.ddns.net
+      LETSENCRYPT_HOST: vietchef-api.ddns.net
       LETSENCRYPT_EMAIL: thieuphong2003@gmail.com
     expose:
       - "8080"

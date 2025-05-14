@@ -3,6 +3,7 @@ package com.spring2025.vietchefs.controllers;
 import com.spring2025.vietchefs.models.payload.dto.NotificationDto;
 import com.spring2025.vietchefs.models.payload.dto.UserDto;
 import com.spring2025.vietchefs.models.payload.requestModel.NotificationRequest;
+import com.spring2025.vietchefs.models.payload.responseModel.NotificationCountResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.NotificationsResponse;
 import com.spring2025.vietchefs.services.UserService;
 import com.spring2025.vietchefs.services.impl.NotificationService;
@@ -43,11 +44,11 @@ public class NotificationController {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
         return notificationService.getALlNotificationsOfUser(bto.getId(), pageNo,  pageSize,  sortBy,  sortDir);
     }
-//    @GetMapping("/my/chat")
-//    public ResponseEntity<List<NotificationDto>> getNotiChatOfUser(@AuthenticationPrincipal UserDetails userDetails) {
-//        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
-//        return ResponseEntity.ok(notificationService.getChatNotificationsOfUser(bto.getId()));
-//    }
+    @GetMapping("/my/count")
+    public ResponseEntity<NotificationCountResponse> countNotiOfUser(@AuthenticationPrincipal UserDetails userDetails) {
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        return ResponseEntity.ok(notificationService.countUnreadNotifications(bto.getId()));
+    }
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_CHEF')")
     @PutMapping("/my/all")

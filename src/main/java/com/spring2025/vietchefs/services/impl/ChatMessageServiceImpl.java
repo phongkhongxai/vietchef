@@ -16,7 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -74,26 +74,26 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .toList();
     }
 
-    @Override
-    public List<ChatMessageDto> getConversationsOfUser(String username) {
-        List<ChatMessage> chatMessages = chatMessageRepository.findByChatIdContainingIgnoreCase(username);
-        return chatMessages.stream()
-                .collect(Collectors.groupingBy(
-                        ChatMessage::getChatId,
-                        Collectors.maxBy(Comparator.comparing(ChatMessage::getTimestamp))
-                ))
-                .values()
-                .stream()
-                .flatMap(Optional::stream)
-                .map(msg -> {
-                    ChatMessageDto dto = modelMapper.map(msg, ChatMessageDto.class);
-                    if (msg.getSenderId().equals(username)) {
-                        dto.setSenderName("You");
-                    }
-                    return dto;
-                })
-                .toList();
-    }
+            @Override
+            public List<ChatMessageDto> getConversationsOfUser(String username) {
+                List<ChatMessage> chatMessages = chatMessageRepository.findByChatIdContainingIgnoreCase(username);
+                return chatMessages.stream()
+                        .collect(Collectors.groupingBy(
+                                ChatMessage::getChatId,
+                                Collectors.maxBy(Comparator.comparing(ChatMessage::getTimestamp))
+                        ))
+                        .values()
+                        .stream()
+                        .flatMap(Optional::stream)
+                        .map(msg -> {
+                            ChatMessageDto dto = modelMapper.map(msg, ChatMessageDto.class);
+                            if (msg.getSenderId().equals(username)) {
+                                dto.setSenderName("You");
+                            }
+                            return dto;
+                        })
+                        .toList();
+            }
 
     private void validateMessage(ChatMessageDto chatMessage) {
         if (chatMessage.getSenderId() == null || chatMessage.getSenderId().isEmpty()) {

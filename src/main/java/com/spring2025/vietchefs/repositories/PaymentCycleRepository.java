@@ -18,5 +18,7 @@ public interface PaymentCycleRepository extends JpaRepository<PaymentCycle, Long
     List<PaymentCycle>findByBookingOrderByCycleOrderAsc(Booking booking);
     PaymentCycle findByBookingAndCycleOrder(Booking booking, int cycleOrder);
     List<PaymentCycle> findByDueDateBeforeAndStatus(LocalDate localDate, String status);
+    List<PaymentCycle> findByBookingAndDueDateAfter(Booking booking,LocalDate localDate);
+
 
 }

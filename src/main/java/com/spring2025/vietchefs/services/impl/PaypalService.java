@@ -360,7 +360,6 @@ public class PaypalService{
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             return Mono.error(new IllegalArgumentException("Amount must be greater than zero"));
         }
-
         // Lấy ví theo ID
         Wallet wallet = walletRepository.findById(walletId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found with id: " + walletId));
@@ -370,15 +369,8 @@ public class PaypalService{
             return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Số dư trong ví không đủ"));
         }
         Optional<Payment> payment = paymentRepository.findTopByWalletAndPaymentTypeOrderByCreatedAtDesc(wallet, "PAYOUT");
-        if (payment.isPresent() && payment.get().getCreatedAt() != null) {
-            // Kiểm tra xem thời gian tạo giao dịch có trong vòng 24 giờ qua không
-            LocalDateTime createdAt = payment.get().getCreatedAt();
-            if (createdAt.isAfter(LocalDateTime.now().minusDays(1))) {
-                return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Bạn không thể thực hiện rút tiền trong vòng 24 giờ sau lần rút gần nhất."));
-            }
-        }
         if (wallet.getPaypalAccountEmail()==null){
-            return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Email Paypal đang null."));
+            return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Email Paypal cannot empty."));
 
         }
         String receiverEmail = wallet.getPaypalAccountEmail();
@@ -414,12 +406,14 @@ public class PaypalService{
                                         String errorName = jsonNode.get("name").asText();
                                         String errorMessage = jsonNode.get("message").asText();
 
-                                        if ("RECEIVER_UNREGISTERED".equals(errorName)) {
-                                            return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Email chưa đăng ký tài khoản PayPal."));
-                                        }
-
-                                        // Các lỗi khác
-                                        return Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "PayPal payout error: " + errorMessage));
+                                        return switch (errorName) {
+                                            case "RECEIVER_UNREGISTERED" ->
+                                                    Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Email chưa đăng ký tài khoản PayPal."));
+                                            case "INSUFFICIENT_FUNDS" ->
+                                                    Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "Tài khoản PayPal hệ thống không đủ tiền để chi trả."));
+                                            default ->
+                                                    Mono.error(new VchefApiException(HttpStatus.BAD_REQUEST, "PayPal payout error: " + errorMessage));
+                                        };
                                     }
 
                                     // ✅ Xử lý thành công
@@ -442,7 +436,7 @@ public class PaypalService{
                                     if (wallet.getWalletType().equalsIgnoreCase("CUSTOMER")) {
                                         customerTransactionRepository.save(CustomerTransaction.builder()
                                                 .wallet(wallet)
-                                                .transactionType("WITHDRAWL")
+                                                .transactionType("WITHDRAWAL")
                                                 .amount(amount)
                                                 .description("Successful withdrawal")
                                                 .status("COMPLETED")
@@ -451,7 +445,7 @@ public class PaypalService{
                                     } else {
                                         chefTransactionRepository.save(ChefTransaction.builder()
                                                 .wallet(wallet)
-                                                .transactionType("WITHDRAWL")
+                                                .transactionType("WITHDRAWAL")
                                                 .amount(amount)
                                                 .description("Successful withdrawal")
                                                 .status("COMPLETED")

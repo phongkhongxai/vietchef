@@ -338,8 +338,8 @@ public class BookingServiceImpl implements BookingService {
     public ReviewSingleBookingResponse calculateFinalPriceForSingleBooking(BookingPriceRequestDto dto) {
         Chef chef = chefRepository.findById(dto.getChefId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found"));
-        if (chef.getReputationPoints() < 60 || chef.getStatus().equalsIgnoreCase("LOCKED")) {
-            throw new VchefApiException(HttpStatus.FORBIDDEN, "Chef không đủ uy tín để nhận booking dài hạn.");
+        if (chef.getReputationPoints() < 60 || chef.getStatus().equalsIgnoreCase("LOCKED") || !chef.getStatus().equalsIgnoreCase("ACTIVE")) {
+            throw new VchefApiException(HttpStatus.FORBIDDEN, "Chef không đủ uy tín để nhận booking.");
         }
         if (dto.getGuestCount()>chef.getMaxServingSize()) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef just can serving max is "+chef.getMaxServingSize()+".");
@@ -434,8 +434,8 @@ public class BookingServiceImpl implements BookingService {
     public ReviewLongTermBookingResponse calculateFinalPriceForLongTermBooking(BookingLTPriceRequestDto dto) {
         Chef chef = chefRepository.findById(dto.getChefId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found"));
-        if (chef.getReputationPoints() < 80) {
-            throw new VchefApiException(HttpStatus.FORBIDDEN, "Chef không đủ uy tín để nhận booking dài hạn.");
+        if (chef.getReputationPoints() < 80 || !chef.getStatus().equalsIgnoreCase("ACTIVE")) {
+            throw new VchefApiException(HttpStatus.FORBIDDEN, "Chef không đủ uy tín để nhận booking.");
         }
         if (dto.getGuestCount()>chef.getMaxServingSize()) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef just can serving max is "+chef.getMaxServingSize()+".");
@@ -692,6 +692,15 @@ public class BookingServiceImpl implements BookingService {
                 // 7. Cập nhật trạng thái Booking thành REJECTED
                 booking.setStatus("REJECTED");
                 bookingRepository.save(booking);
+                NotificationRequest rejectChefNotification = NotificationRequest.builder()
+                        .userId(booking.getChef().getUser().getId())
+                        .title("Booking Rejected - Reputation Points Penalized")
+                        .body("Your booking #" + booking.getBookingType() + " was rejected. As a result, your reputation points have been penalized for not accepting the booking.")
+                        .bookingId(booking.getId())
+                        .screen("ChefDashboard")
+                        .notiType("PENALDO_NOTIFY")
+                        .build();
+                notificationService.sendPushNotification(rejectChefNotification);
 
                 NotificationRequest rejectNotification = NotificationRequest.builder()
                         .userId(booking.getCustomer().getId())
@@ -917,7 +926,7 @@ public class BookingServiceImpl implements BookingService {
                     .description("Deposit for Long-Term Booking #" + booking.getId() +
                             " with " + booking.getChef().getUser().getFullName() + " Chef.")
                     .build();
-            customerTransactionRepository.save(transaction);
+            customerTransactionRepository.save(transaction1);
         }
         NotificationRequest chefNotification;
         if(booking.getStatus().equalsIgnoreCase("PAID_FIRST_CYCLE")){
@@ -1049,9 +1058,14 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
-    public BookingResponseDto cancelSingleBooking(Long bookingId) {
+    public BookingResponseDto cancelSingleBooking(Long bookingId,Long userId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Booking not found"));
+        User customer = userRepository.findById(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User not found"));
+        if (!customer.getId().equals(booking.getCustomer().getId())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "User not in booking.");
+        }
         if (!"SINGLE".equalsIgnoreCase(booking.getBookingType())) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "This is not a single booking");
         }
@@ -1061,10 +1075,12 @@ public class BookingServiceImpl implements BookingService {
         }
         BookingDetail bookingDetail = bookingDetails.get(0);
         if ("CONFIRMED".equalsIgnoreCase(booking.getStatus()) &&
-                bookingDetail.getSessionDate().isBefore(LocalDate.now().plusDays(2))) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel booking less than 2 days before session date");
+                bookingDetail.getSessionDate().isBefore(LocalDate.now().plusDays(1))) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel booking less than 1 days before session date");
         }
         if ("PENDING".equalsIgnoreCase(booking.getStatus())) {
+            bookingDetail.setStatus("CANCELED");
+            bookingDetailRepository.save(bookingDetail);
             booking.setStatus("CANCELED");
             booking = bookingRepository.save(booking);
             return modelMapper.map(booking, BookingResponseDto.class);
@@ -1096,12 +1112,10 @@ public class BookingServiceImpl implements BookingService {
 
                 customerWallet.setBalance(customerWallet.getBalance().add(refundAmount));
                 walletRepository.save(customerWallet);
+                bookingDetail.setStatus("REFUNDED");
+                bookingDetailRepository.save(bookingDetail);
             }
         }
-
-        // Cập nhật trạng thái booking
-        bookingDetail.setStatus("CANCELED");
-        bookingDetailRepository.save(bookingDetail);
         booking.setStatus("CANCELED");
         booking = bookingRepository.save(booking);
         if("CONFIRMED".equalsIgnoreCase(booking.getStatus())){
@@ -1118,6 +1132,264 @@ public class BookingServiceImpl implements BookingService {
         // Trả về DTO phản hồi
         return modelMapper.map(booking, BookingResponseDto.class);
 
+    }
+
+    @Override
+    @Transactional
+    public BookingResponseDto cancelSingleBookingFromChef(Long bookingId, Long userId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Booking not found"));
+        Chef chef = chefRepository.findByUserId(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found with userId"));
+        if (!chef.getId().equals(booking.getChef().getId())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef not in booking.");
+        }
+        if (!"SINGLE".equalsIgnoreCase(booking.getBookingType())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "This is not a single booking");
+        }
+        List<BookingDetail> bookingDetails = bookingDetailRepository.findByBookingId(bookingId);
+        if (bookingDetails.isEmpty()) {
+            throw new VchefApiException(HttpStatus.NOT_FOUND, "Booking detail not found");
+        }
+        BookingDetail bookingDetail = bookingDetails.get(0);
+        if ("CONFIRMED".equalsIgnoreCase(booking.getStatus()) &&
+                bookingDetail.getSessionDate().isEqual(LocalDate.now())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel booking with a session happening today.");
+        }
+        if ("CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
+            List<CustomerTransaction> transactions = customerTransactionRepository
+                    .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(bookingId, "PAYMENT", "COMPLETED");
+            if (!transactions.isEmpty()) {
+                boolean hasRefund = customerTransactionRepository.existsByBookingIdAndTransactionType(bookingId, "REFUND");
+                if (hasRefund) {
+                    throw new VchefApiException(HttpStatus.BAD_REQUEST, "Booking has already been refunded");
+                }
+                Wallet customerWallet = transactions.get(0).getWallet();
+                BigDecimal refundAmount = transactions.get(0).getAmount();
+                // Tạo giao dịch hoàn tiền (REFUND)
+                CustomerTransaction refundTransaction = CustomerTransaction.builder()
+                        .wallet(customerWallet)
+                        .booking(booking)
+                        .transactionType("REFUND")
+                        .amount(refundAmount)
+                        .description("Refund for canceled booking by Chef.")
+                        .status("COMPLETED")
+                        .isDeleted(false)
+                        .build();
+                customerTransactionRepository.save(refundTransaction);
+
+                customerWallet.setBalance(customerWallet.getBalance().add(refundAmount));
+                walletRepository.save(customerWallet);
+                bookingDetail.setStatus("REFUNDED");
+                bookingDetailRepository.save(bookingDetail);
+
+                // Gửi thông báo cho customer về việc hoàn tiền
+                NotificationRequest refundNotification = NotificationRequest.builder()
+                        .userId(booking.getCustomer().getId())
+                        .title("Booking Canceled and Refund Issued")
+                        .body("Your booking #" + booking.getBookingType() +" with Chef "+ booking.getChef().getUser().getFullName()+" has been canceled by the chef. A refund of " +
+                                refundAmount + " has been issued to your wallet.")
+                        .bookingId(booking.getId())
+                        .screen("CustomerBookingManagementScreen")
+                        .build();
+                notificationService.sendPushNotification(refundNotification);
+            }
+        }else{
+            bookingDetail.setStatus("CANCELED");
+            bookingDetailRepository.save(bookingDetail);
+        }
+
+        booking.setStatus("CANCELED");
+        booking = bookingRepository.save(booking);
+        chefService.updateReputation(chef,-3);
+
+        NotificationRequest customerNotification = NotificationRequest.builder()
+                .userId(chef.getId())
+                .title("Booking Cancel - Reputation Points Penalized")
+                .body("Your booking #" + booking.getBookingType() + " was cancelled. As a result, your reputation points have been penalized for cancelling the booking.")
+                .bookingId(booking.getId())
+                .notiType("PENALDO_NOTIFY")
+                .screen("ChefDashboard")
+                .build();
+        notificationService.sendPushNotification(customerNotification);
+
+        return modelMapper.map(booking, BookingResponseDto.class);
+    }
+
+    @Override
+    @Transactional
+    public BookingResponseDto cancelLongTermBookingFromChef(Long bookingId, Long userId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Booking not found"));
+        Chef chef = chefRepository.findByUserId(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found with userId"));
+        if (!chef.getId().equals(booking.getChef().getId())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef not in booking.");
+        }
+        if (!"LONG_TERM".equalsIgnoreCase(booking.getBookingType())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "This is not a long-term booking");
+        }
+        if (!"CONFIRMED".equalsIgnoreCase(booking.getStatus()) &&
+                !"CONFIRMED_PARTIALLY_PAID".equalsIgnoreCase(booking.getStatus()) &&
+                !"CONFIRMED_PAID".equalsIgnoreCase(booking.getStatus())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Booking cannot be cancelled.");
+        }
+        List<BookingDetail> allDetails = bookingDetailRepository.findByBookingId(bookingId);
+        if (allDetails.isEmpty()) {
+            throw new VchefApiException(HttpStatus.NOT_FOUND, "No booking details found");
+        }
+        boolean hasTodaySession = allDetails.stream()
+                .anyMatch(detail -> detail.getSessionDate().isEqual(LocalDate.now()));
+        if (hasTodaySession) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel booking with a session happening today.");
+        }
+
+//        List<BookingDetail> futureDetails = allDetails.stream()
+//                .filter(detail -> detail.getSessionDate().isAfter(LocalDate.now()))
+//                .toList();
+//
+//        BigDecimal totalRefund = BigDecimal.ZERO;
+//        for (BookingDetail detail : futureDetails) {
+//            PaymentCycle paymentCycle = getPaymentCycleForBookingDetail(detail);
+//            if (paymentCycle!=null) {
+//                if ("PAID".equalsIgnoreCase(paymentCycle.getStatus())) {
+//                    if(!detail.getStatus().equalsIgnoreCase("COMPLETED")){
+//                        detail.setStatus("REFUNDED");
+//                        totalRefund = totalRefund.add(detail.getTotalPrice());
+//                    }
+//                } else {
+//                    paymentCycle.setStatus("CANCELED");
+//                    paymentCycleRepository.save(paymentCycle);
+//                    detail.setStatus("CANCELED");
+//                }
+//                bookingDetailRepository.save(detail);
+//
+//            }
+//        }
+        List<BookingDetail> futureDetails = allDetails.stream()
+                .filter(detail -> detail.getSessionDate().isAfter(LocalDate.now()))
+                .toList();
+
+        BigDecimal totalRefund = BigDecimal.ZERO;
+        Set<PaymentCycle> updatedCycles = new HashSet<>();
+
+        for (BookingDetail detail : futureDetails) {
+            PaymentCycle paymentCycle = getPaymentCycleForBookingDetail(detail);
+            if (paymentCycle != null) {
+                if ("PAID".equalsIgnoreCase(paymentCycle.getStatus())) {
+                    if (!"COMPLETED".equalsIgnoreCase(detail.getStatus())) {
+                        detail.setStatus("REFUNDED");
+                        totalRefund = totalRefund.add(detail.getTotalPrice());
+                    }
+                } else {
+                    paymentCycle.setStatus("CANCELED");
+                    paymentCycleRepository.save(paymentCycle);
+                    detail.setStatus("CANCELED");
+                }
+                bookingDetailRepository.save(detail);
+
+                // Thêm PaymentCycle vào danh sách các PaymentCycle đã được cập nhật
+                updatedCycles.add(paymentCycle);
+            }
+        }
+
+// Cập nhật trạng thái PaymentCycle sau khi đã xử lý tất cả BookingDetail
+        for (PaymentCycle paymentCycle : updatedCycles) {
+            List<BookingDetail> detailsInCycle = bookingDetailRepository.findByBookingId(bookingId).stream()
+                    .filter(detail -> {
+                        LocalDate sessionDate = detail.getSessionDate();
+                        return !sessionDate.isBefore(paymentCycle.getStartDate()) && !sessionDate.isAfter(paymentCycle.getEndDate());
+                    })
+                    .toList();
+
+            boolean hasRefunded = false;
+            boolean hasCompleted = false;
+            boolean allRefunded = true;
+
+            for (BookingDetail d : detailsInCycle) {
+                if ("REFUNDED".equalsIgnoreCase(d.getStatus())) {
+                    hasRefunded = true;
+                } else if ("COMPLETED".equalsIgnoreCase(d.getStatus())) {
+                    hasCompleted = true;
+                    allRefunded = false;
+                } else {
+                    allRefunded = false;
+                }
+            }
+
+            // Cập nhật trạng thái của PaymentCycle
+            if (allRefunded) {
+                paymentCycle.setStatus("REFUNDED");
+            } else if (hasRefunded && hasCompleted) {
+                paymentCycle.setStatus("REFUNDED_PARTLY");
+            }
+
+            paymentCycleRepository.save(paymentCycle);
+        }
+
+        Wallet customerWallet = walletRepository.findByUserId(booking.getCustomer().getId())
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for customer."));
+        if(booking.getDepositPaid()!=null){
+            totalRefund= totalRefund.add(booking.getDepositPaid());
+        }else{
+            booking.setStatus("CANCELED");
+        }
+
+        if (totalRefund.compareTo(BigDecimal.ZERO) > 0) {
+            customerWallet.setBalance(totalRefund);
+            CustomerTransaction refundTransaction = CustomerTransaction.builder()
+                    .wallet(customerWallet)
+                    .booking(booking)
+                    .transactionType("REFUND")
+                    .amount(totalRefund)
+                    .description("Refund for canceled booking by Chef.")
+                    .status("COMPLETED")
+                    .isDeleted(false)
+                    .build();
+            customerTransactionRepository.save(refundTransaction);
+            boolean hasCompletedDetail = allDetails.stream()
+                    .anyMatch(detail -> "COMPLETED".equalsIgnoreCase(detail.getStatus()));
+            if (hasCompletedDetail) {
+                booking.setStatus("COMPLETED");
+                booking.setTotalPrice(booking.getTotalPrice().subtract(totalRefund));
+                booking.setDepositPaid(BigDecimal.ZERO);
+            } else {
+                booking.setStatus("CANCELED");
+            }
+            booking = bookingRepository.save(booking);
+
+        }
+
+        chefService.updateReputation(chef,-5);
+
+        NotificationRequest customerNotification = NotificationRequest.builder()
+                .userId(chef.getId())
+                .title("Booking Cancel - Reputation Points Penalized")
+                .body("Your booking #" + booking.getBookingType() + " was cancelled. As a result, your reputation points have been penalized for cancelling the booking.")
+                .bookingId(booking.getId())
+                .notiType("PENALDO_NOTIFY")
+                .screen("ChefDashboard")
+                .build();
+        notificationService.sendPushNotification(customerNotification);
+        NotificationRequest refundNotification = NotificationRequest.builder()
+                .userId(booking.getCustomer().getId())
+                .title("Booking Canceled and Refund Issued")
+                .body("Your booking #" + booking.getBookingType() +" with Chef "+ booking.getChef().getUser().getFullName()+" has been canceled by the chef. A refund of " +
+                        totalRefund + " has been issued to your wallet.")
+                .bookingId(booking.getId())
+                .screen("CustomerBookingManagementScreen")
+                .build();
+        notificationService.sendPushNotification(refundNotification);
+        return modelMapper.map(booking, BookingResponseDto.class);
+    }
+    private PaymentCycle getPaymentCycleForBookingDetail(BookingDetail bookingDetail) {
+        Booking booking = bookingDetail.getBooking();
+        LocalDate sessionDate = bookingDetail.getSessionDate();
+        return paymentCycleRepository.findByBookingId(booking.getId())
+                .stream()
+                .filter(paymentCycle -> !sessionDate.isBefore(paymentCycle.getStartDate()) && !sessionDate.isAfter(paymentCycle.getEndDate()))
+                .findFirst()
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "No valid payment cycle found for the given session date."));
     }
 
     @Override
@@ -1217,6 +1489,210 @@ public class BookingServiceImpl implements BookingService {
         booking.setStatus("CANCELED");
         bookingRepository.save(booking);
 
+        return modelMapper.map(booking, BookingResponseDto.class);
+    }
+
+    @Override
+    public BookingResponseDto cancelLongTermBooking2(Long bookingId, Long userId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Booking not found"));
+        User customer = userRepository.findById(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User not found"));
+        if (!customer.getId().equals(booking.getCustomer().getId())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "User not in booking.");
+        }
+        if (!"LONG_TERM".equalsIgnoreCase(booking.getBookingType())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "This is not a long-term booking");
+        }
+        String status = booking.getStatus();
+        if (!List.of("PENDING", "PENDING_FIRST_CYCLE", "PAID_FIRST_CYCLE", "CONFIRMED", "DEPOSITED","CONFIRMED_PARTIALLY_PAID","CONFIRMED_PAID").contains(status.toUpperCase())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "This booking status cannot be canceled");
+        }
+        List<BookingDetail> allDetails = bookingDetailRepository.findByBookingId(bookingId);
+        if (allDetails.isEmpty()) {
+            throw new VchefApiException(HttpStatus.NOT_FOUND, "No booking details found");
+        }
+        if (List.of("CONFIRMED_PARTIALLY_PAID","CONFIRMED_PAID").contains(status.toUpperCase())) {
+            boolean hasTodaySession = allDetails.stream()
+                    .anyMatch(detail -> detail.getSessionDate().isBefore(LocalDate.now().plusDays(1)) || detail.getStatus().equalsIgnoreCase("IN_PROGRESS"));
+            if (hasTodaySession) {
+                throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel booking less than 1 day before session date or has session today.");
+            }
+        }
+
+        List<BookingDetail> futureDetails = allDetails.stream()
+                .filter(detail -> detail.getSessionDate().isAfter(LocalDate.now()))
+                .toList();
+        List<PaymentCycle> allCycles = paymentCycleRepository.findByBookingId(bookingId);
+        BigDecimal totalRefund = BigDecimal.ZERO;
+        Wallet customerWallet = walletRepository.findByUserId(customer.getId())
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for customer."));
+
+        switch (status.toUpperCase()) {
+            case "PENDING":
+            case "PENDING_FIRST_CYCLE":
+                for (PaymentCycle cycle : allCycles) {
+                    cycle.setStatus("CANCELED");
+                    paymentCycleRepository.save(cycle);
+                }
+                for (BookingDetail detail : allDetails) {
+                    detail.setStatus("CANCELED");
+                    bookingDetailRepository.save(detail);
+                }
+                booking.setStatus("CANCELED");
+                break;
+            case "CONFIRMED":
+                for (PaymentCycle cycle : allCycles) {
+                    cycle.setStatus("CANCELED");
+                    paymentCycleRepository.save(cycle);
+                }
+                for (BookingDetail detail : allDetails) {
+                    detail.setStatus("CANCELED");
+                    bookingDetailRepository.save(detail);
+                }
+                if (booking.getDepositPaid()!=null){
+                    totalRefund = totalRefund.add(booking.getDepositPaid());
+                }
+                booking.setStatus("CANCELED");
+                break;
+            case "PAID_FIRST_CYCLE":
+                Optional<PaymentCycle> paidCycleOpt = allCycles.stream()
+                        .filter(cycle -> "PAID".equalsIgnoreCase(cycle.getStatus()))
+                        .findFirst();
+                if (paidCycleOpt.isPresent()) {
+                    PaymentCycle paidCycle = paidCycleOpt.get();
+                    for (BookingDetail detail : allDetails) {
+                        LocalDate sessionDate = detail.getSessionDate();
+                        if (!sessionDate.isBefore(paidCycle.getStartDate()) && !sessionDate.isAfter(paidCycle.getEndDate())) {
+                            detail.setStatus("REFUNDED");
+                            totalRefund = totalRefund.add(detail.getTotalPrice());
+                            bookingDetailRepository.save(detail);
+                        }
+                        detail.setStatus("CANCELED");
+                        bookingDetailRepository.save(detail);
+                    }
+
+                }
+                if (booking.getDepositPaid() != null) {
+                    totalRefund = totalRefund.add(booking.getDepositPaid());
+                    booking.setDepositPaid(BigDecimal.ZERO);
+                }
+                booking.setStatus("CANCELED");
+                break;
+
+            case "DEPOSITED":
+                for (PaymentCycle cycle : allCycles) {
+                    cycle.setStatus("CANCELED");
+                    paymentCycleRepository.save(cycle);
+                }
+                for (BookingDetail detail : allDetails) {
+                    detail.setStatus("CANCELED");
+                    bookingDetailRepository.save(detail);
+                }
+                booking.setStatus("CANCELED");
+                if (booking.getDepositPaid() != null) {
+                    totalRefund = totalRefund.add(booking.getDepositPaid());
+                    booking.setDepositPaid(BigDecimal.ZERO);
+                }
+                booking.setStatus("CANCELED");
+                break;
+
+            case "CONFIRMED_PARTIALLY_PAID":
+            case "CONFIRMED_PAID":
+                Map<PaymentCycle, List<BookingDetail>> cycleToDetails = new HashMap<>();
+                Set<PaymentCycle> updatedCycles = new HashSet<>();
+
+                for (BookingDetail detail : futureDetails) {
+                    PaymentCycle paymentCycle = getPaymentCycleForBookingDetail(detail);
+                    if (paymentCycle != null) {
+                        cycleToDetails.computeIfAbsent(paymentCycle, k -> new ArrayList<>()).add(detail);
+
+                        if ("PAID".equalsIgnoreCase(paymentCycle.getStatus())) {
+                            if (!"COMPLETED".equalsIgnoreCase(detail.getStatus())) {
+                                detail.setStatus("REFUNDED");
+                                totalRefund = totalRefund.add(detail.getTotalPrice());
+                            }
+                            updatedCycles.add(paymentCycle);
+                        } else {
+                            paymentCycle.setStatus("CANCELED");
+                            paymentCycleRepository.save(paymentCycle);
+                            detail.setStatus("CANCELED");
+                        }
+
+                        bookingDetailRepository.save(detail);
+                    }
+                }
+                for (PaymentCycle paymentCycle : updatedCycles) {
+                    List<BookingDetail> detailsInCycle = cycleToDetails.get(paymentCycle);
+                    boolean hasRefunded = false;
+                    boolean hasCompleted = false;
+                    boolean allRefunded = true;
+                    for (BookingDetail d : detailsInCycle) {
+                        if ("REFUNDED".equalsIgnoreCase(d.getStatus())) {
+                            hasRefunded = true;
+                        } else if ("COMPLETED".equalsIgnoreCase(d.getStatus())) {
+                            hasCompleted = true;
+                            allRefunded = false;
+                        } else {
+                            allRefunded = false;
+                        }
+                    }
+
+                    if (allRefunded) {
+                        paymentCycle.setStatus("REFUNDED");
+                    } else if (hasRefunded && hasCompleted) {
+                        paymentCycle.setStatus("REFUNDED_PARTLY");
+                    }
+
+                    paymentCycleRepository.save(paymentCycle);
+                }
+                break;
+        }
+        if (totalRefund.compareTo(BigDecimal.ZERO) > 0) {
+            customerWallet.setBalance(customerWallet.getBalance().add(totalRefund));
+            walletRepository.save(customerWallet);
+            CustomerTransaction refundTransaction = CustomerTransaction.builder()
+                    .wallet(customerWallet)
+                    .booking(booking)
+                    .transactionType("REFUND")
+                    .amount(totalRefund)
+                    .description("Refund for canceled booking.")
+                    .status("COMPLETED")
+                    .isDeleted(false)
+                    .build();
+            customerTransactionRepository.save(refundTransaction);
+            boolean hasCompletedDetail = allDetails.stream()
+                    .anyMatch(detail -> "COMPLETED".equalsIgnoreCase(detail.getStatus()));
+            if (hasCompletedDetail) {
+                booking.setStatus("COMPLETED");
+                booking.setTotalPrice(booking.getTotalPrice().subtract(totalRefund));
+                booking.setDepositPaid(BigDecimal.ZERO);
+            } else {
+                booking.setStatus("CANCELED");
+            }
+        }
+        booking = bookingRepository.save(booking);
+
+        NotificationRequest customerNotification = NotificationRequest.builder()
+                .userId(customer.getId())
+                .title("Booking Canceled")
+                .body("You have canceled your booking #" + booking.getBookingType() +" with Chef "+ booking.getChef().getUser().getFullName()+ ". A refund of " +
+                        totalRefund + " has been issued to your wallet (if applicable).")
+                .bookingId(booking.getId())
+                .screen("CustomerBookingManagementScreen")
+                .build();
+        notificationService.sendPushNotification(customerNotification);
+
+        if(!List.of("CONFIRMED","CONFIRMED_PARTIALLY_PAID","CONFIRMED_PAID").contains(status.toUpperCase())){
+            NotificationRequest notifyChef = NotificationRequest.builder()
+                    .userId(booking.getChef().getId())
+                    .title("Booking Canceled by Customer")
+                    .body("Customer "+customer.getFullName()+ " has canceled booking #" + booking.getBookingType() + ".")
+                    .bookingId(booking.getId())
+                    .screen("ChefDashboard")
+                    .build();
+            notificationService.sendPushNotification(notifyChef);
+        }
         return modelMapper.map(booking, BookingResponseDto.class);
     }
 

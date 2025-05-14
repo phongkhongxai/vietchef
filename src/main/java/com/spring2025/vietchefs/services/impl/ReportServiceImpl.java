@@ -2,10 +2,12 @@ package com.spring2025.vietchefs.services.impl;
 
 import com.spring2025.vietchefs.models.entity.*;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
+import com.spring2025.vietchefs.models.payload.dto.ImageDto;
 import com.spring2025.vietchefs.models.payload.dto.ReportDto;
 import com.spring2025.vietchefs.models.payload.requestModel.NotificationRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ReportHandleRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ReportRequest;
+import com.spring2025.vietchefs.models.payload.responseModel.BookingDetailResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.DishResponseDto;
 import com.spring2025.vietchefs.models.payload.responseModel.ReportsResponse;
 import com.spring2025.vietchefs.repositories.*;
@@ -43,6 +45,8 @@ public class ReportServiceImpl implements ReportService{
     private ChefRepository chefRepository;
     @Autowired
     private ChefService chefService;
+    @Autowired
+    private ImageService imageService;
     @Autowired
     private NotificationService notificationService;
     @Autowired
@@ -189,8 +193,18 @@ public class ReportServiceImpl implements ReportService{
     public ReportDto getReportById(Long id) {
         Report report = reportRepository.findById(id)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Report not found with id: "+id));
+        ReportDto reportDto = modelMapper.map(report, ReportDto.class);
+        if (report.getBookingDetail() != null) {
+            BookingDetailResponse bookingDetailResponse = modelMapper.map(report.getBookingDetail(), BookingDetailResponse.class);
+            List<Image> images = imageService.getImagesByEntity("BOOKING_DETAIL", report.getBookingDetail().getId());
+            List<ImageDto> imageDtos = images.stream()
+                    .map(image -> modelMapper.map(image, ImageDto.class))
+                    .collect(Collectors.toList());
+            bookingDetailResponse.setImages(imageDtos);
+            reportDto.setBookingDetail(bookingDetailResponse);
+        }
 
-        return modelMapper.map(report, ReportDto.class);
+        return reportDto;
     }
 
     @Override
@@ -221,7 +235,8 @@ public class ReportServiceImpl implements ReportService{
             }
             chefRepository.save(chef);
             if(request.isRefundBooking()){
-                bookingDetailService.refundBookingDetail(bookingDetail.getId());
+                chef.setPenaltyFee(bookingDetailService.refundBookingDetail(bookingDetail.getId()));
+                chef = chefRepository.save(chef);
             }
             NotificationRequest chefNotification = NotificationRequest.builder()
                     .userId(chef.getUser().getId())
@@ -240,10 +255,10 @@ public class ReportServiceImpl implements ReportService{
                     .screen("BookingDetail")
                     .build();
             notificationService.sendPushNotification(customerNotification);
-        } else if (normalizedStatus.equals("REJECTED")) {
+        } else {
             if (bookingDetail.getStatus().equalsIgnoreCase("LOCKED")) {
                 bookingDetail.setStatus("WAITING_FOR_CONFIRMATION");
-                bookingDetailRepository.save(bookingDetail);
+                bookingDetail=bookingDetailRepository.save(bookingDetail);
             }
             NotificationRequest customerNotification = NotificationRequest.builder()
                     .userId(report.getReportedBy().getId())

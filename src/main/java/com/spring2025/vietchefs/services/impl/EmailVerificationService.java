@@ -73,6 +73,52 @@ public class EmailVerificationService {
          }
     }
 
+    @Async
+    public void sendWalletPassword(User user, String walletPassword) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(user.getEmail());
+            helper.setSubject("🔐 Mật khẩu ví điện tử - VietChefs");
+            helper.setFrom("apehome8386@gmail.com");
+
+            String content = "<!DOCTYPE html>" +
+                    "<html>" +
+                    "<head>" +
+                    "<meta charset='UTF-8'>" +
+                    "<style>" +
+                    "  body { font-family: 'Segoe UI', sans-serif; background-color: #f4f4f4; padding: 30px; }" +
+                    "  .container { max-width: 600px; background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin: auto; }" +
+                    "  h2 { color: #2c3e50; }" +
+                    "  .password-box { background-color: #eaf2fb; border-left: 6px solid #3498db; padding: 15px; font-size: 20px; letter-spacing: 2px; font-weight: bold; color: #2980b9; text-align: center; margin: 20px 0; }" +
+                    "  p { color: #333333; font-size: 16px; line-height: 1.6; }" +
+                    "  .footer { font-size: 13px; color: #999999; margin-top: 30px; text-align: center; }" +
+                    "</style>" +
+                    "</head>" +
+                    "<body>" +
+                    "<div class='container'>" +
+                    "<h2>Forgot password wallet on Vietchef</h2>" +
+                    "<p>Xin chào <strong>" + user.getFullName() + "</strong>,</p>" +
+                    "<p>Dưới đây là mật khẩu truy cập ví của bạn:</p>" +
+                    "<div class='password-box'>" + walletPassword + "</div>" +
+                    "<p>Vui lòng lưu lại mật khẩu này và không chia sẻ với bất kỳ ai để đảm bảo an toàn cho tài sản của bạn.</p>" +
+                    "<p>Bạn có thể thay đổi mật khẩu trong phần Cài đặt tài khoản bất kỳ lúc nào.</p>" +
+                    "<div class='footer'>Trân trọng,<br>Đội ngũ VietChefs 🧑‍🍳</div>" +
+                    "</div>" +
+                    "</body>" +
+                    "</html>";
+
+            helper.setText(content, true);
+            mailSender.send(message);
+
+        } catch (MessagingException e) {
+            e.printStackTrace();
+            throw new RuntimeException("Không thể gửi email mật khẩu ví.");
+        }
+    }
+
+
 
     private void sendEmailVerify(String recipientEmail, String verificationCode) {
         String subject = "Email Verification Code";

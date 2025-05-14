@@ -5,38 +5,40 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "chef_wallet_requests")
+@Table(name = "wallet_requests")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ChefWalletRequest {
+public class WalletRequest {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "chef_id", nullable = false)
-    private Chef chef;
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
-    //   "WITHDRAWAL" (rút tiền)
     @Column(nullable = false)
     private String requestType;
 
-    // Số tiền yêu cầu
     @Column(nullable = false)
     private BigDecimal amount;
 
-    // Trạng thái của request: "PENDING", "APPROVED", "REJECTED","COMPLETED"
     @Column(nullable = false)
-    private String status;
+    private String status; //PENDING, APPROVED, REJECTED
 
-    // Ghi chú (nếu có), ví dụ: lý do nạp/ rút, mô tả thêm
     @Column(columnDefinition = "TEXT")
     private String note;
+    @Column(name = "created_at", updatable = false)
+    @CreationTimestamp
+    private LocalDateTime createdAt;
 
 }

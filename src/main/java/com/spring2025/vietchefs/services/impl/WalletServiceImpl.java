@@ -18,19 +18,20 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Random;
 import java.util.stream.Collectors;
 
 @Service
 public class WalletServiceImpl implements WalletService {
     @Autowired
     private WalletRepository walletRepository;
-
     @Autowired
     private UserRepository userRepository;
     @Autowired
@@ -39,6 +40,10 @@ public class WalletServiceImpl implements WalletService {
     private PaymentRepository paymentRepository;
     @Autowired
     private ChefTransactionRepository chefTransactionRepository;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+    @Autowired
+    private EmailVerificationService emailVerificationService;
     @Autowired
     private ModelMapper modelMapper;
     @Override
@@ -86,13 +91,24 @@ public class WalletServiceImpl implements WalletService {
         walletRepository.save(wallet);
         return modelMapper.map(wallet, WalletDto.class);
     }
-    private boolean isValidEmail(String email) {
-        String regex = "^[A-Za-z0-9+_.-]+@(.+)$";
-        return email.matches(regex);
-    }
 
     @Override
-    public WalletPlusResponse getWalletByUserId(Long userId,int pageNo, int pageSize, String sortBy, String sortDir) {
+    public WalletDto setPasswordForWallet(Long userId, String password) {
+        if (password == null || !password.matches("\\d{4}")) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Password must be exactly 4 digits.");
+        }
+        Wallet wallet = walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for user id: " + userId));
+        wallet.setPassword(passwordEncoder.encode(password));
+        walletRepository.save(wallet);
+        return modelMapper.map(wallet, WalletDto.class);
+    }
+
+
+
+
+    @Override
+    public WalletPlusResponse getWalletByUserIdAll(Long userId,int pageNo, int pageSize, String sortBy, String sortDir) {
         Wallet wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for user id: " + userId));
 
@@ -133,5 +149,56 @@ public class WalletServiceImpl implements WalletService {
             response.setChefTransactions(templatesResponse);
         }
         return response;
+    }
+
+    @Override
+    public WalletDto getWalletByUserId(Long userId) {
+        Wallet wallet = walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for user id: " + userId));
+        return modelMapper.map(wallet, WalletDto.class);
+    }
+
+    @Override
+    public boolean checkWalletHasPassword(Long userId) {
+        Wallet wallet = walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for user id: " + userId));
+        return wallet.getPassword() != null;
+    }
+
+    @Override
+    public boolean accessWallet(Long userId, String inputPassword) {
+        Wallet wallet = walletRepository.findByUserId(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for user id: " + userId));
+
+        if (wallet.getPassword() == null) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Wallet has no password set yet.");
+        }
+        return passwordEncoder.matches(inputPassword, wallet.getPassword());
+    }
+
+    @Override
+    public String forgotWalletPassword(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for username: " + username));
+
+        Wallet wallet = walletRepository.findByUserId(user.getId())
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for user id: " + user.getId()));
+
+        String newRawPassword = generateRandom4DigitCode();
+        String hashedPassword = passwordEncoder.encode(newRawPassword);
+        wallet.setPassword(hashedPassword);
+        walletRepository.save(wallet);
+        emailVerificationService.sendWalletPassword(user, newRawPassword);
+        return "New password sent you email.";
+    }
+
+    private boolean isValidEmail(String email) {
+        String regex = "^[A-Za-z0-9+_.-]+@(.+)$";
+        return email.matches(regex);
+    }
+    private String generateRandom4DigitCode() {
+        Random random = new Random();
+        int code = 1000 + random.nextInt(9000);
+        return String.valueOf(code);
     }
 }
