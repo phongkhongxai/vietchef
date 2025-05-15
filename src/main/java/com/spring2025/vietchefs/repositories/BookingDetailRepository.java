@@ -22,8 +22,12 @@ public interface BookingDetailRepository extends JpaRepository<BookingDetail, Lo
 
     @Query("SELECT bd FROM BookingDetail bd WHERE bd.booking.id = :bookingId")
     List<BookingDetail> findByBookingId(@Param("bookingId") Long bookingId);
-    @Query("SELECT COALESCE(SUM(bd.totalPrice), 0) FROM BookingDetail bd WHERE bd.booking.id = :bookingId AND bd.status <> 'CANCELED'")
+    @Query("SELECT COALESCE(SUM(bd.totalPrice), 0) " +
+            "FROM BookingDetail bd " +
+            "WHERE bd.booking.id = :bookingId " +
+            "AND bd.status NOT IN ('CANCELED', 'OVERDUE')")
     BigDecimal calculateTotalPriceByBooking(@Param("bookingId") Long bookingId);
+
 
 
     /**

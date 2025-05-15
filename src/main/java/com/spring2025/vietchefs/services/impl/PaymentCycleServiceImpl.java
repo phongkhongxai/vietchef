@@ -9,12 +9,12 @@ import com.spring2025.vietchefs.repositories.BookingDetailRepository;
 import com.spring2025.vietchefs.repositories.BookingRepository;
 import com.spring2025.vietchefs.repositories.PaymentCycleRepository;
 import com.spring2025.vietchefs.services.PaymentCycleService;
-import jakarta.transaction.Transactional;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -182,75 +182,65 @@ public class PaymentCycleServiceImpl implements PaymentCycleService {
         int durationDays = booking.getBookingPackage().getDurationDays();
         return (int) Math.ceil((double) durationDays / 5.0);
     }
-    @Scheduled(cron = "0 15 0 * * *") // Chạy lúc 00:00 mỗi ngày
+
+    @Scheduled(cron = "0 10 0 * * *") // Run daily at 00:15
     @Transactional
     public void checkOverduePaymentCycles() {
         LocalDate today = LocalDate.now();
-
         List<PaymentCycle> overdueCycles = paymentCycleRepository.findByDueDateBeforeAndStatus(today, "PENDING");
 
         for (PaymentCycle cycle : overdueCycles) {
-            // Cập nhật cycle hiện tại thành OVERDUE
+            Booking booking = cycle.getBooking();
             cycle.setStatus("OVERDUE");
             paymentCycleRepository.save(cycle);
-
-            Booking booking = cycle.getBooking();
-
-            // Cập nhật BookingDetail của kỳ này nếu chưa bị CANCELED
-            List<BookingDetail> relatedDetails = bookingDetailRepository.findByBookingId(booking.getId()).stream()
-                    .filter(detail ->
-                            !detail.getStatus().equalsIgnoreCase("CANCELED") &&
-                                    !detail.getSessionDate().isBefore(cycle.getStartDate()) &&
-                                    !detail.getSessionDate().isAfter(cycle.getEndDate()))
-                    .toList();
-
-            for (BookingDetail detail : relatedDetails) {
-                detail.setStatus("OVERDUE");
-                bookingDetailRepository.save(detail);
-            }
-
-            // Hủy các kỳ và buổi còn lại (sau kỳ này)
-            List<PaymentCycle> futureCycles = paymentCycleRepository.findByBookingId(booking.getId()).stream()
-                    .filter(c -> c.getCycleOrder() > cycle.getCycleOrder())
-                    .toList();
-
-            for (PaymentCycle futureCycle : futureCycles) {
-                futureCycle.setStatus("CANCELED");
-                paymentCycleRepository.save(futureCycle);
-            }
-
-            List<BookingDetail> futureDetails = bookingDetailRepository.findByBookingId(booking.getId()).stream()
-                    .filter(detail ->
-                            !detail.getStatus().equalsIgnoreCase("CANCELED") &&
-                                    detail.getSessionDate().isAfter(cycle.getEndDate()))
-                    .toList();
-
-            for (BookingDetail futureDetail : futureDetails) {
-                futureDetail.setStatus("CANCELED");
-                bookingDetailRepository.save(futureDetail);
-            }
-
-            // Kiểm tra nếu là kỳ đầu tiên
+            // Trường hợp cycleOrder == 1 => OVERDUE toàn bộ booking & bookingDetails
             if (cycle.getCycleOrder() == 1) {
+                List<BookingDetail> allDetails = bookingDetailRepository.findByBookingId(booking.getId());
+                for (BookingDetail detail : allDetails) {
+                    detail.setStatus("OVERDUE");
+                    bookingDetailRepository.save(detail);
+                }
                 booking.setStatus("OVERDUE");
+                bookingRepository.save(booking);
             } else {
-                // Tìm kỳ trước đó
-                Optional<PaymentCycle> previousCycleOpt = paymentCycleRepository.findByBookingId(booking.getId()).stream()
-                        .filter(c -> c.getCycleOrder() == cycle.getCycleOrder() - 1)
-                        .findFirst();
-
-                if (previousCycleOpt.isPresent()) {
-                    PaymentCycle previousCycle = previousCycleOpt.get();
-                    if (previousCycle.getEndDate().isBefore(today) && !booking.getStatus().equalsIgnoreCase("COMPLETED")) {
-                        BigDecimal newTotalPrice = bookingDetailRepository.calculateTotalPriceByBooking(booking.getId());
-                        booking.setTotalPrice(newTotalPrice);
-                        booking.setStatus("COMPLETED");
+                List<BookingDetail> currentDetails = bookingDetailRepository.findByBookingId(booking.getId()).stream()
+                        .filter(detail -> !detail.getSessionDate().isBefore(cycle.getStartDate()) &&
+                                        !detail.getSessionDate().isAfter(cycle.getEndDate()))
+                        .toList();
+                for (BookingDetail detail : currentDetails) {
+                    detail.setStatus("OVERDUE");
+                    bookingDetailRepository.save(detail);
+                }
+                // Hủy các kỳ và buổi sau kỳ này
+                List<PaymentCycle> futureCycles = paymentCycleRepository.findByBookingId(booking.getId()).stream()
+                        .filter(c -> c.getCycleOrder() > cycle.getCycleOrder())
+                        .toList();
+                for (PaymentCycle fc : futureCycles) {
+                    List<BookingDetail> currentDetails1 = bookingDetailRepository.findByBookingId(booking.getId()).stream()
+                            .filter(detail -> !detail.getSessionDate().isBefore(cycle.getStartDate()) &&
+                                    !detail.getSessionDate().isAfter(cycle.getEndDate()))
+                            .toList();
+                    for (BookingDetail detail : currentDetails1) {
+                        detail.setStatus("OVERDUE");
+                        bookingDetailRepository.save(detail);
                     }
+                    fc.setStatus("OVERDUE");
+                    paymentCycleRepository.save(fc);
+                }
+                Optional<PaymentCycle> firstCycleOpt = paymentCycleRepository.findByBookingId(booking.getId()).stream()
+                        .filter(c -> c.getCycleOrder() == 1)
+                        .findFirst();
+                if (firstCycleOpt.isPresent() &&
+                        firstCycleOpt.get().getEndDate().isBefore(today) &&
+                        !booking.getStatus().equalsIgnoreCase("COMPLETED")) {
+                    BigDecimal newTotalPrice = bookingDetailRepository.calculateTotalPriceByBooking(booking.getId());
+                    booking.setTotalPrice(newTotalPrice);
+                    booking.setStatus("COMPLETED");
+                    bookingRepository.save(booking);
                 }
             }
-            bookingRepository.save(booking);
         }
-
-        System.out.println("✅ Checked and updated overdue payment cycles at " + today);
+        System.out.println("✅ Checked overdue payment cycles at " + today);
     }
+
 }
