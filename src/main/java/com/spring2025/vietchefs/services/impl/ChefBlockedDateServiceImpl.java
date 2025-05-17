@@ -90,9 +90,6 @@ public class ChefBlockedDateServiceImpl implements ChefBlockedDateService {
         
         // Kiểm tra xung đột với các blocked date khác
         validateNoBlockedDateConflict(currentChef, blockedDate.getBlockedDate(), blockedDate.getStartTime(), blockedDate.getEndTime(), blockedDate.getBlockId());
-        
-        // Kiểm tra xung đột với lịch làm việc
-        validateNoScheduleConflict(currentChef, blockedDate.getBlockedDate(), blockedDate.getStartTime(), blockedDate.getEndTime());
 
         // Kiểm tra xung đột với các đơn đặt hàng hiện có
         validateNoBookingConflict(currentChef, blockedDate.getBlockedDate(), blockedDate.getStartTime(), blockedDate.getEndTime());
@@ -125,9 +122,6 @@ public class ChefBlockedDateServiceImpl implements ChefBlockedDateService {
         
         // Kiểm tra xung đột với các blocked date khác
         validateNoBlockedDateConflict(chef, request.getBlockedDate(), request.getStartTime(), request.getEndTime(), null);
-        
-        // Kiểm tra xung đột với lịch làm việc
-        validateNoScheduleConflict(chef, request.getBlockedDate(), request.getStartTime(), request.getEndTime());
         
         // Kiểm tra xung đột với các đơn đặt hàng hiện có
         validateNoBookingConflict(chef, request.getBlockedDate(), request.getStartTime(), request.getEndTime());
@@ -215,7 +209,6 @@ public class ChefBlockedDateServiceImpl implements ChefBlockedDateService {
             
             // Validate no conflicts for each date
             validateNoBlockedDateConflict(chef, currentDate, blockStartTime, blockEndTime, null);
-            validateNoScheduleConflict(chef, currentDate, blockStartTime, blockEndTime);
             validateNoBookingConflict(chef, currentDate, blockStartTime, blockEndTime);
             
             // Create blocked date for current date
@@ -278,29 +271,6 @@ public class ChefBlockedDateServiceImpl implements ChefBlockedDateService {
         }
     }
     
-    /**
-     * Kiểm tra xung đột với lịch làm việc
-     */
-    private void validateNoScheduleConflict(Chef chef, LocalDate blockedDate, LocalTime startTime, LocalTime endTime) {
-        // Lấy ra thứ trong tuần từ ngày bị chặn (0-6, với 0 là Chủ nhật)
-        int dayOfWeek = blockedDate.getDayOfWeek().getValue();
-        // Điều chỉnh để Chủ nhật là 0 thay vì 7
-        if (dayOfWeek == 7) {
-            dayOfWeek = 0;
-        }
-        
-        // Lấy tất cả lịch làm việc của chef trong ngày đó
-        List<ChefSchedule> schedules = scheduleRepository.findByChefAndDayOfWeekAndIsDeletedFalse(chef, dayOfWeek);
-        
-        // Kiểm tra từng lịch làm việc có xung đột không
-        for (ChefSchedule schedule : schedules) {
-            // Nếu khung giờ bị chặn chồng lấn với khung giờ làm việc
-            if (startTime.isBefore(schedule.getEndTime()) && endTime.isAfter(schedule.getStartTime())) {
-                throw new VchefApiException(HttpStatus.BAD_REQUEST, 
-                    "Blocked date conflicts with an existing work schedule at " + schedule.getStartTime() + " - " + schedule.getEndTime());
-            }
-        }
-    }
 
     /**
      * Kiểm tra xung đột với các blocked date khác

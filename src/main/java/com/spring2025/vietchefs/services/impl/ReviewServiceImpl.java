@@ -103,6 +103,57 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
+    public Page<ReviewResponse> getFilteredReviewsByChef(Map<String, Object> filters, Pageable pageable) {
+        // Extract chef ID from filters map
+        Long chefId = (Long) filters.get("chefId");
+        Chef chef = chefRepository.findById(chefId)
+                .orElseThrow(() -> new ResourceNotFoundException("Chef not found with id: " + chefId));
+        
+        // Extract rating filters
+        BigDecimal minRating = filters.containsKey("minRating") ? (BigDecimal) filters.get("minRating") : null;
+        BigDecimal maxRating = filters.containsKey("maxRating") ? (BigDecimal) filters.get("maxRating") : null;
+        
+        // Extract date filters
+        LocalDateTime fromDate = filters.containsKey("fromDate") ? (LocalDateTime) filters.get("fromDate") : null;
+        LocalDateTime toDate = filters.containsKey("toDate") ? (LocalDateTime) filters.get("toDate") : null;
+        
+        // Apply filters based on which ones are present
+        if (minRating != null && maxRating != null && fromDate != null && toDate != null) {
+            return reviewRepository.findByChefAndRatingBetweenAndCreateAtBetweenAndIsDeletedFalse(
+                    chef, minRating, maxRating, fromDate, toDate, pageable)
+                    .map(this::mapToResponse);
+        } else if (minRating != null && maxRating != null) {
+            return reviewRepository.findByChefAndRatingBetweenAndIsDeletedFalse(
+                    chef, minRating, maxRating, pageable)
+                    .map(this::mapToResponse);
+        } else if (fromDate != null && toDate != null) {
+            return reviewRepository.findByChefAndCreateAtBetweenAndIsDeletedFalse(
+                    chef, fromDate, toDate, pageable)
+                    .map(this::mapToResponse);
+        } else if (minRating != null) {
+            return reviewRepository.findByChefAndRatingGreaterThanEqualAndIsDeletedFalse(
+                    chef, minRating, pageable)
+                    .map(this::mapToResponse);
+        } else if (maxRating != null) {
+            return reviewRepository.findByChefAndRatingLessThanEqualAndIsDeletedFalse(
+                    chef, maxRating, pageable)
+                    .map(this::mapToResponse);
+        } else if (fromDate != null) {
+            return reviewRepository.findByChefAndCreateAtGreaterThanEqualAndIsDeletedFalse(
+                    chef, fromDate, pageable)
+                    .map(this::mapToResponse);
+        } else if (toDate != null) {
+            return reviewRepository.findByChefAndCreateAtLessThanEqualAndIsDeletedFalse(
+                    chef, toDate, pageable)
+                    .map(this::mapToResponse);
+        } else {
+            // Default to unfiltered results
+            return reviewRepository.findByChefAndIsDeletedFalse(chef, pageable)
+                    .map(this::mapToResponse);
+        }
+    }
+
+    @Override
     public List<ReviewResponse> getReviewsByUser(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
