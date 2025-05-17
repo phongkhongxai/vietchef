@@ -1,0 +1,24 @@
+# Custom profanity words file
+# Format: '+word' for added, '-word' for removed
+
+newbadword
+-badword
+newbadword
+badword123
+-badword
+-badword
+inappropriate
+newbadword
+-badword
+newbadword
+badword123
+-badword
+-badword
+inappropriate
+newbadword
+-badword
+newbadword
+badword123
+-badword
+-badword
+inappropriate

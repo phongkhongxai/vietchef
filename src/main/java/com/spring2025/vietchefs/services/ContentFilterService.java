@@ -5,13 +5,16 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
+import org.springframework.beans.factory.annotation.Value;
 
 /**
  * Service xử lý việc lọc nội dung không phù hợp từ các bài đánh giá
@@ -22,10 +25,22 @@ public class ContentFilterService {
     private final Set<String> profanityWords = new HashSet<>();
     private static final String REPLACEMENT = "***";
     
+    private final ResourceLoader resourceLoader;
+    
+    @Value("${app.profanity.custom-file-path:}")
+    private String customFilePath;
+    
+    @Value("${app.profanity.vietnamese-file:classpath:/profanity/vietnamese_profanity.txt}")
+    private String vietnameseProfanityPath;
+    
+    @Value("${app.profanity.english-file:classpath:/profanity/english_profanity.txt}")
+    private String englishProfanityPath;
+    
     /**
      * Constructor khởi tạo danh sách từ ngữ cần lọc từ file
      */
-    public ContentFilterService() {
+    public ContentFilterService(ResourceLoader resourceLoader) {
+        this.resourceLoader = resourceLoader;
         loadProfanityWords();
     }
     
@@ -61,9 +76,83 @@ public class ContentFilterService {
                     }
                 }
             }
+            
+            // Nạp từ tệp tùy chỉnh nếu có
+            loadCustomProfanityWords();
+            
         } catch (IOException e) {
             // Log the error
             System.err.println("Error loading profanity words: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Phương thức tải danh sách từ ngữ tùy chỉnh (đã thêm hoặc xóa) từ file
+     */
+    private void loadCustomProfanityWords() {
+        if (customFilePath == null || customFilePath.isEmpty()) {
+            // Sử dụng thư mục data trong ứng dụng nếu không có đường dẫn tùy chỉnh
+            customFilePath = "data/custom_profanity.txt";
+        }
+        
+        File customFile = new File(customFilePath);
+        if (customFile.exists()) {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                    new FileInputStream(customFile), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (line.startsWith("-")) {
+                        // Đây là từ đã bị xóa
+                        profanityWords.remove(line.substring(1).trim().toLowerCase());
+                    } else if (!line.isEmpty() && !line.startsWith("#")) {
+                        // Đây là từ được thêm vào
+                        profanityWords.add(line.toLowerCase());
+                    }
+                }
+            } catch (IOException e) {
+                System.err.println("Error loading custom profanity words: " + e.getMessage());
+            }
+        }
+    }
+    
+    /**
+     * Lưu danh sách thay đổi vào file tùy chỉnh
+     * 
+     * @param addedWord Từ mới được thêm vào, null nếu không có
+     * @param removedWord Từ được xóa, null nếu không có
+     */
+    private void saveProfanityChanges(String addedWord, String removedWord) {
+        if (customFilePath == null || customFilePath.isEmpty()) {
+            customFilePath = "data/custom_profanity.txt";
+        }
+        
+        try {
+            // Tạo thư mục nếu không tồn tại
+            File parentDir = new File(customFilePath).getParentFile();
+            if (parentDir != null && !parentDir.exists()) {
+                parentDir.mkdirs();
+            }
+            
+            File customFile = new File(customFilePath);
+            boolean fileExists = customFile.exists();
+            
+            try (FileWriter writer = new FileWriter(customFile, fileExists)) {
+                if (!fileExists) {
+                    writer.write("# Custom profanity words file\n");
+                    writer.write("# Format: '+word' for added, '-word' for removed\n\n");
+                }
+                
+                if (addedWord != null && !addedWord.isEmpty()) {
+                    writer.write(addedWord.toLowerCase().trim() + "\n");
+                }
+                
+                if (removedWord != null && !removedWord.isEmpty()) {
+                    writer.write("-" + removedWord.toLowerCase().trim() + "\n");
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Error saving profanity words changes: " + e.getMessage());
         }
     }
     
@@ -182,7 +271,11 @@ public class ContentFilterService {
      */
     public void addProfanityWord(String word) {
         if (word != null && !word.trim().isEmpty()) {
-            profanityWords.add(word.toLowerCase().trim());
+            String trimmedWord = word.toLowerCase().trim();
+            if (profanityWords.add(trimmedWord)) {
+                // Chỉ lưu khi từ đó chưa có trong danh sách
+                saveProfanityChanges(trimmedWord, null);
+            }
         }
     }
     
@@ -193,7 +286,11 @@ public class ContentFilterService {
      */
     public void removeProfanityWord(String word) {
         if (word != null && !word.trim().isEmpty()) {
-            profanityWords.remove(word.toLowerCase().trim());
+            String trimmedWord = word.toLowerCase().trim();
+            if (profanityWords.remove(trimmedWord)) {
+                // Chỉ lưu khi từ đó có trong danh sách và đã xóa thành công
+                saveProfanityChanges(null, trimmedWord);
+            }
         }
     }
     

@@ -23,7 +23,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -190,7 +189,7 @@ public class BookingServiceImpl implements BookingService {
         Chef chef = chefRepository.findById(dto.getChefId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found"));
         if (chef.getReputationPoints() < 60 && chef.getStatus().equalsIgnoreCase("LOCKED")) {
-            throw new VchefApiException(HttpStatus.FORBIDDEN, "Chef không đủ uy tín để nhận booking dài hạn.");
+                throw new VchefApiException(HttpStatus.FORBIDDEN, "The chef does not have enough reputation points and valid status to accept bookings.");
         }
         if (dto.getGuestCount()>chef.getMaxServingSize()) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef just can serving max is "+chef.getMaxServingSize()+".");
@@ -238,12 +237,23 @@ public class BookingServiceImpl implements BookingService {
         Package selectedPackage = packageRepository.findById(dto.getPackageId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Package not found"));
         if (chef.getReputationPoints() < 80) {
-            throw new VchefApiException(HttpStatus.FORBIDDEN, "Chef không đủ uy tín để nhận booking dài hạn.");
+            throw new VchefApiException(HttpStatus.FORBIDDEN, "The chef does not have enough reputation points to accept long-term bookings.");
         }
         if (dto.getGuestCount()>chef.getMaxServingSize()) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef just can serving max is "+chef.getMaxServingSize()+".");
         }
-        // Kiểm tra xem đầu bếp có hỗ trợ package này không
+        boolean hasCompletedSingleBookingWithChef = bookingRepository
+                .existsByCustomerIdAndChefIdAndBookingTypeIgnoreCaseAndStatusIgnoreCase(
+                        dto.getCustomerId(),
+                        dto.getChefId(),
+                        "SINGLE",
+                        "COMPLETED"
+                );
+
+        if (!hasCompletedSingleBookingWithChef) {
+            throw new VchefApiException(HttpStatus.FORBIDDEN,
+                    "You must have completed at least one SINGLE booking with this chef before making a long-term booking.");
+        }
         if (!chef.getPackages().contains(selectedPackage)) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Selected package is not available for this chef.");
         }
@@ -253,7 +263,6 @@ public class BookingServiceImpl implements BookingService {
         }
         BigDecimal totalPrice = BigDecimal.ZERO;
 
-        // Tạo Booking chính
         Booking booking = new Booking();
         booking.setCustomer(customer);
         booking.setChef(chef);
@@ -269,9 +278,8 @@ public class BookingServiceImpl implements BookingService {
         List<BookingDetail> bookingDetailList = new ArrayList<>();
         List<String> overlapMessages = new ArrayList<>();
         for (BookingDetailRequestDto detailDto : dto.getBookingDetails()) {
-            // Kiểm tra trùng lịch cho từng ngày
             if (isOverlappingWithExistingBookings(chef, detailDto.getSessionDate(), detailDto.getTimeBeginTravel(), detailDto.getStartTime())) {
-                String overlapMessage = "Chef đã có lịch trong khoảng thời gian này cho ngày " + detailDto.getSessionDate() + ". Vui lòng chọn khung giờ khác.";
+                String overlapMessage = "The chef already has a booking during this time on " + detailDto.getSessionDate() + ". Please choose a different time slot.";
                 overlapMessages.add(overlapMessage);
             } else {
                 BookingDetail detail = bookingDetailService.createBookingDetail(booking, detailDto);
@@ -1750,56 +1758,86 @@ public class BookingServiceImpl implements BookingService {
                             .build());
                 }
             }
-            // Kiểm tra ngày sửa < hôm nay với PAID/DEPOSITED → refund
             else if (isPaidStatus && Duration.between(booking.getUpdatedAt(), now).toHours() > 6) {
                 // Kiểm tra đã hoàn tiền chưa
                 boolean hasRefund = customerTransactionRepository
                         .existsByBookingIdAndTransactionType(booking.getId(), "REFUND");
                 if (hasRefund) continue;
-                String transactionType = switch (status) {
-                    case "PAID" -> "PAYMENT";
-                    case "DEPOSITED", "PAID_FIRST_CYCLE" -> "INITIAL_PAYMENT";
-                    default -> null;
-                };
-                List<CustomerTransaction> transactions = customerTransactionRepository
-                        .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(
-                                booking.getId(), transactionType, "COMPLETED");
-                if (transactions.isEmpty()) continue;
-                CustomerTransaction original = transactions.get(0);
-                Wallet wallet = original.getWallet();
-                BigDecimal refundAmount = original.getAmount();
+                List<CustomerTransaction> refundList = new ArrayList<>();
 
-                // Cập nhật ví
-                wallet.setBalance(wallet.getBalance().add(refundAmount));
-                walletRepository.save(wallet);
-                // Giao dịch hoàn tiền
-                CustomerTransaction refund = CustomerTransaction.builder()
-                        .wallet(wallet)
-                        .booking(booking)
-                        .transactionType("REFUND")
-                        .amount(refundAmount)
-                        .description("Refund for overdue booking")
-                        .status("COMPLETED")
-                        .isDeleted(false)
-                        .build();
-                customerTransactionRepository.save(refund);
-                // Cập nhật booking
+                if (status.equalsIgnoreCase("PAID")) {
+                    refundList.addAll(customerTransactionRepository
+                            .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(
+                                    booking.getId(), "PAYMENT", "COMPLETED"));
+                } else if (status.equalsIgnoreCase("DEPOSITED")) {
+                    refundList.addAll(customerTransactionRepository
+                            .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(
+                                    booking.getId(), "INITIAL_PAYMENT", "COMPLETED"));
+                } else if (status.equalsIgnoreCase("PAID_FIRST_CYCLE")) {
+                    refundList.addAll(customerTransactionRepository
+                            .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(
+                                    booking.getId(), "INITIAL_PAYMENT", "COMPLETED"));
+                    refundList.addAll(customerTransactionRepository
+                            .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(
+                                    booking.getId(), "PAYMENT", "COMPLETED"));
+                }
+                if (refundList.isEmpty()) continue;
+                BigDecimal totalRefund = BigDecimal.ZERO;
+                Wallet wallet = null;
+
+                for (CustomerTransaction transaction : refundList) {
+                    if (wallet == null) wallet = transaction.getWallet();
+                    totalRefund = totalRefund.add(transaction.getAmount());
+
+                    CustomerTransaction refund = CustomerTransaction.builder()
+                            .wallet(transaction.getWallet())
+                            .booking(booking)
+                            .transactionType("REFUND")
+                            .amount(transaction.getAmount())
+                            .description("Refund for " + transaction.getTransactionType() + " due to overdue booking")
+                            .status("COMPLETED")
+                            .isDeleted(false)
+                            .build();
+                    customerTransactionRepository.save(refund);
+                }
+                // Cập nhật số dư ví
+                if (wallet != null) {
+                    wallet.setBalance(wallet.getBalance().add(totalRefund));
+                    walletRepository.save(wallet);
+                }
+                // Cập nhật trạng thái booking
                 booking.setStatus("OVERDUE");
                 bookingRepository.save(booking);
-                // Hủy các bookingDetail
+                // Hủy các buổi booking
                 for (BookingDetail detail : booking.getBookingDetails()) {
-                    detail.setStatus("CANCELED");
+                    detail.setStatus("OVERDUE");
                 }
                 bookingDetailRepository.saveAll(booking.getBookingDetails());
+                if ("LONG_TERM".equalsIgnoreCase(booking.getBookingType())) {
+                    List<PaymentCycle> cycles = paymentCycleRepository
+                            .findByBookingId(booking.getId());
+                    for (PaymentCycle cycle : cycles) {
+                        if (cycle.getCycleOrder() == 1 && status.equals("PAID_FIRST_CYCLE")) {
+                            cycle.setStatus("REFUNDED");
+                        } else {
+                            cycle.setStatus("OVERDUE");
+                        }
+                    }
+                    paymentCycleRepository.saveAll(cycles);
+                }
+
                 // Gửi thông báo
                 notificationService.sendPushNotification(NotificationRequest.builder()
                         .userId(booking.getCustomer().getId())
                         .title("Booking Overdue & Refunded")
-                        .body("Your booking on " + booking.getCreatedAt() + " has expired and refunded " + refundAmount)
+                        .body("Your booking on " + booking.getCreatedAt() +
+                                " has expired and a total of " + totalRefund + " has been refunded to your wallet.")
                         .bookingId(booking.getId())
                         .screen("CustomerWalletScreen")
                         .build());
-                chefService.updateReputation(booking.getChef(),-1);
+
+                // Trừ uy tín đầu bếp
+                chefService.updateReputation(booking.getChef(), -1);
             }
         }
     }

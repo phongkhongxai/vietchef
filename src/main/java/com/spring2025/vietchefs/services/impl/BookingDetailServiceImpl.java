@@ -78,7 +78,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     @Override
     public BookingDetail createBookingDetail(Booking booking, BookingDetailRequestDto dto) {
         if (isOverlappingWithExistingBookings(booking.getChef(), dto.getSessionDate(), dto.getTimeBeginTravel(), dto.getStartTime())) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef đã có lịch trong khoảng thời gian này cho ngày "+dto.getSessionDate()+". Vui lòng chọn khung giờ khác.");
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "The chef already has a booking during this time on " + dto.getSessionDate() + ". Please choose a different time slot.");
         }
         BookingDetail detail =  new BookingDetail();
         detail.setBooking(booking);
@@ -485,7 +485,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chỉ được upload tối đa 2 ảnh.");
         }
         if (bookingDetail.getStatus().equalsIgnoreCase("IN_PROGRESS")
-                && !completedTime.isBefore(bookingDetail.getTimeBeginCook())
+                && !completedTime.isBefore(bookingDetail.getTimeBeginCook()) && !completedTime.isAfter(bookingDetail.getStartTime().plusHours(2))
                 ) {
             for (MultipartFile file : files) {
                 try {
@@ -837,6 +837,62 @@ public class BookingDetailServiceImpl implements BookingDetailService {
             }
         }
     }
+    @Scheduled(cron = "0 5 0 * * *") //mỗi đêm 0h5p
+    @Transactional
+    public void markOverdueBookingDetails() {
+        LocalDateTime now = LocalDateTime.now();
+
+        List<BookingDetail> details = bookingDetailRepository
+                .findAllByStatusAndIsDeletedFalse("SCHEDULED_COMPLETE");
+
+        for (BookingDetail detail : details) {
+            Booking booking = detail.getBooking();
+            if (detail.getSessionDate().isBefore(LocalDate.now())) {
+                detail.setStatus("OVERDUE");
+                bookingDetailRepository.save(detail);
+                if(booking.getBookingType().equalsIgnoreCase("SINGLE")){
+                    booking.setStatus("OVERDUE");
+                    bookingRepository.save(booking);
+                }
+                CustomerTransaction paymentTransaction = getPaymentTransaction(detail);
+                if (paymentTransaction != null) {
+                    Wallet customerWallet = paymentTransaction.getWallet();
+                    customerWallet.setBalance(customerWallet.getBalance().add(detail.getTotalPrice()));
+                    walletRepository.save(customerWallet);
+
+                    CustomerTransaction refundTransaction = CustomerTransaction.builder()
+                            .wallet(customerWallet)
+                            .booking(booking)
+                            .transactionType("REFUND")
+                            .amount(detail.getTotalPrice())
+                            .description("Refund for session was not fulfilled on time.")
+                            .status("COMPLETED")
+                            .isDeleted(false)
+                            .build();
+                    customerTransactionRepository.save(refundTransaction);
+                }
+                NotificationRequest chefNotification = NotificationRequest.builder()
+                        .userId(booking.getChef().getUser().getId())
+                        .title("Missed Cooking Session")
+                        .body("You missed the scheduled cooking session on " + detail.getSessionDate() +
+                                ". It has been marked as overdue, and your reputation score has been reduced.")
+                        .bookingDetailId(detail.getId())
+                        .screen("BookingDetail")
+                        .build();
+                notificationService.sendPushNotification(chefNotification);
+                NotificationRequest customerNotification = NotificationRequest.builder()
+                        .userId(booking.getCustomer().getId())
+                        .title("Session Canceled")
+                        .body("Your session on " + detail.getSessionDate() +
+                                " was not fulfilled on time. A refund will be issued to your wallet.")
+                        .bookingDetailId(detail.getId())
+                        .screen("BookingDetail")
+                        .build();
+                notificationService.sendPushNotification(customerNotification);
+            }
+        }
+    }
+
 
     private void completeBookingDetail(BookingDetail detail) {
         Booking booking = detail.getBooking();
@@ -926,6 +982,6 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                 .bookingId(booking.getId())
                 .build()
         );
-        chefService.updateReputation(chef, 1);
+        chefService.updateReputation(chef, 3);
     }
 }
