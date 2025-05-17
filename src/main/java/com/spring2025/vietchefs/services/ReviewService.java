@@ -14,6 +14,7 @@ public interface ReviewService {
     ReviewResponse getReviewById(Long id);
     // List<ReviewResponse> getReviewsByChef(Long chefId);
     Page<ReviewResponse> getReviewsByChef(Long chefId, Pageable pageable);
+    Page<ReviewResponse> getFilteredReviewsByChef(Map<String, Object> filters, Pageable pageable);
     List<ReviewResponse> getReviewsByUser(Long userId);
     ReviewResponse getReviewByBooking(Long bookingId);
     

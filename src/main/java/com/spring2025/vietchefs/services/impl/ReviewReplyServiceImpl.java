@@ -11,6 +11,8 @@ import com.spring2025.vietchefs.repositories.ReviewRepository;
 import com.spring2025.vietchefs.repositories.UserRepository;
 import com.spring2025.vietchefs.services.ReviewReplyService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -99,6 +101,16 @@ public class ReviewReplyServiceImpl implements ReviewReplyService {
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+    }
+    
+    @Override
+    public Page<ReviewReplyResponse> getRepliesByReviewPaginated(Long reviewId, Pageable pageable) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new ResourceNotFoundException("Review not found with id: " + reviewId));
+        
+        Page<ReviewReply> repliesPage = reviewReplyRepository.findByReviewAndIsDeletedFalse(review, pageable);
+        
+        return repliesPage.map(this::mapToResponse);
     }
     
     private ReviewReplyResponse mapToResponse(ReviewReply reply) {
