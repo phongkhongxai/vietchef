@@ -27,4 +27,5 @@ public class ReviewResponse {
     private LocalDateTime chefResponseAt;
     private LocalDateTime createAt;
     private Map<String, Long> reactionCounts;
+    private List<ReviewReplyResponse> replies;
 } 
