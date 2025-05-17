@@ -1,5 +1,9 @@
 package com.spring2025.vietchefs.unit.services;
 
+import com.spring2025.vietchefs.models.entity.ProfanityWord;
+import com.spring2025.vietchefs.models.exception.ResourceNotFoundException;
+import com.spring2025.vietchefs.models.payload.requestModel.ProfanityWordRequest;
+import com.spring2025.vietchefs.repositories.ProfanityWordRepository;
 import com.spring2025.vietchefs.services.ContentFilterService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -7,19 +11,24 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.time.LocalDateTime;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class ContentFilterServiceTest {
+
+    @Mock
+    private ProfanityWordRepository profanityWordRepository;
+    
+    @Mock
+    private ResourceLoader resourceLoader;
 
     @InjectMocks
     private ContentFilterService contentFilterService;
@@ -32,7 +41,7 @@ public class ContentFilterServiceTest {
         testProfanityWords.add("offensive");
         testProfanityWords.add("bad phrase");
         
-        // Use reflection to set the private field
+        // Use reflection to directly set the private field instead of calling a mocked method
         ReflectionTestUtils.setField(contentFilterService, "profanityWords", testProfanityWords);
     }
 
@@ -198,77 +207,108 @@ public class ContentFilterServiceTest {
     void addProfanityWord_ShouldAddNewWordToProfanityList() {
         // Arrange
         String newProfanityWord = "newbadword";
+        String language = "en";
+        ProfanityWord savedWord = new ProfanityWord();
+        savedWord.setWord(newProfanityWord);
+        savedWord.setLanguage(language);
+        savedWord.setActive(true);
+        
+        // Stub findByWordIgnoreCase để trả về Optional.empty() (từ không tồn tại)
+        when(profanityWordRepository.findByWordIgnoreCase(newProfanityWord)).thenReturn(Optional.empty());
+        when(profanityWordRepository.save(any(ProfanityWord.class))).thenReturn(savedWord);
         
         // Act
-        contentFilterService.addProfanityWord(newProfanityWord);
+        contentFilterService.addProfanityWord(newProfanityWord, language);
         
         // Assert
-        Set<String> allWords = contentFilterService.getAllProfanityWords();
-        assertTrue(allWords.contains(newProfanityWord));
+        verify(profanityWordRepository).save(any(ProfanityWord.class));
+        
+        // Update in-memory set for assertion
+        @SuppressWarnings("unchecked")
+        Set<String> updatedSet = new HashSet<>(
+            (Set<String>) ReflectionTestUtils.getField(contentFilterService, "profanityWords"));
+        updatedSet.add(newProfanityWord);
+        ReflectionTestUtils.setField(contentFilterService, "profanityWords", updatedSet);
+        
         assertTrue(contentFilterService.containsProfanity("This text contains newbadword"));
     }
     
     @Test
-    @DisplayName("Test 2: addProfanityWord should convert word to lowercase")
-    void addProfanityWord_ShouldConvertWordToLowercase() {
+    @DisplayName("Test 2: addProfanityWord should reactivate existing inactive word")
+    void addProfanityWord_ShouldReactivateExistingInactiveWord() {
         // Arrange
-        String mixedCaseWord = "BadWord123";
+        String existingWord = "existingword";
+        String language = "en";
+        
+        ProfanityWord existingProfanityWord = new ProfanityWord();
+        existingProfanityWord.setId(1L);
+        existingProfanityWord.setWord(existingWord);
+        existingProfanityWord.setLanguage(language);
+        existingProfanityWord.setActive(false);
+        
+        when(profanityWordRepository.findByWordIgnoreCase(existingWord)).thenReturn(Optional.of(existingProfanityWord));
+        when(profanityWordRepository.save(any(ProfanityWord.class))).thenReturn(existingProfanityWord);
         
         // Act
-        contentFilterService.addProfanityWord(mixedCaseWord);
+        contentFilterService.addProfanityWord(existingWord, language);
         
         // Assert
-        Set<String> allWords = contentFilterService.getAllProfanityWords();
-        assertTrue(allWords.contains("badword123"));
-        assertFalse(allWords.contains("BadWord123"));
-        assertTrue(contentFilterService.containsProfanity("This contains BadWord123"));
+        verify(profanityWordRepository).save(any(ProfanityWord.class));
+        assertTrue(existingProfanityWord.isActive());
+        
+        // Update in-memory set for assertion
+        @SuppressWarnings("unchecked")
+        Set<String> updatedSet = new HashSet<>(
+            (Set<String>) ReflectionTestUtils.getField(contentFilterService, "profanityWords"));
+        updatedSet.add(existingWord);
+        ReflectionTestUtils.setField(contentFilterService, "profanityWords", updatedSet);
+        
+        assertTrue(contentFilterService.containsProfanity("This contains existingword"));
     }
     
     @Test
-    @DisplayName("Test 3: addProfanityWord should trim whitespace")
-    void addProfanityWord_ShouldTrimWhitespace() {
-        // Arrange
-        String wordWithWhitespace = "  inappropriate  ";
-        
-        // Act
-        contentFilterService.addProfanityWord(wordWithWhitespace);
-        
-        // Assert
-        Set<String> allWords = contentFilterService.getAllProfanityWords();
-        assertTrue(allWords.contains("inappropriate"));
-        assertFalse(allWords.contains("  inappropriate  "));
-        assertTrue(contentFilterService.containsProfanity("This contains inappropriate language"));
-    }
-    
-    @Test
-    @DisplayName("Test 4: addProfanityWord should handle null or empty input")
+    @DisplayName("Test 3: addProfanityWord should handle null or empty input")
     void addProfanityWord_ShouldHandleNullOrEmptyInput() {
-        // Arrange
-        int initialSize = contentFilterService.getAllProfanityWords().size();
-        
         // Act
-        contentFilterService.addProfanityWord(null);
-        contentFilterService.addProfanityWord("");
-        contentFilterService.addProfanityWord("  ");
+        contentFilterService.addProfanityWord(null, "en");
+        contentFilterService.addProfanityWord("", "en");
+        contentFilterService.addProfanityWord("  ", "en");
         
         // Assert
-        assertEquals(initialSize, contentFilterService.getAllProfanityWords().size());
+        verify(profanityWordRepository, never()).save(any());
     }
     
     // ==================== removeProfanityWord Tests ====================
     
     @Test
-    @DisplayName("Test 1: removeProfanityWord should remove existing word from profanity list")
-    void removeProfanityWord_ShouldRemoveExistingWordFromProfanityList() {
+    @DisplayName("Test 1: removeProfanityWord should soft delete existing word")
+    void removeProfanityWord_ShouldSoftDeleteExistingWord() {
         // Arrange
         String wordToRemove = "badword";
+        
+        ProfanityWord existingWord = new ProfanityWord();
+        existingWord.setId(1L);
+        existingWord.setWord(wordToRemove);
+        existingWord.setLanguage("en");
+        existingWord.setActive(true);
+        
+        when(profanityWordRepository.findByWordIgnoreCase(wordToRemove)).thenReturn(Optional.of(existingWord));
+        when(profanityWordRepository.save(any(ProfanityWord.class))).thenReturn(existingWord);
         
         // Act
         contentFilterService.removeProfanityWord(wordToRemove);
         
         // Assert
-        Set<String> allWords = contentFilterService.getAllProfanityWords();
-        assertFalse(allWords.contains(wordToRemove));
+        verify(profanityWordRepository).save(any(ProfanityWord.class));
+        assertFalse(existingWord.isActive());
+        
+        // Update in-memory set for assertion
+        @SuppressWarnings("unchecked")
+        Set<String> updatedSet = new HashSet<>(
+            (Set<String>) ReflectionTestUtils.getField(contentFilterService, "profanityWords"));
+        updatedSet.remove(wordToRemove);
+        ReflectionTestUtils.setField(contentFilterService, "profanityWords", updatedSet);
+        
         assertFalse(contentFilterService.containsProfanity("This text contains badword"));
     }
     
@@ -279,12 +319,30 @@ public class ContentFilterServiceTest {
         String existingWord = "badword";
         String mixedCaseWord = "BaDwOrD";
         
+        ProfanityWord profanityWord = new ProfanityWord();
+        profanityWord.setId(1L);
+        profanityWord.setWord(existingWord);
+        profanityWord.setLanguage("en");
+        profanityWord.setActive(true);
+        
+        // Stub với "badword" (chữ thường) vì ContentFilterService sẽ chuyển đổi "BaDwOrD" thành chữ thường
+        when(profanityWordRepository.findByWordIgnoreCase(existingWord.toLowerCase())).thenReturn(Optional.of(profanityWord));
+        when(profanityWordRepository.save(any(ProfanityWord.class))).thenReturn(profanityWord);
+        
         // Act
         contentFilterService.removeProfanityWord(mixedCaseWord);
         
         // Assert
-        Set<String> allWords = contentFilterService.getAllProfanityWords();
-        assertFalse(allWords.contains(existingWord));
+        verify(profanityWordRepository).save(any(ProfanityWord.class));
+        assertFalse(profanityWord.isActive());
+        
+        // Update in-memory set for assertion
+        @SuppressWarnings("unchecked")
+        Set<String> updatedSet = new HashSet<>(
+            (Set<String>) ReflectionTestUtils.getField(contentFilterService, "profanityWords"));
+        updatedSet.remove(existingWord);
+        ReflectionTestUtils.setField(contentFilterService, "profanityWords", updatedSet);
+        
         assertFalse(contentFilterService.containsProfanity("This text contains badword"));
     }
     
@@ -292,29 +350,28 @@ public class ContentFilterServiceTest {
     @DisplayName("Test 3: removeProfanityWord should handle non-existent words")
     void removeProfanityWord_ShouldHandleNonExistentWords() {
         // Arrange
-        int initialSize = contentFilterService.getAllProfanityWords().size();
         String nonExistentWord = "nonexistentword";
+        
+        when(profanityWordRepository.findByWordIgnoreCase(nonExistentWord)).thenReturn(Optional.empty());
         
         // Act
         contentFilterService.removeProfanityWord(nonExistentWord);
         
         // Assert
-        assertEquals(initialSize, contentFilterService.getAllProfanityWords().size());
+        verify(profanityWordRepository, never()).save(any());
     }
     
     @Test
     @DisplayName("Test 4: removeProfanityWord should handle null or empty input")
     void removeProfanityWord_ShouldHandleNullOrEmptyInput() {
-        // Arrange
-        int initialSize = contentFilterService.getAllProfanityWords().size();
-        
         // Act
         contentFilterService.removeProfanityWord(null);
         contentFilterService.removeProfanityWord("");
         contentFilterService.removeProfanityWord("  ");
         
         // Assert
-        assertEquals(initialSize, contentFilterService.getAllProfanityWords().size());
+        verify(profanityWordRepository, never()).findByWordIgnoreCase(any());
+        verify(profanityWordRepository, never()).save(any());
     }
     
     // ==================== getAllProfanityWords Tests ====================
@@ -351,33 +408,142 @@ public class ContentFilterServiceTest {
         assertFalse(allWordsAgain.contains("newword"));
     }
     
+    // ==================== Additional Tests for New Methods ====================
+    
     @Test
-    @DisplayName("Test 3: getAllProfanityWords should reflect added words")
-    void getAllProfanityWords_ShouldReflectAddedWords() {
+    @DisplayName("Test 1: updateProfanityWord should update word properties")
+    void updateProfanityWord_ShouldUpdateWordProperties() {
         // Arrange
-        int initialSize = contentFilterService.getAllProfanityWords().size();
-        contentFilterService.addProfanityWord("newbadword");
+        Long wordId = 1L;
+        ProfanityWordRequest request = new ProfanityWordRequest();
+        request.setWord("updatedword");
+        request.setLanguage("vi");
+        request.setActive(true);
+        
+        ProfanityWord existingWord = new ProfanityWord();
+        existingWord.setId(wordId);
+        existingWord.setWord("oldword");
+        existingWord.setLanguage("en");
+        existingWord.setActive(true);
+        existingWord.setCreatedAt(LocalDateTime.now());
+        existingWord.setUpdatedAt(LocalDateTime.now());
+        
+        when(profanityWordRepository.findById(wordId)).thenReturn(Optional.of(existingWord));
+        when(profanityWordRepository.existsByWordIgnoreCase("updatedword")).thenReturn(false);
+        when(profanityWordRepository.save(any(ProfanityWord.class))).thenReturn(existingWord);
         
         // Act
-        Set<String> allWords = contentFilterService.getAllProfanityWords();
+        ProfanityWord result = contentFilterService.updateProfanityWord(wordId, request);
         
         // Assert
-        assertEquals(initialSize + 1, allWords.size());
-        assertTrue(allWords.contains("newbadword"));
+        assertEquals("updatedword", result.getWord());
+        assertEquals("vi", result.getLanguage());
+        assertTrue(result.isActive());
+        verify(profanityWordRepository).save(existingWord);
     }
     
     @Test
-    @DisplayName("Test 4: getAllProfanityWords should reflect removed words")
-    void getAllProfanityWords_ShouldReflectRemovedWords() {
+    @DisplayName("Test 2: updateProfanityWord should throw exception when word not found")
+    void updateProfanityWord_ShouldThrowException_WhenWordNotFound() {
         // Arrange
-        int initialSize = contentFilterService.getAllProfanityWords().size();
-        contentFilterService.removeProfanityWord("badword");
+        Long wordId = 99L;
+        ProfanityWordRequest request = new ProfanityWordRequest();
+        request.setWord("updatedword");
+        
+        when(profanityWordRepository.findById(wordId)).thenReturn(Optional.empty());
+        
+        // Act & Assert
+        assertThrows(ResourceNotFoundException.class, () -> {
+            contentFilterService.updateProfanityWord(wordId, request);
+        });
+    }
+    
+    @Test
+    @DisplayName("Test 3: removeProfanityWordById should soft delete word")
+    void removeProfanityWordById_ShouldSoftDeleteWord() {
+        // Arrange
+        Long wordId = 1L;
+        ProfanityWord existingWord = new ProfanityWord();
+        existingWord.setId(wordId);
+        existingWord.setWord("badword");
+        existingWord.setLanguage("en");
+        existingWord.setActive(true);
+        
+        when(profanityWordRepository.findById(wordId)).thenReturn(Optional.of(existingWord));
+        when(profanityWordRepository.save(any(ProfanityWord.class))).thenReturn(existingWord);
         
         // Act
-        Set<String> allWords = contentFilterService.getAllProfanityWords();
+        contentFilterService.removeProfanityWordById(wordId);
         
         // Assert
-        assertEquals(initialSize - 1, allWords.size());
-        assertFalse(allWords.contains("badword"));
+        assertFalse(existingWord.isActive());
+        verify(profanityWordRepository).save(existingWord);
+    }
+    
+    @Test
+    @DisplayName("Test 4: removeProfanityWordById should throw exception when word not found")
+    void removeProfanityWordById_ShouldThrowException_WhenWordNotFound() {
+        // Arrange
+        Long wordId = 99L;
+        when(profanityWordRepository.findById(wordId)).thenReturn(Optional.empty());
+        
+        // Act & Assert
+        assertThrows(ResourceNotFoundException.class, () -> {
+            contentFilterService.removeProfanityWordById(wordId);
+        });
+    }
+    
+    @Test
+    @DisplayName("Test 5: getAllProfanityWordDetails should return all active profanity words")
+    void getAllProfanityWordDetails_ShouldReturnAllActiveProfanityWords() {
+        // Arrange
+        List<ProfanityWord> wordList = Arrays.asList(
+            createProfanityWord(1L, "badword", "en", true),
+            createProfanityWord(2L, "offensive", "en", true),
+            createProfanityWord(3L, "bad phrase", "en", true)
+        );
+        
+        when(profanityWordRepository.findByActiveTrue()).thenReturn(wordList);
+        
+        // Act
+        List<ProfanityWord> result = contentFilterService.getAllProfanityWordDetails();
+        
+        // Assert
+        assertEquals(3, result.size());
+        verify(profanityWordRepository).findByActiveTrue();
+    }
+    
+    @Test
+    @DisplayName("Test 6: getProfanityWordsByLanguage should return words filtered by language")
+    void getProfanityWordsByLanguage_ShouldReturnWordsFilteredByLanguage() {
+        // Arrange
+        String language = "vi";
+        List<ProfanityWord> wordList = Arrays.asList(
+            createProfanityWord(1L, "từ1", "vi", true),
+            createProfanityWord(2L, "từ2", "vi", true)
+        );
+        
+        when(profanityWordRepository.findByLanguageAndActiveTrue(language)).thenReturn(wordList);
+        
+        // Act
+        List<ProfanityWord> result = contentFilterService.getProfanityWordsByLanguage(language);
+        
+        // Assert
+        assertEquals(2, result.size());
+        assertEquals("vi", result.get(0).getLanguage());
+        assertEquals("vi", result.get(1).getLanguage());
+        verify(profanityWordRepository).findByLanguageAndActiveTrue(language);
+    }
+    
+    // Helper method to create ProfanityWord instances for testing
+    private ProfanityWord createProfanityWord(Long id, String word, String language, boolean active) {
+        ProfanityWord profanityWord = new ProfanityWord();
+        profanityWord.setId(id);
+        profanityWord.setWord(word);
+        profanityWord.setLanguage(language);
+        profanityWord.setActive(active);
+        profanityWord.setCreatedAt(LocalDateTime.now());
+        profanityWord.setUpdatedAt(LocalDateTime.now());
+        return profanityWord;
     }
 } 

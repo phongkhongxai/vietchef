@@ -441,8 +441,6 @@ public class ChefBlockedDateServiceTest {
             when(chefRepository.findByUser(testUser)).thenReturn(Optional.of(testChef));
             when(blockedDateRepository.findByChefAndBlockedDateAndIsDeletedFalse(eq(testChef), any(LocalDate.class)))
                 .thenReturn(Collections.emptyList());
-            when(scheduleRepository.findByChefAndDayOfWeekAndIsDeletedFalse(eq(testChef), anyInt()))
-                .thenReturn(Collections.emptyList());
             when(bookingConflictService.hasBookingConflict(
                     eq(testChef), 
                     any(LocalDate.class), 
@@ -637,8 +635,6 @@ public class ChefBlockedDateServiceTest {
             when(chefRepository.findByUser(testUser)).thenReturn(Optional.of(testChef));
             when(blockedDateRepository.findByChefAndBlockedDateAndIsDeletedFalse(eq(testChef), any(LocalDate.class)))
                 .thenReturn(Collections.emptyList());
-            when(scheduleRepository.findByChefAndDayOfWeekAndIsDeletedFalse(eq(testChef), anyInt()))
-                .thenReturn(Collections.emptyList());
             when(bookingConflictService.hasBookingConflict(
                     eq(testChef), 
                     any(LocalDate.class), 
@@ -771,8 +767,6 @@ public class ChefBlockedDateServiceTest {
             when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
             when(chefRepository.findByUser(testUser)).thenReturn(Optional.of(testChef));
             when(blockedDateRepository.findByChefAndBlockedDateAndIsDeletedFalse(eq(testChef), any(LocalDate.class)))
-                .thenReturn(Collections.emptyList());
-            when(scheduleRepository.findByChefAndDayOfWeekAndIsDeletedFalse(eq(testChef), anyInt()))
                 .thenReturn(Collections.emptyList());
                 
             // Mock booking conflict on the first day
