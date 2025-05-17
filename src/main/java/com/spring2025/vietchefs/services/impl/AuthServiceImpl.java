@@ -369,7 +369,8 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User Role not found."));
         user.setRole(userRole);
         user.setEmailVerified(false);
-        user.setAvatarUrl("default");
+        String avatarUrl = "https://api.dicebear.com/7.x/initials/svg?seed=" + signupDto.getUsername();
+        user.setAvatarUrl(avatarUrl);
         emailVerificationService.sendVerificationCode(user);
         userRepository.save(user);
         return "Account registered successfully! Please check your email for the verification code.";
