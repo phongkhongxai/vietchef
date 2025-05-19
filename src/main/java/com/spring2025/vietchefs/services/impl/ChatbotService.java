@@ -86,8 +86,7 @@ public class ChatbotService {
         }
 
         List<Document> similarDocuments = vectorStore.similaritySearch(
-                SearchRequest.builder().query(message).topK(2).build());
-
+                SearchRequest.builder().query(message).topK(3).build());
         String context = similarDocuments.stream()
                 .map(Document::getText)
                 .collect(Collectors.joining("\n\n"));
