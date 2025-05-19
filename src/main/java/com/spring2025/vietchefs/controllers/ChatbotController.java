@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/chatbox")
+@RequestMapping("/api/v1/chatbot")
 public class ChatbotController {
 
     private final ChatbotService chatbotService;
