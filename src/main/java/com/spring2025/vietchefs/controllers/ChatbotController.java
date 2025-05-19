@@ -24,7 +24,7 @@ public class ChatbotController {
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_CHEF')")
     @PostMapping("/ask")
-    public ResponseEntity<ChatboxResponse> chatWithAI(@RequestParam(value = "message", defaultValue = "Sơn Tùng sinh ngày tháng năm nào?") String message) {
+    public ResponseEntity<ChatboxResponse> chatWithAI(@RequestParam(value = "message", defaultValue = "Vietchef là gì?") String message) {
         return ResponseEntity.ok(chatbotService.processMessage(message));
     }
 }
