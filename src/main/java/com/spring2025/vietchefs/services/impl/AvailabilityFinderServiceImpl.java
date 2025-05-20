@@ -88,6 +88,15 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
             Long menuId, List<Long> dishIds, int guestCount, 
             int maxDishesPerMeal) {
         
+        System.out.println("[DEBUG] --- findAvailableTimeSlotsWithInSingleDate called ---");
+        System.out.println("[DEBUG] chefId: " + chefId);
+        System.out.println("[DEBUG] date: " + date);
+        System.out.println("[DEBUG] customerLocation: " + customerLocation);
+        System.out.println("[DEBUG] menuId: " + menuId);
+        System.out.println("[DEBUG] dishIds: " + dishIds);
+        System.out.println("[DEBUG] guestCount: " + guestCount);
+        System.out.println("[DEBUG] maxDishesPerMeal: " + maxDishesPerMeal);
+        
         // Kiểm tra tham số đầu vào
         if (date == null) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Date cannot be null");
@@ -101,11 +110,13 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         
         // Lưu thời gian request hiện tại
         LocalDateTime requestTime = LocalDateTime.now();
+        System.out.println("[DEBUG] requestTime: " + requestTime);
         
         // Lấy thông tin chef
         Chef chef = chefRepository.findById(chefId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, 
                     "Chef not found with id: " + chefId));
+        System.out.println("[DEBUG] Chef address: " + chef.getAddress());
         
         String chefAddress = chef.getAddress();
         if (chefAddress == null || chefAddress.trim().isEmpty()) {
@@ -116,12 +127,13 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         String chefTimezone = timeZoneService.getTimezoneFromAddress(chefAddress);
         String customerTimezone = timeZoneService.getTimezoneFromAddress(customerLocation);
         
-        System.out.println("Chef timezone: " + chefTimezone);
-        System.out.println("Customer timezone: " + customerTimezone);
+        System.out.println("[DEBUG] Chef timezone: " + chefTimezone);
+        System.out.println("[DEBUG] Customer timezone: " + customerTimezone);
         
         // Tính thời gian di chuyển từ vị trí của chef đến vị trí khách hàng
         DistanceResponse distanceResponse = distanceService.calculateDistanceAndTime(chefAddress, customerLocation);
         BigDecimal travelTimeHours = distanceResponse.getDurationHours();
+        System.out.println("[DEBUG] travelTimeHours: " + travelTimeHours);
         
         // Nếu không thể tính toán thời gian di chuyển
         if (travelTimeHours.compareTo(BigDecimal.ZERO) == 0) {
@@ -137,13 +149,19 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         } else {
             cookTimeHours = calculateService.calculateMaxCookTime(chefId, maxDishesPerMeal, guestCount);
         }
+        System.out.println("[DEBUG] cookTimeHours: " + cookTimeHours);
         
         // Tính tổng thời gian chuẩn bị (giờ)
         int totalPrepMinutes = (int)(cookTimeHours.floatValue() * 60) + (int)(travelTimeHours.floatValue() * 60);
+        System.out.println("[DEBUG] totalPrepMinutes: " + totalPrepMinutes);
         
         // Sử dụng minDuration null để lấy tất cả các khung giờ trống cơ bản
         // Các slots này đã loại bỏ các booking time
-        List<AvailableTimeSlotResponse> availableSlots = findAvailableTimeSlots(chef, date, date);
+        List<AvailableTimeSlotResponse> availableSlots = findAvailableTimeSlots(chef, date, date, requestTime);
+        System.out.println("[DEBUG] availableSlots.size: " + availableSlots.size());
+        for (AvailableTimeSlotResponse slot : availableSlots) {
+            System.out.println("[DEBUG] Slot before adjust: " + slot.getStartTime() + " - " + slot.getEndTime());
+        }
         
         // Kết quả cuối cùng
         List<AvailableTimeSlotResponse> adjustedSlots = new ArrayList<>();
@@ -153,7 +171,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
             // Cần điều chỉnh thời gian bắt đầu để tính đến thời gian nấu ăn và di chuyển
             LocalTime adjustedStartTime = slot.getStartTime().plusMinutes(totalPrepMinutes);
             
-            // Nếu thời gian bắt đầu điều chỉnh vẫn trước thời gian kết thúc slot
+            System.out.println("[DEBUG] Try adjust slot: " + slot.getStartTime() + " -> " + adjustedStartTime + " (end: " + slot.getEndTime() + ")");
             if (adjustedStartTime.isBefore(slot.getEndTime())) {
                 AvailableTimeSlotResponse adjustedSlot = new AvailableTimeSlotResponse();
                 adjustedSlot.setChefId(slot.getChefId());
@@ -170,12 +188,16 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                 if (adjustedSlot.getDurationMinutes() >= 30) {
                     adjustedSlots.add(adjustedSlot);
                 }
+                System.out.println("[DEBUG] Adjusted slot: " + adjustedStartTime + " - " + slot.getEndTime());
+            } else {
+                System.out.println("[DEBUG] Slot skipped, adjustedStartTime >= endTime");
             }
-            // Nếu thời gian bắt đầu điều chỉnh sau thời gian kết thúc, bỏ qua slot này
         }
         
         // Sắp xếp kết quả theo thời gian bắt đầu
         Collections.sort(adjustedSlots, Comparator.comparing(AvailableTimeSlotResponse::getStartTime));
+        
+        System.out.println("[DEBUG] adjustedSlots.size: " + adjustedSlots.size());
         
         // Debug current slots before filtering
         System.out.println("DEBUG: Before final filtering, found " + adjustedSlots.size() + " slots");
@@ -221,20 +243,18 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                 })
                 .collect(Collectors.toList());
         
-        System.out.println("DEBUG: After final filtering, found " + finalSlots.size() + " slots");
+        System.out.println("[DEBUG] finalSlots.size: " + finalSlots.size());
+        for (AvailableTimeSlotResponse slot : finalSlots) {
+            System.out.println("[DEBUG] Final slot: " + slot.getStartTime() + " - " + slot.getEndTime());
+        }
         
         // Lọc các khung giờ theo business rule: phải sau thời gian request ít nhất 24h
-        List<AvailableTimeSlotResponse> validTimeSlots = finalSlots.stream()
-                .filter(slot -> {
-                    // Tạo LocalDateTime từ date và startTime của slot
-                    LocalDateTime slotStartDateTime = LocalDateTime.of(slot.getDate(), slot.getStartTime());
-                    
-                    // Kiểm tra xem slot có sau thời gian request ít nhất 24h không
-                    return slotStartDateTime.isAfter(requestTime.plusHours(24));
-                })
-                .collect(Collectors.toList());
+        List<AvailableTimeSlotResponse> validTimeSlots = finalSlots;
         
-        System.out.println("DEBUG: After 24h business rule filtering, found " + validTimeSlots.size() + " slots");
+        System.out.println("[DEBUG] validTimeSlots.size: " + validTimeSlots.size());
+        for (AvailableTimeSlotResponse slot : validTimeSlots) {
+            System.out.println("[DEBUG] Valid slot: " + slot.getStartTime() + " - " + slot.getEndTime());
+        }
         
         // Convert time slots from chef's timezone to customer's timezone
         List<AvailableTimeSlotResponse> convertedSlots = new ArrayList<>();
@@ -260,6 +280,11 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
             convertedSlot.setNote(slot.getNote());
             
             convertedSlots.add(convertedSlot);
+        }
+        
+        System.out.println("[DEBUG] convertedSlots.size: " + convertedSlots.size());
+        for (AvailableTimeSlotResponse slot : convertedSlots) {
+            System.out.println("[DEBUG] Converted slot: " + slot.getStartTime() + " - " + slot.getEndTime());
         }
         
         // Check for day boundary crossings and adjust
@@ -300,7 +325,11 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                 .comparing(AvailableTimeSlotResponse::getDate)
                 .thenComparing(AvailableTimeSlotResponse::getStartTime));
         
-        System.out.println("DEBUG: After timezone conversion, returning " + adjustedConvertedSlots.size() + " slots");
+        System.out.println("[DEBUG] adjustedConvertedSlots.size: " + adjustedConvertedSlots.size());
+        for (AvailableTimeSlotResponse slot : adjustedConvertedSlots) {
+            System.out.println("[DEBUG] Adjusted converted slot: " + slot.getDate() + " " + slot.getStartTime() + " - " + slot.getEndTime());
+        }
+        
         return adjustedConvertedSlots;
     }
 
@@ -365,7 +394,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
             int totalPrepMinutes = (int)(cookTimeHours.floatValue() * 60) + (int)(travelTimeHours.floatValue() * 60);
 
             // Lấy các slots đã loại bỏ bookings
-            List<AvailableTimeSlotResponse> availableSlots = findAvailableTimeSlots(chef, date, date);
+            List<AvailableTimeSlotResponse> availableSlots = findAvailableTimeSlots(chef, date, date, requestTime);
             
             // Kiểm tra từng khung giờ trống và áp dụng thời gian chuẩn bị
             for (AvailableTimeSlotResponse slot : availableSlots) {
@@ -446,15 +475,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         System.out.println("DEBUG: After final filtering, found " + finalSlots.size() + " slots");
         
         // Lọc các khung giờ theo business rule: phải sau thời gian request ít nhất 24h
-        List<AvailableTimeSlotResponse> validTimeSlots = finalSlots.stream()
-                .filter(slot -> {
-                    // Tạo LocalDateTime từ date và startTime của slot
-                    LocalDateTime slotStartDateTime = LocalDateTime.of(slot.getDate(), slot.getStartTime());
-                    
-                    // Kiểm tra xem slot có sau thời gian request ít nhất 24h không
-                    return slotStartDateTime.isAfter(requestTime.plusHours(24));
-                })
-                .collect(Collectors.toList());
+        List<AvailableTimeSlotResponse> validTimeSlots = finalSlots;
         
         System.out.println("DEBUG: After 24h business rule filtering, found " + validTimeSlots.size() + " slots");
         
@@ -530,7 +551,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
      * Tìm tất cả các khung giờ trống cho một chef trong khoảng ngày
      */
     private List<AvailableTimeSlotResponse> findAvailableTimeSlots(
-            Chef chef, LocalDate startDate, LocalDate endDate) {
+            Chef chef, LocalDate startDate, LocalDate endDate, LocalDateTime requestTime) {
         
         // Using default preparation and cleanup times directly
         int prepTimeMinutes = DEFAULT_PREP_TIME_MINUTES;
@@ -560,7 +581,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
             for (ChefSchedule schedule : schedules) {
                 // Tìm các khung giờ trống trong lịch làm việc
                 List<AvailableTimeSlotResponse> slotsInSchedule = findAvailableSlotsInSchedule(
-                        chef, currentDate, schedule, blockedDates, prepTimeMinutes, cleanupTimeMinutes);
+                        chef, currentDate, schedule, blockedDates, prepTimeMinutes, cleanupTimeMinutes, requestTime);
                 
                 availableSlots.addAll(slotsInSchedule);
             }
@@ -581,7 +602,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
      */
     public List<AvailableTimeSlotResponse> findAvailableSlotsInSchedule(
             Chef chef, LocalDate date, ChefSchedule schedule, 
-            List<ChefBlockedDate> blockedDates, int prepTimeMinutes, int cleanupTimeMinutes) {
+            List<ChefBlockedDate> blockedDates, int prepTimeMinutes, int cleanupTimeMinutes, LocalDateTime requestTime) {
         
         List<AvailableTimeSlotResponse> availableSlots = new ArrayList<>();
         
@@ -646,7 +667,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
                 if (hasTimeOverlap(scheduleStart, scheduleEnd, blockedStart, blockedEnd)) {
                     // Create a slot before the blocked period if there's enough time
                     if (currentTime.isBefore(blockedStart)) {
-                        createAndAddSlot(availableSlots, chef, date, currentTime, blockedStart);
+                        createAndAddSlot(availableSlots, chef, date, currentTime, blockedStart, requestTime);
                     }
                     
                     // Move current time to after this blocked date
@@ -661,7 +682,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
             
             // Add one final slot after the last blocked date (if any remaining time)
             if (currentTime.isBefore(scheduleEnd)) {
-                createAndAddSlot(availableSlots, chef, date, currentTime, scheduleEnd);
+                createAndAddSlot(availableSlots, chef, date, currentTime, scheduleEnd, requestTime);
             }
             
             return availableSlots;
@@ -704,7 +725,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
             if (event.getType() == EventType.BOOKING_START || event.getType() == EventType.BLOCKED_START) {
                 // If we're going from available to blocked, create a slot
                 if (blockLevel == 0 && currentTime.isBefore(event.getTime())) {
-                    createAndAddSlot(availableSlots, chef, date, currentTime, event.getTime());
+                    createAndAddSlot(availableSlots, chef, date, currentTime, event.getTime(), requestTime);
                 }
                 blockLevel++;
             } else { // BOOKING_END or BLOCKED_END
@@ -718,7 +739,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         
         // Add one final slot after the last event (if any remaining time and not blocked)
         if (blockLevel == 0 && currentTime.isBefore(scheduleEnd)) {
-            createAndAddSlot(availableSlots, chef, date, currentTime, scheduleEnd);
+            createAndAddSlot(availableSlots, chef, date, currentTime, scheduleEnd, requestTime);
         }
         
         return availableSlots;
@@ -759,7 +780,7 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
     
     // Helper method to create and add a slot if it's long enough
     private void createAndAddSlot(List<AvailableTimeSlotResponse> slots, Chef chef, LocalDate date, 
-                                LocalTime startTime, LocalTime endTime) {
+                                 LocalTime startTime, LocalTime endTime, LocalDateTime requestTime) {
         // Create slot
         AvailableTimeSlotResponse slot = new AvailableTimeSlotResponse();
         slot.setChefId(chef.getId());
@@ -767,12 +788,34 @@ public class AvailabilityFinderServiceImpl implements AvailabilityFinderService 
         slot.setDate(date);
         slot.setStartTime(startTime);
         slot.setEndTime(endTime);
-        slot.setDurationMinutes((int) Duration.between(startTime, endTime).toMinutes());
-        
-        // Only add slot if it's at least 30 minutes
-        if (slot.getDurationMinutes() >= 30) {
-            slots.add(slot);
+        // --- Begin new logic for 24h rule ---
+        LocalDateTime minStart = requestTime != null ? requestTime.plusHours(24) : null;
+        LocalDateTime slotStartDateTime = LocalDateTime.of(date, startTime);
+        LocalDateTime slotEndDateTime = LocalDateTime.of(date, endTime);
+        if (slotEndDateTime.isBefore(slotStartDateTime)) {
+            // Slot qua ngày hôm sau
+            slotEndDateTime = slotEndDateTime.plusDays(1);
         }
+        if (minStart == null || slotEndDateTime.isAfter(minStart)) {
+            // Nếu slot bắt đầu trước minStart, cắt startTime = minStart
+            LocalTime newStartTime = startTime;
+            LocalDate newDate = date;
+            if (minStart != null && slotStartDateTime.isBefore(minStart)) {
+                newStartTime = minStart.toLocalTime();
+                newDate = minStart.toLocalDate();
+            }
+            int duration = (int) Duration.between(
+                LocalDateTime.of(newDate, newStartTime), slotEndDateTime
+            ).toMinutes();
+            if (duration >= 30) {
+                slot.setDate(newDate);
+                slot.setStartTime(newStartTime);
+                slot.setEndTime(endTime);
+                slot.setDurationMinutes(duration);
+                slots.add(slot);
+            }
+        }
+        // --- End new logic for 24h rule ---
     }
     
     /**
