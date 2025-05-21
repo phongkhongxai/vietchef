@@ -34,9 +34,10 @@ public class WalletRequestServiceImpl implements WalletRequestService {
 
     @Override
     public WalletRequestDto createWithdrawalRequest(WalletRequestDto dto) {
-        if (dto.getAmount() == null || dto.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST,"Amount must be greater than zero.");
+        if (dto.getAmount() == null || dto.getAmount().compareTo(BigDecimal.valueOf(1.00)) < 0) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Amount must be at least $1.00 to process a payout.");
         }
+
         User user = userRepository.findById(dto.getUserId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"User not found."));
 
