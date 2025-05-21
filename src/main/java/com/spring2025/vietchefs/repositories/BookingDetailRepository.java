@@ -59,6 +59,12 @@ public interface BookingDetailRepository extends JpaRepository<BookingDetail, Lo
     Page<BookingDetail> findByBooking_CustomerAndStatusIgnoreCaseAndIsDeletedFalse(User user, String status, Pageable pageable);
     Page<BookingDetail> findByBooking_CustomerAndStatusInIgnoreCaseAndIsDeletedFalse(User user, List<String> status, Pageable pageable);
 
+    @Query("SELECT bd FROM BookingDetail bd " +
+            "WHERE bd.status IN ('IN_PROGRESS', 'SCHEDULED', 'SCHEDULED_COMPLETE') " +
+            "AND bd.isDeleted = false " +
+            "AND bd.sessionDate < :today")
+    List<BookingDetail> findOverdueBookingDetails(@Param("today") LocalDate today);
+
 
 
     @Query("SELECT bd.sessionDate, COUNT(bd) " +

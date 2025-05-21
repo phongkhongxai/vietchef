@@ -840,14 +840,13 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     @Scheduled(cron = "0 5 0 * * *") //mỗi đêm 0h5p
     @Transactional
     public void markOverdueBookingDetails() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDate today = LocalDate.now();
 
-        List<BookingDetail> details = bookingDetailRepository
-                .findAllByStatusAndIsDeletedFalse("IN_PROGRESS");
+        List<BookingDetail> overdueDetails = bookingDetailRepository.findOverdueBookingDetails(today);
 
-        for (BookingDetail detail : details) {
-            Booking booking = detail.getBooking();
-            if (detail.getSessionDate().isBefore(now.toLocalDate())) {
+
+        for (BookingDetail detail : overdueDetails) {
+                Booking booking = detail.getBooking();
                 detail.setStatus("OVERDUE");
                 bookingDetailRepository.save(detail);
                 if(booking.getBookingType().equalsIgnoreCase("SINGLE")){
@@ -891,7 +890,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                         .screen("BookingDetail")
                         .build();
                 notificationService.sendPushNotification(customerNotification);
-            }
+
         }
     }
 
