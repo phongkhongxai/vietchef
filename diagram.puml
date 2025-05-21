@@ -1,84 +1,57 @@
 @startuml
+title Sequence Diagram: Cancel Single Booking
+
 actor Customer
-participant Controller
-participant BookingDetailService
-participant BookingDetailRepository
-participant BookingRepository
-participant WalletRepository
-participant CustomerTransactionRepository
-participant ChefTransactionRepository
-participant NotificationService
-participant ChefService
-participant Database
+participant "BookingService" as Service
+participant "BookingRepository" as BookingRepo
+participant "UserRepository" as UserRepo
+participant "BookingDetailRepository" as DetailRepo
+participant "CustomerTransactionRepository" as TransactionRepo
+participant "WalletRepository" as WalletRepo
+participant "NotificationService" as Notification
+participant "ModelMapper" as Mapper
 
-Customer -> Controller : confirmBookingCompletionByCustomer(bookingDetailId, userId)
-Controller -> BookingDetailService : confirmBookingCompletionByCustomer(bookingDetailId, userId)
+Customer -> Service : cancelSingleBooking(bookingId, userId)
+Service -> BookingRepo : findById(bookingId)
+BookingRepo --> Service : Booking
 
-BookingDetailService -> BookingDetailRepository : findById(bookingDetailId)
-BookingDetailRepository -> Database : SELECT * FROM booking_details WHERE id = ?
-Database --> BookingDetailRepository : BookingDetail
-BookingDetailRepository --> BookingDetailService : BookingDetail
+Service -> UserRepo : findById(userId)
+UserRepo --> Service : User
 
-BookingDetailService -> BookingDetailService : Kiểm tra quyền và trạng thái
+Service -> DetailRepo : findByBookingId(bookingId)
+DetailRepo --> Service : List<BookingDetail>
 
-BookingDetailService -> BookingDetailRepository : save(BookingDetail - status: COMPLETED)
-BookingDetailRepository -> Database : UPDATE booking_details SET status='COMPLETED'
-Database --> BookingDetailRepository : BookingDetail
-BookingDetailRepository --> BookingDetailService : BookingDetail
+alt Booking.status == "CONFIRMED" && sessionDate < today + 1
+    Service --> Customer : throw "Cannot cancel booking"
+else Booking.status == "PENDING"
+    Service -> DetailRepo : save(bookingDetail.setStatus("CANCELED"))
+    Service -> BookingRepo : save(booking.setStatus("CANCELED"))
+    Service -> Mapper : map(Booking, BookingResponseDto)
+    Mapper --> Service : BookingResponseDto
+    Service --> Customer : return BookingResponseDto
+else Booking.status in ("PAID", "CONFIRMED")
+    Service -> TransactionRepo : findByBookingIdAndTransactionType(...)
+    TransactionRepo --> Service : List<CustomerTransaction>
 
-alt bookingType == "SINGLE"
-    BookingDetailService -> BookingRepository : save(Booking - status: COMPLETED)
-    BookingRepository -> Database : UPDATE bookings SET status='COMPLETED'
-    Database --> BookingRepository : Booking
-    BookingRepository --> BookingDetailService : Booking
-    BookingDetailService -> NotificationService : sendPushNotification(to Customer)
-else
-    BookingDetailService -> BookingDetailRepository : findByBookingId(bookingId)
-    BookingDetailRepository -> Database : SELECT * FROM booking_details WHERE booking_id = ?
-    Database --> BookingDetailRepository : List<BookingDetail>
-    BookingDetailRepository --> BookingDetailService : List<BookingDetail>
-
-    BookingDetailService -> BookingDetailService : Kiểm tra tất cả các BookingDetail đã COMPLETED
-
-    alt Nếu đã hoàn tất và có depositPaid > 0
-        BookingDetailService -> WalletRepository : findByUserId(userId)
-        WalletRepository -> Database : SELECT * FROM wallets WHERE user_id = ?
-        Database --> WalletRepository : Wallet
-        WalletRepository --> BookingDetailService : Wallet
-
-        BookingDetailService -> WalletRepository : save(Wallet - hoàn tiền)
-        WalletRepository -> Database : UPDATE wallets SET balance = ...
-        Database --> WalletRepository : Wallet
-
-        BookingDetailService -> CustomerTransactionRepository : save(Refund Transaction)
-        CustomerTransactionRepository -> Database : INSERT INTO customer_transactions ...
-        Database --> CustomerTransactionRepository : OK
-
-        BookingDetailService -> NotificationService : sendPushNotification(to Customer - Refund)
+    alt hasRefund
+        Service -> TransactionRepo : existsByBookingIdAndTransactionType(...)
+        TransactionRepo --> Service : true
+        Service --> Customer : throw "Booking already refunded"
+    else
+        Service -> WalletRepo : save(wallet.add(refundAmount))
+        Service -> TransactionRepo : save(RefundTransaction)
+        Service -> DetailRepo : save(bookingDetail.setStatus("REFUNDED"))
     end
 
-    BookingDetailService -> BookingRepository : save(Booking - status: COMPLETED)
-    BookingRepository -> Database : UPDATE bookings SET status = 'COMPLETED'
-    Database --> BookingRepository : Booking
-    BookingRepository --> BookingDetailService : Booking
+    Service -> BookingRepo : save(booking.setStatus("CANCELED"))
+
+    alt booking was "CONFIRMED"
+        Service -> Notification : sendPushNotification(to chef)
+    end
+
+    Service -> Mapper : map(Booking, BookingResponseDto)
+    Mapper --> Service : BookingResponseDto
+    Service --> Customer : return BookingResponseDto
 end
 
-BookingDetailService -> WalletRepository : findByUserId(chef.userId)
-WalletRepository -> Database : SELECT * FROM wallets WHERE user_id = ?
-Database --> WalletRepository : Wallet
-WalletRepository --> BookingDetailService : Wallet
-
-BookingDetailService -> WalletRepository : save(Wallet - cộng tiền)
-WalletRepository -> Database : UPDATE wallets SET balance = ...
-Database --> WalletRepository : Wallet
-
-BookingDetailService -> ChefTransactionRepository : save(ChefTransaction)
-ChefTransactionRepository -> Database : INSERT INTO chef_transactions ...
-Database --> ChefTransactionRepository : OK
-
-BookingDetailService -> NotificationService : sendPushNotification(to Chef)
-BookingDetailService -> ChefService : updateReputation(chef, +3)
-
-BookingDetailService --> Controller : BookingDetailDto
-Controller --> Customer : Trả về BookingDetailDto
 @enduml

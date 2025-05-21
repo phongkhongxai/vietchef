@@ -5,6 +5,7 @@ import com.spring2025.vietchefs.models.entity.Wallet;
 import com.spring2025.vietchefs.models.entity.WalletRequest;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.dto.WalletRequestDto;
+import com.spring2025.vietchefs.models.payload.requestModel.NotificationRequest;
 import com.spring2025.vietchefs.repositories.UserRepository;
 import com.spring2025.vietchefs.repositories.WalletRepository;
 import com.spring2025.vietchefs.repositories.WalletRequestRepository;
@@ -29,12 +30,14 @@ public class WalletRequestServiceImpl implements WalletRequestService {
     private final UserRepository userRepository;
     private final PaypalService paypalService;
     private final ModelMapper modelMapper;
+    private final NotificationService notificationService;
 
     @Override
     public WalletRequestDto createWithdrawalRequest(WalletRequestDto dto) {
-        if (dto.getAmount() == null || dto.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST,"Amount must be greater than zero.");
+        if (dto.getAmount() == null || dto.getAmount().compareTo(BigDecimal.valueOf(1.00)) < 0) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Amount must be at least $1.00 to process a payout.");
         }
+
         User user = userRepository.findById(dto.getUserId())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"User not found."));
 
@@ -94,6 +97,13 @@ public class WalletRequestServiceImpl implements WalletRequestService {
         ).block();
         request.setStatus("APPROVED");
         WalletRequest updated = walletRequestRepository.save(request);
+        NotificationRequest refundNotification = NotificationRequest.builder()
+                .userId(wallet.getUser().getId())
+                .title("Withdrawal Request Approved")
+                .body("Your request to withdraw " + amount + " USD from your VietChefs Wallet has been successfully processed. Please check your PayPal account for confirmation.")
+                .screen("WalletScreen")
+                .build();
+        notificationService.sendPushNotification(refundNotification);
         return modelMapper.map(updated, WalletRequestDto.class);
     }
 
@@ -110,6 +120,13 @@ public class WalletRequestServiceImpl implements WalletRequestService {
         String updatedNote = (request.getNote() == null ? "" : request.getNote() + " | ") + "REJECT: " + reason;
         request.setNote(updatedNote);
         WalletRequest updated = walletRequestRepository.save(request);
+        NotificationRequest rejectNotification = NotificationRequest.builder()
+                .userId(request.getUser().getId())
+                .title("Withdrawal Request Rejected")
+                .body("Your request to withdraw " + request.getAmount() + " USD from your VietChefs Wallet has been rejected. Reason: "+reason)
+                .screen("WalletScreen")
+                .build();
+
         return modelMapper.map(updated, WalletRequestDto.class);
     }
 
