@@ -56,7 +56,7 @@ public class NotificationService {
             throw new VchefApiException(HttpStatus.NOT_FOUND, "User not found.");
         }
 
-        Page<Notification> notifications = notificationRepository.findByUserIdAndNotiTypeNotOrderByCreatedAtDesc(optionalUser.get().getId(), "CHAT_NOTIFY",pageable);
+        Page<Notification> notifications = notificationRepository.findNonChatNotifications(optionalUser.get().getId(), "CHAT_NOTIFY",pageable);
 
         // get content for page object
         List<Notification> notificationList = notifications.getContent();

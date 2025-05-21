@@ -16,8 +16,10 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     List<Notification> findUnreadNonChatNotifications(@Param("userId") Long userId);
 
     List<Notification> findByUserIdAndIsReadFalseAndNotiType(Long userId, String notiType);
+    @Query("SELECT n FROM Notification n WHERE n.userId = :userId AND (n.notiType <> :notiType OR n.notiType IS NULL) ORDER BY n.createdAt DESC")
+    Page<Notification> findNonChatNotifications(@Param("userId") Long userId, @Param("notiType") String notiType, Pageable pageable);
 
-    Page<Notification> findByUserIdAndNotiTypeNotOrderByCreatedAtDesc(Long userId, String notiType, Pageable pageable);
+
     List<Notification> findByUserIdAndNotiType(Long userId, String notiType);
     int countByUserIdAndIsReadFalseAndNotiType(Long userId, String notiType);
     int countByUserIdAndIsReadFalse(Long userId);
