@@ -548,7 +548,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         }else {
             List<BookingDetail> refreshedDetails = bookingDetailRepository.findByBookingId(booking.getId());
             boolean allDetailsCompleted = refreshedDetails.stream()
-                    .filter(detail -> !"CANCELED".equalsIgnoreCase(detail.getStatus()))
+                    .filter(detail -> !List.of("CANCELED", "REFUNDED", "OVERDUE").contains(detail.getStatus().toUpperCase()))
                     .allMatch(detail -> "COMPLETED".equalsIgnoreCase(detail.getStatus()));
 
             if (allDetailsCompleted) {
@@ -843,23 +843,24 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         LocalDateTime now = LocalDateTime.now();
 
         List<BookingDetail> details = bookingDetailRepository
-                .findAllByStatusAndIsDeletedFalse("SCHEDULED_COMPLETE");
+                .findAllByStatusAndIsDeletedFalse("IN_PROGRESS");
 
         for (BookingDetail detail : details) {
             Booking booking = detail.getBooking();
-            if (detail.getSessionDate().isBefore(LocalDate.now())) {
+            if (detail.getSessionDate().isBefore(now.toLocalDate())) {
                 detail.setStatus("OVERDUE");
                 bookingDetailRepository.save(detail);
                 if(booking.getBookingType().equalsIgnoreCase("SINGLE")){
                     booking.setStatus("OVERDUE");
-                    bookingRepository.save(booking);
+                    booking = bookingRepository.save(booking);
                 }
                 CustomerTransaction paymentTransaction = getPaymentTransaction(detail);
                 if (paymentTransaction != null) {
                     Wallet customerWallet = paymentTransaction.getWallet();
                     customerWallet.setBalance(customerWallet.getBalance().add(detail.getTotalPrice()));
                     walletRepository.save(customerWallet);
-
+                    booking.setTotalPrice(booking.getTotalPrice().subtract(detail.getTotalPrice()));
+                    booking = bookingRepository.save(booking);
                     CustomerTransaction refundTransaction = CustomerTransaction.builder()
                             .wallet(customerWallet)
                             .booking(booking)
@@ -879,6 +880,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                         .bookingDetailId(detail.getId())
                         .screen("BookingDetail")
                         .build();
+                chefService.updateReputation(booking.getChef(), -3);
                 notificationService.sendPushNotification(chefNotification);
                 NotificationRequest customerNotification = NotificationRequest.builder()
                         .userId(booking.getCustomer().getId())
@@ -916,7 +918,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
             // LOAD lại danh sách từ DB
             List<BookingDetail> refreshedDetails = bookingDetailRepository.findByBookingId(booking.getId());
             boolean allCompleted = refreshedDetails.stream()
-                    .filter(d -> !"CANCELED".equalsIgnoreCase(d.getStatus()))
+                    .filter(d -> !List.of("CANCELED", "REFUNDED", "OVERDUE").contains(d.getStatus().toUpperCase()))
                     .allMatch(d -> "COMPLETED".equalsIgnoreCase(d.getStatus()));
 
             if (allCompleted) {
