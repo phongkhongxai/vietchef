@@ -12,4 +12,5 @@ public class ChefBlockedDateResponse {
     private LocalTime startTime;
     private LocalTime endTime;
     private String reason;
+    private String timezone;
 } 
