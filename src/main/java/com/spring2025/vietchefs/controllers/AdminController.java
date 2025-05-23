@@ -1,9 +1,11 @@
 package com.spring2025.vietchefs.controllers;
 
+import com.spring2025.vietchefs.models.entity.BookingDetail;
 import com.spring2025.vietchefs.models.payload.dto.ChefDto;
 import com.spring2025.vietchefs.models.payload.dto.SignupDto;
 import com.spring2025.vietchefs.models.payload.dto.UserDto;
 import com.spring2025.vietchefs.models.payload.responseModel.UsersResponse;
+import com.spring2025.vietchefs.repositories.BookingDetailRepository;
 import com.spring2025.vietchefs.services.BookingService;
 import com.spring2025.vietchefs.services.ChefService;
 import com.spring2025.vietchefs.services.PaymentCycleService;
@@ -19,7 +21,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -28,6 +33,8 @@ public class AdminController {
     private ChefService chefService;
     @Autowired
     private UserService userService;
+    @Autowired
+    private BookingDetailRepository bookingDetailRepository;
     @Autowired
     private BookingService bookingService;
     @Autowired
@@ -51,6 +58,14 @@ public class AdminController {
     @GetMapping("/server-time")
     public String getServerTime() {
         return "Server time: " + LocalDateTime.now();
+    }
+    @GetMapping("/server-timess")
+    public ResponseEntity<List<BookingDetail>> getProge() {
+        LocalDate today = LocalDate.now();
+
+        List<BookingDetail> overdueDetails = bookingDetailRepository.findOverdueBookingDetails(today);
+
+        return ResponseEntity.ok(overdueDetails);
     }
 
 
