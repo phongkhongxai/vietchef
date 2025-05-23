@@ -5,9 +5,12 @@ import com.spring2025.vietchefs.models.entity.BookingDetail;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -28,6 +31,21 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     boolean existsByCustomerIdAndChefIdAndBookingTypeIgnoreCaseAndStatusIgnoreCase(
             Long customerId, Long chefId, String bookingType, String status
     );
+    @Query("""
+    SELECT b FROM Booking b
+    WHERE b.status IN ('CONFIRMED', 'CONFIRMED_PAID', 'CONFIRMED_PARTIALLY_PAID')
+    AND b.isDeleted = false
+    AND NOT EXISTS (
+        SELECT 1 FROM BookingDetail d
+        WHERE d.booking = b
+        AND d.isDeleted = false
+        AND d.sessionDate >= :now
+    )
+""")
+    List<Booking> findBookingsWhereAllDetailsBeforeNow(@Param("now") LocalDate now);
+
+
+
 
 
 

@@ -1851,6 +1851,29 @@ public class BookingServiceImpl implements BookingService {
         }
     }
 
+    @Scheduled(cron = "0 7 0 * * *")
+    public void updateBookingStatusBasedOnBookingDetails() {
+        LocalDate today = LocalDate.now();
+        List<Booking> bookings = bookingRepository.findBookingsWhereAllDetailsBeforeNow(today);
+        for (Booking booking : bookings) {
+            boolean anyCompleted = booking.getBookingDetails().stream()
+                    .anyMatch(d -> "COMPLETED".equalsIgnoreCase(d.getStatus()));
+            if (!anyCompleted) {
+                if (!"OVERDUE".equalsIgnoreCase(booking.getStatus())) {
+                    booking.setStatus("OVERDUE");
+                    bookingRepository.save(booking);
+                }
+            } else {
+                if (!"COMPLETED".equalsIgnoreCase(booking.getStatus())) {
+                    booking.setStatus("COMPLETED");
+                    bookingRepository.save(booking);
+                }
+            }
+        }
+    }
+
+
+
 
 
 
