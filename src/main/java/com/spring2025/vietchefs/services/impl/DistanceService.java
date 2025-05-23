@@ -50,7 +50,7 @@ public class DistanceService {
                     .header(HttpHeaders.USER_AGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                     .retrieve()
                     .bodyToMono(String.class)
-                    .doOnError(e -> System.err.println("❌ WebClient lỗi: " + e.getMessage()))
+                    .doOnError(e -> System.err.println("WebClient lỗi: " + e.getMessage()))
                     .block();
 
             if (rawResponse == null) {
