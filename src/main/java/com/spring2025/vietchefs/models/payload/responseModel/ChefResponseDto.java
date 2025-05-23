@@ -1,6 +1,7 @@
 package com.spring2025.vietchefs.models.payload.responseModel;
 
 import com.spring2025.vietchefs.models.payload.dto.UserDto;
+import jakarta.persistence.Column;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -17,6 +18,8 @@ public class ChefResponseDto {
     private String bio;                 // Giới thiệu ngắn
     private String description;         // Mô tả chi tiết
     private String address;
+    private Double latitude;
+    private Double longitude;
     private String country;
     private BigDecimal price;           // Giá theo giờ
     private Integer maxServingSize;     // Số lượng khách tối đa
