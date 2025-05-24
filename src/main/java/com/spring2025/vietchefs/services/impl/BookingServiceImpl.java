@@ -1758,8 +1758,8 @@ public class BookingServiceImpl implements BookingService {
                 // Hủy các buổi booking detail
                 for (BookingDetail detail : booking.getBookingDetails()) {
                     detail.setStatus("CANCELED");
+                    bookingDetailRepository.save(detail);
                 }
-                bookingDetailRepository.saveAll(booking.getBookingDetails());
                 // Gửi thông báo
                 notificationService.sendPushNotification(NotificationRequest.builder()
                         .userId(booking.getCustomer().getId())
@@ -1817,12 +1817,12 @@ public class BookingServiceImpl implements BookingService {
             }
             // Cập nhật trạng thái booking
             booking.setStatus("OVERDUE");
-            bookingRepository.save(booking);
+            booking = bookingRepository.save(booking);
             // Hủy các buổi booking
             for (BookingDetail detail : booking.getBookingDetails()) {
                 detail.setStatus("OVERDUE");
+                bookingDetailRepository.save(detail);
             }
-            bookingDetailRepository.saveAll(booking.getBookingDetails());
             if ("LONG_TERM".equalsIgnoreCase(booking.getBookingType())) {
                 List<PaymentCycle> cycles = paymentCycleRepository
                         .findByBookingId(booking.getId());
@@ -1845,7 +1845,6 @@ public class BookingServiceImpl implements BookingService {
                     .bookingId(booking.getId())
                     .screen("CustomerWalletScreen")
                     .build());
-
             // Trừ uy tín đầu bếp
             chefService.updateReputation(booking.getChef(), -1);
         }
