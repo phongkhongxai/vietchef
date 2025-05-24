@@ -1299,7 +1299,6 @@ public class BookingServiceImpl implements BookingService {
                     detail.setStatus("CANCELED");
                 }
                 bookingDetailRepository.save(detail);
-
                 // Thêm PaymentCycle vào danh sách các PaymentCycle đã được cập nhật
                 updatedCycles.add(paymentCycle);
             }
@@ -1307,35 +1306,27 @@ public class BookingServiceImpl implements BookingService {
 
 // Cập nhật trạng thái PaymentCycle sau khi đã xử lý tất cả BookingDetail
         for (PaymentCycle paymentCycle : updatedCycles) {
+            if ("CANCELED".equalsIgnoreCase(paymentCycle.getStatus())) continue;
             List<BookingDetail> detailsInCycle = bookingDetailRepository.findByBookingId(bookingId).stream()
                     .filter(detail -> {
                         LocalDate sessionDate = detail.getSessionDate();
                         return !sessionDate.isBefore(paymentCycle.getStartDate()) && !sessionDate.isAfter(paymentCycle.getEndDate());
                     })
                     .toList();
+            boolean allRefunded = detailsInCycle.stream()
+                    .allMatch(d -> "REFUNDED".equalsIgnoreCase(d.getStatus()));
 
-            boolean hasRefunded = false;
-            boolean hasCompleted = false;
-            boolean allRefunded = true;
+            boolean anyRefunded = detailsInCycle.stream()
+                    .anyMatch(d -> "REFUNDED".equalsIgnoreCase(d.getStatus()));
 
-            for (BookingDetail d : detailsInCycle) {
-                if ("REFUNDED".equalsIgnoreCase(d.getStatus())) {
-                    hasRefunded = true;
-                } else if ("COMPLETED".equalsIgnoreCase(d.getStatus())) {
-                    hasCompleted = true;
-                    allRefunded = false;
-                } else {
-                    allRefunded = false;
-                }
-            }
+            boolean anyCompleted = detailsInCycle.stream()
+                    .anyMatch(d -> "COMPLETED".equalsIgnoreCase(d.getStatus()));
 
-            // Cập nhật trạng thái của PaymentCycle
             if (allRefunded) {
                 paymentCycle.setStatus("REFUNDED");
-            } else if (hasRefunded && hasCompleted) {
+            } else if (anyRefunded && anyCompleted) {
                 paymentCycle.setStatus("REFUNDED_PARTLY");
             }
-
             paymentCycleRepository.save(paymentCycle);
         }
 
@@ -1635,27 +1626,22 @@ public class BookingServiceImpl implements BookingService {
                     }
                 }
                 for (PaymentCycle paymentCycle : updatedCycles) {
+                    if ("CANCELED".equalsIgnoreCase(paymentCycle.getStatus())) continue;
                     List<BookingDetail> detailsInCycle = cycleToDetails.get(paymentCycle);
-                    boolean hasRefunded = false;
-                    boolean hasCompleted = false;
-                    boolean allRefunded = true;
-                    for (BookingDetail d : detailsInCycle) {
-                        if ("REFUNDED".equalsIgnoreCase(d.getStatus())) {
-                            hasRefunded = true;
-                        } else if ("COMPLETED".equalsIgnoreCase(d.getStatus())) {
-                            hasCompleted = true;
-                            allRefunded = false;
-                        } else {
-                            allRefunded = false;
-                        }
-                    }
+                    boolean allRefunded = detailsInCycle.stream()
+                            .allMatch(d -> "REFUNDED".equalsIgnoreCase(d.getStatus()));
+
+                    boolean anyRefunded = detailsInCycle.stream()
+                            .anyMatch(d -> "REFUNDED".equalsIgnoreCase(d.getStatus()));
+
+                    boolean anyCompleted = detailsInCycle.stream()
+                            .anyMatch(d -> "COMPLETED".equalsIgnoreCase(d.getStatus()));
 
                     if (allRefunded) {
                         paymentCycle.setStatus("REFUNDED");
-                    } else if (hasRefunded && hasCompleted) {
+                    } else if (anyRefunded && anyCompleted) {
                         paymentCycle.setStatus("REFUNDED_PARTLY");
                     }
-
                     paymentCycleRepository.save(paymentCycle);
                 }
                 break;
