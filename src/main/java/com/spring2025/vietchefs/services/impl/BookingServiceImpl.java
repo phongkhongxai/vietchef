@@ -1820,7 +1820,7 @@ public class BookingServiceImpl implements BookingService {
             booking = bookingRepository.save(booking);
             // Hủy các buổi booking
             for (BookingDetail detail : booking.getBookingDetails()) {
-                detail.setStatus("OVERDUE");
+                detail.setStatus("CANCELED");
                 bookingDetailRepository.save(detail);
             }
             if ("LONG_TERM".equalsIgnoreCase(booking.getBookingType())) {
@@ -1830,7 +1830,7 @@ public class BookingServiceImpl implements BookingService {
                     if (cycle.getCycleOrder() == 1 && status.equals("PAID_FIRST_CYCLE")) {
                         cycle.setStatus("REFUNDED");
                     } else {
-                        cycle.setStatus("OVERDUE");
+                        cycle.setStatus("CANCELED");
                     }
                 }
                 paymentCycleRepository.saveAll(cycles);
