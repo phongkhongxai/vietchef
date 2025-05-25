@@ -1,57 +1,104 @@
 @startuml
-title Sequence Diagram: Cancel Single Booking
+title Sequence Diagram: cancelLongTermBookingFromChef
 
-actor Customer
+actor Chef
 participant "BookingService" as Service
 participant "BookingRepository" as BookingRepo
-participant "UserRepository" as UserRepo
+participant "ChefRepository" as ChefRepo
 participant "BookingDetailRepository" as DetailRepo
-participant "CustomerTransactionRepository" as TransactionRepo
+participant "PaymentCycleRepository" as PaymentRepo
 participant "WalletRepository" as WalletRepo
+participant "CustomerTransactionRepository" as TransactionRepo
+participant "ChefService" as ChefService
 participant "NotificationService" as Notification
 participant "ModelMapper" as Mapper
 
-Customer -> Service : cancelSingleBooking(bookingId, userId)
+Chef -> Service : cancelLongTermBookingFromChef(bookingId, userId)
+
 Service -> BookingRepo : findById(bookingId)
 BookingRepo --> Service : Booking
 
-Service -> UserRepo : findById(userId)
-UserRepo --> Service : User
+Service -> ChefRepo : findByUserId(userId)
+ChefRepo --> Service : Chef
+
+alt Chef không thuộc booking
+    Service --> Chef : throw "Chef not in booking"
+end
+
+alt Booking không phải LONG_TERM
+    Service --> Chef : throw "Not a long-term booking"
+end
+
+alt Booking.status không phải CONFIRMED/PARTIALLY_PAID/PAID
+    Service --> Chef : throw "Booking cannot be cancelled"
+end
 
 Service -> DetailRepo : findByBookingId(bookingId)
 DetailRepo --> Service : List<BookingDetail>
 
-alt Booking.status == "CONFIRMED" && sessionDate < today + 1
-    Service --> Customer : throw "Cannot cancel booking"
-else Booking.status == "PENDING"
-    Service -> DetailRepo : save(bookingDetail.setStatus("CANCELED"))
-    Service -> BookingRepo : save(booking.setStatus("CANCELED"))
-    Service -> Mapper : map(Booking, BookingResponseDto)
-    Mapper --> Service : BookingResponseDto
-    Service --> Customer : return BookingResponseDto
-else Booking.status in ("PAID", "CONFIRMED")
-    Service -> TransactionRepo : findByBookingIdAndTransactionType(...)
-    TransactionRepo --> Service : List<CustomerTransaction>
-
-    alt hasRefund
-        Service -> TransactionRepo : existsByBookingIdAndTransactionType(...)
-        TransactionRepo --> Service : true
-        Service --> Customer : throw "Booking already refunded"
-    else
-        Service -> WalletRepo : save(wallet.add(refundAmount))
-        Service -> TransactionRepo : save(RefundTransaction)
-        Service -> DetailRepo : save(bookingDetail.setStatus("REFUNDED"))
-    end
-
-    Service -> BookingRepo : save(booking.setStatus("CANCELED"))
-
-    alt booking was "CONFIRMED"
-        Service -> Notification : sendPushNotification(to chef)
-    end
-
-    Service -> Mapper : map(Booking, BookingResponseDto)
-    Mapper --> Service : BookingResponseDto
-    Service --> Customer : return BookingResponseDto
+alt No details
+    Service --> Chef : throw "No booking details found"
 end
+
+alt Có session hôm nay
+    Service --> Chef : throw "Cannot cancel session happening today"
+end
+
+loop for each future detail
+    Service -> Service : getPaymentCycleForBookingDetail(detail)
+
+    alt paymentCycle != null
+        alt paymentCycle.status == "PAID" and detail.status != "COMPLETED"
+            Service -> DetailRepo : save(detail.setStatus("REFUNDED"))
+            Service -> Service : Add detail.totalPrice to totalRefund
+        else
+            Service -> PaymentRepo : save(paymentCycle.setStatus("CANCELED"))
+            Service -> DetailRepo : save(detail.setStatus("CANCELED"))
+        end
+        Service -> Service : updatedCycles.add(paymentCycle)
+    end
+end
+
+loop for each updated paymentCycle
+    Service -> DetailRepo : findByBookingId(bookingId)
+    Service -> Service : filter details in paymentCycle
+
+    alt allRefunded
+        Service -> PaymentRepo : save(paymentCycle.setStatus("REFUNDED"))
+    else anyRefunded && anyCompleted
+        Service -> PaymentRepo : save(paymentCycle.setStatus("REFUNDED_PARTLY"))
+    end
+end
+
+Service -> WalletRepo : findByUserId(customerId)
+WalletRepo --> Service : Wallet
+
+alt booking.depositPaid != null
+    Service -> Service : totalRefund += depositPaid
+    Service -> BookingRepo : save(booking.setStatus("CANCELED"))
+else
+    Service -> BookingRepo : save(booking.setStatus("CANCELED"))
+end
+
+alt totalRefund > 0
+    Service -> WalletRepo : update(wallet.setBalance(totalRefund))
+    Service -> TransactionRepo : save(CustomerTransaction for REFUND)
+
+    alt has any COMPLETED detail
+        Service -> BookingRepo : save(booking.setStatus("COMPLETED"))
+        Service -> BookingRepo : update totalPrice and depositPaid
+    else
+        Service -> BookingRepo : save(booking.setStatus("CANCELED"))
+    end
+end
+
+Service -> ChefService : updateReputation(chef, -5)
+
+Service -> Notification : sendPushNotification(to Chef - penalty)
+Service -> Notification : sendPushNotification(to Customer - refund)
+
+Service -> Mapper : map(Booking, BookingResponseDto)
+Mapper --> Service : BookingResponseDto
+Service --> Chef : return BookingResponseDto
 
 @enduml
