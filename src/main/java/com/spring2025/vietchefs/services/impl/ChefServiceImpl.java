@@ -361,7 +361,9 @@ public class ChefServiceImpl implements ChefService {
         chef.setAddress(requestDto.getAddress() != null ? requestDto.getAddress() : chef.getAddress());
         chef.setPrice(requestDto.getPrice() != null ? requestDto.getPrice() : chef.getPrice());
         chef.setMaxServingSize(requestDto.getMaxServingSize() != null ? requestDto.getMaxServingSize() : chef.getMaxServingSize());
-
+        double[] latLng = distanceService.getLatLngFromAddress(requestDto.getAddress());
+        chef.setLatitude(latLng[0]);
+        chef.setLongitude(latLng[1]);
         chefRepository.save(chef);
         return modelMapper.map(chef, ChefResponseDto.class);
     }
@@ -376,7 +378,9 @@ public class ChefServiceImpl implements ChefService {
         chef.setAddress(requestDto.getAddress() != null ? requestDto.getAddress() : chef.getAddress());
         chef.setPrice(requestDto.getPrice() != null ? requestDto.getPrice() : chef.getPrice());
         chef.setMaxServingSize(requestDto.getMaxServingSize() != null ? requestDto.getMaxServingSize() : chef.getMaxServingSize());
-
+        double[] latLng = distanceService.getLatLngFromAddress(requestDto.getAddress());
+        chef.setLatitude(latLng[0]);
+        chef.setLongitude(latLng[1]);
         chefRepository.save(chef);
         return modelMapper.map(chef, ChefResponseDto.class);
     }
