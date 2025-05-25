@@ -863,6 +863,7 @@ public void markOverdueBookingDetails() {
             log.warn("No completed PAYMENT transaction found for bookingDetail ID {}", detail.getId());
             continue;
         }
+        if ("SCHEDULED".equalsIgnoreCase(detail.getStatus())) continue;
         Wallet customerWallet = paymentTransaction.getWallet();
         customerWallet.setBalance(customerWallet.getBalance().add(detail.getTotalPrice()));
         walletRepository.save(customerWallet);
