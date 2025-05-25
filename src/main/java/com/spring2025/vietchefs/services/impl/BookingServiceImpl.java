@@ -1163,12 +1163,13 @@ public class BookingServiceImpl implements BookingService {
         if (bookingDetails.isEmpty()) {
             throw new VchefApiException(HttpStatus.NOT_FOUND, "Booking detail not found");
         }
+        if (!"CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Only CONFIRMED bookings can be canceled");
+        }
         BookingDetail bookingDetail = bookingDetails.get(0);
-        if ("CONFIRMED".equalsIgnoreCase(booking.getStatus()) &&
-                bookingDetail.getSessionDate().isEqual(LocalDate.now())) {
+        if (bookingDetail.getSessionDate().isEqual(LocalDate.now())) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel booking with a session happening today.");
         }
-        if ("CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
             List<CustomerTransaction> transactions = customerTransactionRepository
                     .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(bookingId, "PAYMENT", "COMPLETED");
             if (!transactions.isEmpty()) {
@@ -1205,11 +1206,10 @@ public class BookingServiceImpl implements BookingService {
                         .screen("CustomerBookingManagementScreen")
                         .build();
                 notificationService.sendPushNotification(refundNotification);
+            }else{
+                bookingDetail.setStatus("CANCELED");
+                bookingDetailRepository.save(bookingDetail);
             }
-        }else{
-            bookingDetail.setStatus("CANCELED");
-            bookingDetailRepository.save(bookingDetail);
-        }
 
         booking.setStatus("CANCELED");
         booking = bookingRepository.save(booking);
@@ -1317,7 +1317,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         if (totalRefund.compareTo(BigDecimal.ZERO) > 0) {
-            customerWallet.setBalance(totalRefund);
+            customerWallet.setBalance(customerWallet.getBalance().add(totalRefund));
             CustomerTransaction refundTransaction = CustomerTransaction.builder()
                     .wallet(customerWallet)
                     .booking(booking)
@@ -1473,6 +1473,7 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    @Transactional
     public BookingResponseDto cancelLongTermBooking2(Long bookingId, Long userId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Booking not found"));
