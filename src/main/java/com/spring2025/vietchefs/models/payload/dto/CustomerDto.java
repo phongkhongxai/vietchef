@@ -16,5 +16,6 @@ public class CustomerDto {
     private String fullName;
     private String gender;
     private String phone;
+    private String username;
     private String avatarUrl;
 }
