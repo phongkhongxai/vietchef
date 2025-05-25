@@ -1255,29 +1255,6 @@ public class BookingServiceImpl implements BookingService {
         if (hasTodaySession) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel booking with a session happening today.");
         }
-
-//        List<BookingDetail> futureDetails = allDetails.stream()
-//                .filter(detail -> detail.getSessionDate().isAfter(LocalDate.now()))
-//                .toList();
-//
-//        BigDecimal totalRefund = BigDecimal.ZERO;
-//        for (BookingDetail detail : futureDetails) {
-//            PaymentCycle paymentCycle = getPaymentCycleForBookingDetail(detail);
-//            if (paymentCycle!=null) {
-//                if ("PAID".equalsIgnoreCase(paymentCycle.getStatus())) {
-//                    if(!detail.getStatus().equalsIgnoreCase("COMPLETED")){
-//                        detail.setStatus("REFUNDED");
-//                        totalRefund = totalRefund.add(detail.getTotalPrice());
-//                    }
-//                } else {
-//                    paymentCycle.setStatus("CANCELED");
-//                    paymentCycleRepository.save(paymentCycle);
-//                    detail.setStatus("CANCELED");
-//                }
-//                bookingDetailRepository.save(detail);
-//
-//            }
-//        }
         List<BookingDetail> futureDetails = allDetails.stream()
                 .filter(detail -> detail.getSessionDate().isAfter(LocalDate.now()))
                 .toList();
@@ -1334,6 +1311,7 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for customer."));
         if(booking.getDepositPaid()!=null){
             totalRefund= totalRefund.add(booking.getDepositPaid());
+            booking.setStatus("CANCELED");
         }else{
             booking.setStatus("CANCELED");
         }
@@ -1360,7 +1338,6 @@ public class BookingServiceImpl implements BookingService {
                 booking.setStatus("CANCELED");
             }
             booking = bookingRepository.save(booking);
-
         }
 
         chefService.updateReputation(chef,-5);
@@ -1844,8 +1821,8 @@ public class BookingServiceImpl implements BookingService {
             boolean anyCompleted = booking.getBookingDetails().stream()
                     .anyMatch(d -> "COMPLETED".equalsIgnoreCase(d.getStatus()));
             if (!anyCompleted) {
-                if (!"OVERDUE".equalsIgnoreCase(booking.getStatus())) {
-                    booking.setStatus("OVERDUE");
+                if (!"CANCELED".equalsIgnoreCase(booking.getStatus())) {
+                    booking.setStatus("CANCELED");
                     bookingRepository.save(booking);
                 }
             } else {

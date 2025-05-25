@@ -33,16 +33,18 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     );
     @Query("""
     SELECT b FROM Booking b
+    LEFT JOIN FETCH b.bookingDetails bd
     WHERE b.status IN ('CONFIRMED', 'CONFIRMED_PAID', 'CONFIRMED_PARTIALLY_PAID')
-    AND b.isDeleted = false
-    AND NOT EXISTS (
-        SELECT 1 FROM BookingDetail d
-        WHERE d.booking = b
-        AND d.isDeleted = false
-        AND d.sessionDate >= :now
-    )
+      AND b.isDeleted = false
+      AND NOT EXISTS (
+          SELECT 1 FROM BookingDetail d
+          WHERE d.booking = b
+            AND d.isDeleted = false
+            AND d.sessionDate >= :now
+      )
 """)
     List<Booking> findBookingsWhereAllDetailsBeforeNow(@Param("now") LocalDate now);
+
 
 
 
