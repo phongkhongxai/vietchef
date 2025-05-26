@@ -76,7 +76,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
             @Override
             public List<ChatMessageDto> getConversationsOfUser(String username) {
-                List<ChatMessage> chatMessages = chatMessageRepository.findByChatIdContainingIgnoreCase(username);
+                List<ChatMessage> chatMessages = chatMessageRepository.findByUserInChatId(username);
                 return chatMessages.stream()
                         .collect(Collectors.groupingBy(
                                 ChatMessage::getChatId,
