@@ -1287,7 +1287,9 @@ public class BookingServiceImpl implements BookingService {
             List<BookingDetail> detailsInCycle = bookingDetailRepository.findByBookingId(bookingId).stream()
                     .filter(detail -> {
                         LocalDate sessionDate = detail.getSessionDate();
-                        return !sessionDate.isBefore(paymentCycle.getStartDate()) && !sessionDate.isAfter(paymentCycle.getEndDate());
+                        return !sessionDate.isBefore(paymentCycle.getStartDate()) && !sessionDate.isAfter(paymentCycle.getEndDate())
+                                && !detail.getStatus().equalsIgnoreCase("CANCELED")
+                                && !detail.getStatus().equalsIgnoreCase("OVERDUE");
                     })
                     .toList();
             boolean allRefunded = detailsInCycle.stream()
@@ -1605,7 +1607,9 @@ public class BookingServiceImpl implements BookingService {
                 }
                 for (PaymentCycle paymentCycle : updatedCycles) {
                     if ("CANCELED".equalsIgnoreCase(paymentCycle.getStatus())) continue;
-                    List<BookingDetail> detailsInCycle = cycleToDetails.get(paymentCycle);
+                    List<BookingDetail> detailsInCycle = cycleToDetails.get(paymentCycle).stream()
+                            .filter(d -> !d.getStatus().equalsIgnoreCase("CANCELED") && !d.getStatus().equalsIgnoreCase("OVERDUE"))
+                            .toList();
                     boolean allRefunded = detailsInCycle.stream()
                             .allMatch(d -> "REFUNDED".equalsIgnoreCase(d.getStatus()));
 
