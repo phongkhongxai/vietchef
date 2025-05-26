@@ -7,6 +7,8 @@ import com.azure.storage.blob.BlobServiceClientBuilder;
 import com.azure.storage.blob.models.BlobHttpHeaders;
 import com.azure.storage.blob.options.BlobUploadFromFileOptions;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,7 @@ import java.util.UUID;
 @Service
 public class AzureBlobStorageService {
     private final BlobContainerClient blobContainerClient;
+    private static final Logger log = LoggerFactory.getLogger(AzureBlobStorageService.class);
 
     public AzureBlobStorageService(@Value("${azure.storage.connection-string}") String connectionString,
                                    @Value("${azure.storage.container-name}") String containerName) {
@@ -53,6 +56,7 @@ public class AzureBlobStorageService {
             // Return the URL of the uploaded file
             return blobClient.getBlobUrl();
         } catch (Exception e) {
+            log.error("Upload failed: {}", e.getMessage(), e);
             throw new IOException("Error uploading file to Azure Blob Storage", e);
         }
     }
