@@ -5,9 +5,12 @@ import com.spring2025.vietchefs.models.entity.BookingDetail;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -28,7 +31,43 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     boolean existsByCustomerIdAndChefIdAndBookingTypeIgnoreCaseAndStatusIgnoreCase(
             Long customerId, Long chefId, String bookingType, String status
     );
+    @Query("""
+    SELECT b FROM Booking b
+    LEFT JOIN FETCH b.bookingDetails bd
+    WHERE b.status IN ('CONFIRMED', 'CONFIRMED_PAID', 'CONFIRMED_PARTIALLY_PAID')
+      AND b.isDeleted = false
+      AND NOT EXISTS (
+          SELECT 1 FROM BookingDetail d
+          WHERE d.booking = b
+            AND d.isDeleted = false
+            AND d.sessionDate >= :now
+      )
+""")
+    List<Booking> findBookingsWhereAllDetailsBeforeNow(@Param("now") LocalDate now);
 
+    // Statistics queries
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.status = :status AND b.isDeleted = false")
+    long countByStatus(@Param("status") String status);
 
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.isDeleted = false")
+    long countActiveBookings();
+
+    @Query("SELECT AVG(b.totalPrice) FROM Booking b WHERE b.status = 'COMPLETED' AND b.isDeleted = false")
+    java.math.BigDecimal findAverageBookingValue();
+
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.chef.id = :chefId AND b.status = :status AND b.isDeleted = false")
+    long countByChefIdAndStatus(@Param("chefId") Long chefId, @Param("status") String status);
+
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.chef.id = :chefId AND b.isDeleted = false")
+    long countByChefId(@Param("chefId") Long chefId);
+
+    @Query("SELECT COUNT(DISTINCT b.customer.id) FROM Booking b WHERE b.chef.id = :chefId AND b.status = 'COMPLETED' AND b.isDeleted = false")
+    long countUniqueCustomersByChef(@Param("chefId") Long chefId);
+
+    @Query("SELECT AVG(b.totalPrice) FROM Booking b WHERE b.chef.id = :chefId AND b.status = 'COMPLETED' AND b.isDeleted = false")
+    java.math.BigDecimal findAverageOrderValueByChef(@Param("chefId") Long chefId);
+
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.createdAt >= :startDate AND b.isDeleted = false")
+    long countBookingsFromDate(@Param("startDate") java.time.LocalDateTime startDate);
 
 }

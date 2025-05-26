@@ -11,8 +11,9 @@ import com.spring2025.vietchefs.services.BookingDetailService;
 import com.spring2025.vietchefs.services.BookingService;
 import com.spring2025.vietchefs.services.ChefService;
 import com.spring2025.vietchefs.services.PaymentCycleService;
-import jakarta.transaction.Transactional;
 import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -21,6 +22,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -68,6 +70,8 @@ public class BookingServiceImpl implements BookingService {
     private ChefService chefService;
     @Autowired
     private ModelMapper modelMapper;
+    private static final Logger log = LoggerFactory.getLogger(BookingServiceImpl.class);
+
 
     @Override
     public BookingsResponse getBookingsByCustomerId(Long customerId, int pageNo, int pageSize, String sortBy, String sortDir) {
@@ -1159,12 +1163,13 @@ public class BookingServiceImpl implements BookingService {
         if (bookingDetails.isEmpty()) {
             throw new VchefApiException(HttpStatus.NOT_FOUND, "Booking detail not found");
         }
+        if (!"CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Only CONFIRMED bookings can be canceled");
+        }
         BookingDetail bookingDetail = bookingDetails.get(0);
-        if ("CONFIRMED".equalsIgnoreCase(booking.getStatus()) &&
-                bookingDetail.getSessionDate().isEqual(LocalDate.now())) {
+        if (bookingDetail.getSessionDate().isEqual(LocalDate.now())) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel booking with a session happening today.");
         }
-        if ("CONFIRMED".equalsIgnoreCase(booking.getStatus())) {
             List<CustomerTransaction> transactions = customerTransactionRepository
                     .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(bookingId, "PAYMENT", "COMPLETED");
             if (!transactions.isEmpty()) {
@@ -1201,11 +1206,10 @@ public class BookingServiceImpl implements BookingService {
                         .screen("CustomerBookingManagementScreen")
                         .build();
                 notificationService.sendPushNotification(refundNotification);
+            }else{
+                bookingDetail.setStatus("CANCELED");
+                bookingDetailRepository.save(bookingDetail);
             }
-        }else{
-            bookingDetail.setStatus("CANCELED");
-            bookingDetailRepository.save(bookingDetail);
-        }
 
         booking.setStatus("CANCELED");
         booking = bookingRepository.save(booking);
@@ -1251,29 +1255,6 @@ public class BookingServiceImpl implements BookingService {
         if (hasTodaySession) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Cannot cancel booking with a session happening today.");
         }
-
-//        List<BookingDetail> futureDetails = allDetails.stream()
-//                .filter(detail -> detail.getSessionDate().isAfter(LocalDate.now()))
-//                .toList();
-//
-//        BigDecimal totalRefund = BigDecimal.ZERO;
-//        for (BookingDetail detail : futureDetails) {
-//            PaymentCycle paymentCycle = getPaymentCycleForBookingDetail(detail);
-//            if (paymentCycle!=null) {
-//                if ("PAID".equalsIgnoreCase(paymentCycle.getStatus())) {
-//                    if(!detail.getStatus().equalsIgnoreCase("COMPLETED")){
-//                        detail.setStatus("REFUNDED");
-//                        totalRefund = totalRefund.add(detail.getTotalPrice());
-//                    }
-//                } else {
-//                    paymentCycle.setStatus("CANCELED");
-//                    paymentCycleRepository.save(paymentCycle);
-//                    detail.setStatus("CANCELED");
-//                }
-//                bookingDetailRepository.save(detail);
-//
-//            }
-//        }
         List<BookingDetail> futureDetails = allDetails.stream()
                 .filter(detail -> detail.getSessionDate().isAfter(LocalDate.now()))
                 .toList();
@@ -1295,7 +1276,6 @@ public class BookingServiceImpl implements BookingService {
                     detail.setStatus("CANCELED");
                 }
                 bookingDetailRepository.save(detail);
-
                 // Thêm PaymentCycle vào danh sách các PaymentCycle đã được cập nhật
                 updatedCycles.add(paymentCycle);
             }
@@ -1303,35 +1283,27 @@ public class BookingServiceImpl implements BookingService {
 
 // Cập nhật trạng thái PaymentCycle sau khi đã xử lý tất cả BookingDetail
         for (PaymentCycle paymentCycle : updatedCycles) {
+            if ("CANCELED".equalsIgnoreCase(paymentCycle.getStatus())) continue;
             List<BookingDetail> detailsInCycle = bookingDetailRepository.findByBookingId(bookingId).stream()
                     .filter(detail -> {
                         LocalDate sessionDate = detail.getSessionDate();
                         return !sessionDate.isBefore(paymentCycle.getStartDate()) && !sessionDate.isAfter(paymentCycle.getEndDate());
                     })
                     .toList();
+            boolean allRefunded = detailsInCycle.stream()
+                    .allMatch(d -> "REFUNDED".equalsIgnoreCase(d.getStatus()));
 
-            boolean hasRefunded = false;
-            boolean hasCompleted = false;
-            boolean allRefunded = true;
+            boolean anyRefunded = detailsInCycle.stream()
+                    .anyMatch(d -> "REFUNDED".equalsIgnoreCase(d.getStatus()));
 
-            for (BookingDetail d : detailsInCycle) {
-                if ("REFUNDED".equalsIgnoreCase(d.getStatus())) {
-                    hasRefunded = true;
-                } else if ("COMPLETED".equalsIgnoreCase(d.getStatus())) {
-                    hasCompleted = true;
-                    allRefunded = false;
-                } else {
-                    allRefunded = false;
-                }
-            }
+            boolean anyCompleted = detailsInCycle.stream()
+                    .anyMatch(d -> "COMPLETED".equalsIgnoreCase(d.getStatus()));
 
-            // Cập nhật trạng thái của PaymentCycle
             if (allRefunded) {
                 paymentCycle.setStatus("REFUNDED");
-            } else if (hasRefunded && hasCompleted) {
+            } else if (anyRefunded && anyCompleted) {
                 paymentCycle.setStatus("REFUNDED_PARTLY");
             }
-
             paymentCycleRepository.save(paymentCycle);
         }
 
@@ -1339,12 +1311,13 @@ public class BookingServiceImpl implements BookingService {
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Wallet not found for customer."));
         if(booking.getDepositPaid()!=null){
             totalRefund= totalRefund.add(booking.getDepositPaid());
+            booking.setStatus("CANCELED");
         }else{
             booking.setStatus("CANCELED");
         }
 
         if (totalRefund.compareTo(BigDecimal.ZERO) > 0) {
-            customerWallet.setBalance(totalRefund);
+            customerWallet.setBalance(customerWallet.getBalance().add(totalRefund));
             CustomerTransaction refundTransaction = CustomerTransaction.builder()
                     .wallet(customerWallet)
                     .booking(booking)
@@ -1365,7 +1338,6 @@ public class BookingServiceImpl implements BookingService {
                 booking.setStatus("CANCELED");
             }
             booking = bookingRepository.save(booking);
-
         }
 
         chefService.updateReputation(chef,-5);
@@ -1501,6 +1473,7 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    @Transactional
     public BookingResponseDto cancelLongTermBooking2(Long bookingId, Long userId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Booking not found"));
@@ -1631,27 +1604,22 @@ public class BookingServiceImpl implements BookingService {
                     }
                 }
                 for (PaymentCycle paymentCycle : updatedCycles) {
+                    if ("CANCELED".equalsIgnoreCase(paymentCycle.getStatus())) continue;
                     List<BookingDetail> detailsInCycle = cycleToDetails.get(paymentCycle);
-                    boolean hasRefunded = false;
-                    boolean hasCompleted = false;
-                    boolean allRefunded = true;
-                    for (BookingDetail d : detailsInCycle) {
-                        if ("REFUNDED".equalsIgnoreCase(d.getStatus())) {
-                            hasRefunded = true;
-                        } else if ("COMPLETED".equalsIgnoreCase(d.getStatus())) {
-                            hasCompleted = true;
-                            allRefunded = false;
-                        } else {
-                            allRefunded = false;
-                        }
-                    }
+                    boolean allRefunded = detailsInCycle.stream()
+                            .allMatch(d -> "REFUNDED".equalsIgnoreCase(d.getStatus()));
+
+                    boolean anyRefunded = detailsInCycle.stream()
+                            .anyMatch(d -> "REFUNDED".equalsIgnoreCase(d.getStatus()));
+
+                    boolean anyCompleted = detailsInCycle.stream()
+                            .anyMatch(d -> "COMPLETED".equalsIgnoreCase(d.getStatus()));
 
                     if (allRefunded) {
                         paymentCycle.setStatus("REFUNDED");
-                    } else if (hasRefunded && hasCompleted) {
+                    } else if (anyRefunded && anyCompleted) {
                         paymentCycle.setStatus("REFUNDED_PARTLY");
                     }
-
                     paymentCycleRepository.save(paymentCycle);
                 }
                 break;
@@ -1727,7 +1695,6 @@ public class BookingServiceImpl implements BookingService {
 
 
     @Scheduled(cron = "0 0/10 * * * *") // chạy mỗi 10 phút
-    @Transactional
     public void markOverdueAndRefundBookings() {
         LocalDateTime now = LocalDateTime.now();
 
@@ -1735,112 +1702,142 @@ public class BookingServiceImpl implements BookingService {
                 .findByStatusIn(List.of("PENDING", "PENDING_FIRST_CYCLE", "PAID", "DEPOSITED", "PAID_FIRST_CYCLE"));
 
         for (Booking booking : bookings) {
-            String status = booking.getStatus().toUpperCase();
-            boolean isPendingStatus = status.equals("PENDING") || status.equals("PENDING_FIRST_CYCLE");
-            boolean isPaidStatus = status.equals("PAID") || status.equals("DEPOSITED") || status.equals("PAID_FIRST_CYCLE");
-            // Kiểm tra với updatedAt > 1 tiếng cho PENDING
-            if (isPendingStatus) {
-                if (booking.getUpdatedAt().isBefore(now.minusHours(1))) {
-                    booking.setStatus("OVERDUE");
-                    bookingRepository.save(booking);
-                    // Hủy các buổi booking detail
-                    for (BookingDetail detail : booking.getBookingDetails()) {
-                        detail.setStatus("CANCELED");
-                    }
-                    bookingDetailRepository.saveAll(booking.getBookingDetails());
-                    // Gửi thông báo
-                    notificationService.sendPushNotification(NotificationRequest.builder()
-                            .userId(booking.getCustomer().getId())
-                            .title("Booking Expired")
-                            .body("Your booking has expired after 1 hour of inactivity.")
-                            .bookingId(booking.getId())
-                            .screen("CustomerBookingScreen")
-                            .build());
-                }
-            }
-            else if (isPaidStatus && Duration.between(booking.getUpdatedAt(), now).toHours() > 6) {
-                // Kiểm tra đã hoàn tiền chưa
-                boolean hasRefund = customerTransactionRepository
-                        .existsByBookingIdAndTransactionType(booking.getId(), "REFUND");
-                if (hasRefund) continue;
-                List<CustomerTransaction> refundList = new ArrayList<>();
-
-                if (status.equalsIgnoreCase("PAID")) {
-                    refundList.addAll(customerTransactionRepository
-                            .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(
-                                    booking.getId(), "PAYMENT", "COMPLETED"));
-                } else if (status.equalsIgnoreCase("DEPOSITED")) {
-                    refundList.addAll(customerTransactionRepository
-                            .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(
-                                    booking.getId(), "INITIAL_PAYMENT", "COMPLETED"));
-                } else if (status.equalsIgnoreCase("PAID_FIRST_CYCLE")) {
-                    refundList.addAll(customerTransactionRepository
-                            .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(
-                                    booking.getId(), "INITIAL_PAYMENT", "COMPLETED"));
-                    refundList.addAll(customerTransactionRepository
-                            .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(
-                                    booking.getId(), "PAYMENT", "COMPLETED"));
-                }
-                if (refundList.isEmpty()) continue;
-                BigDecimal totalRefund = BigDecimal.ZERO;
-                Wallet wallet = null;
-
-                for (CustomerTransaction transaction : refundList) {
-                    if (wallet == null) wallet = transaction.getWallet();
-                    totalRefund = totalRefund.add(transaction.getAmount());
-
-                    CustomerTransaction refund = CustomerTransaction.builder()
-                            .wallet(transaction.getWallet())
-                            .booking(booking)
-                            .transactionType("REFUND")
-                            .amount(transaction.getAmount())
-                            .description("Refund for " + transaction.getTransactionType() + " due to overdue booking")
-                            .status("COMPLETED")
-                            .isDeleted(false)
-                            .build();
-                    customerTransactionRepository.save(refund);
-                }
-                // Cập nhật số dư ví
-                if (wallet != null) {
-                    wallet.setBalance(wallet.getBalance().add(totalRefund));
-                    walletRepository.save(wallet);
-                }
-                // Cập nhật trạng thái booking
-                booking.setStatus("OVERDUE");
-                bookingRepository.save(booking);
-                // Hủy các buổi booking
-                for (BookingDetail detail : booking.getBookingDetails()) {
-                    detail.setStatus("OVERDUE");
-                }
-                bookingDetailRepository.saveAll(booking.getBookingDetails());
-                if ("LONG_TERM".equalsIgnoreCase(booking.getBookingType())) {
-                    List<PaymentCycle> cycles = paymentCycleRepository
-                            .findByBookingId(booking.getId());
-                    for (PaymentCycle cycle : cycles) {
-                        if (cycle.getCycleOrder() == 1 && status.equals("PAID_FIRST_CYCLE")) {
-                            cycle.setStatus("REFUNDED");
-                        } else {
-                            cycle.setStatus("OVERDUE");
-                        }
-                    }
-                    paymentCycleRepository.saveAll(cycles);
-                }
-
-                // Gửi thông báo
-                notificationService.sendPushNotification(NotificationRequest.builder()
-                        .userId(booking.getCustomer().getId())
-                        .title("Booking Overdue & Refunded")
-                        .body("Your booking on " + booking.getCreatedAt() +
-                                " has expired and a total of " + totalRefund + " has been refunded to your wallet.")
-                        .bookingId(booking.getId())
-                        .screen("CustomerWalletScreen")
-                        .build());
-
-                // Trừ uy tín đầu bếp
-                chefService.updateReputation(booking.getChef(), -1);
+            try {
+                processBooking(booking, now);
+            } catch (Exception e) {
+                log.error("Failed to process booking ID {}: {}", booking.getId(), e.getMessage(), e);
             }
         }
     }
+    @Transactional
+    private void processBooking(Booking booking, LocalDateTime now) {
+        String status = booking.getStatus().toUpperCase();
+        boolean isPendingStatus = status.equals("PENDING") || status.equals("PENDING_FIRST_CYCLE");
+        boolean isPaidStatus = status.equals("PAID") || status.equals("DEPOSITED") || status.equals("PAID_FIRST_CYCLE");
+        // Kiểm tra với updatedAt > 1 tiếng cho PENDING
+        if (isPendingStatus) {
+            if (booking.getUpdatedAt().isBefore(now.minusHours(1))) {
+                booking.setStatus("OVERDUE");
+                booking = bookingRepository.save(booking);
+                // Hủy các buổi booking detail
+                for (BookingDetail detail : booking.getBookingDetails()) {
+                    detail.setStatus("CANCELED");
+                    bookingDetailRepository.save(detail);
+                }
+                // Gửi thông báo
+                notificationService.sendPushNotification(NotificationRequest.builder()
+                        .userId(booking.getCustomer().getId())
+                        .title("Booking Expired")
+                        .body("Your booking has expired after 1 hour of inactivity.")
+                        .bookingId(booking.getId())
+                        .screen("CustomerBookingScreen")
+                        .build());
+            }
+        } else if (isPaidStatus && Duration.between(booking.getUpdatedAt(), now).toHours() > 6) {
+            // Kiểm tra đã hoàn tiền chưa
+            boolean hasRefund = customerTransactionRepository
+                    .existsByBookingIdAndTransactionType(booking.getId(), "REFUND");
+            if (hasRefund) return;
+            List<CustomerTransaction> refundList = new ArrayList<>();
+            if (status.equalsIgnoreCase("PAID")) {
+                refundList.addAll(customerTransactionRepository
+                        .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(
+                                booking.getId(), "PAYMENT", "COMPLETED"));
+            } else if (status.equalsIgnoreCase("DEPOSITED")) {
+                refundList.addAll(customerTransactionRepository
+                        .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(
+                                booking.getId(), "INITIAL_PAYMENT", "COMPLETED"));
+            } else if (status.equalsIgnoreCase("PAID_FIRST_CYCLE")) {
+                refundList.addAll(customerTransactionRepository
+                        .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(
+                                booking.getId(), "INITIAL_PAYMENT", "COMPLETED"));
+                refundList.addAll(customerTransactionRepository
+                        .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(
+                                booking.getId(), "PAYMENT", "COMPLETED"));
+            }
+            if (refundList.isEmpty()) return;
+            BigDecimal totalRefund = BigDecimal.ZERO;
+            Wallet wallet = null;
+
+            for (CustomerTransaction transaction : refundList) {
+                if (wallet == null) wallet = transaction.getWallet();
+                totalRefund = totalRefund.add(transaction.getAmount());
+
+                CustomerTransaction refund = CustomerTransaction.builder()
+                        .wallet(transaction.getWallet())
+                        .booking(booking)
+                        .transactionType("REFUND")
+                        .amount(transaction.getAmount())
+                        .description("Refund for " + transaction.getTransactionType() + " due to overdue booking")
+                        .status("COMPLETED")
+                        .isDeleted(false)
+                        .build();
+                customerTransactionRepository.save(refund);
+            }
+            // Cập nhật số dư ví
+            if (wallet != null) {
+                wallet.setBalance(wallet.getBalance().add(totalRefund));
+                walletRepository.save(wallet);
+            }
+            // Cập nhật trạng thái booking
+            booking.setStatus("OVERDUE");
+            booking = bookingRepository.save(booking);
+            // Hủy các buổi booking
+            for (BookingDetail detail : booking.getBookingDetails()) {
+                detail.setStatus("CANCELED");
+                bookingDetailRepository.save(detail);
+            }
+            if ("LONG_TERM".equalsIgnoreCase(booking.getBookingType())) {
+                List<PaymentCycle> cycles = paymentCycleRepository
+                        .findByBookingId(booking.getId());
+                for (PaymentCycle cycle : cycles) {
+                    if (cycle.getCycleOrder() == 1 && status.equals("PAID_FIRST_CYCLE")) {
+                        cycle.setStatus("REFUNDED");
+                    } else {
+                        cycle.setStatus("CANCELED");
+                    }
+                }
+                paymentCycleRepository.saveAll(cycles);
+            }
+
+            // Gửi thông báo
+            notificationService.sendPushNotification(NotificationRequest.builder()
+                    .userId(booking.getCustomer().getId())
+                    .title("Booking Overdue & Refunded")
+                    .body("Your booking on " + booking.getCreatedAt() +
+                            " has expired and a total of " + totalRefund + " has been refunded to your wallet.")
+                    .bookingId(booking.getId())
+                    .screen("CustomerWalletScreen")
+                    .build());
+            // Trừ uy tín đầu bếp
+            chefService.updateReputation(booking.getChef(), -1);
+        }
+    }
+
+    @Scheduled(cron = "0 7 0 * * *")
+    public void updateBookingStatusBasedOnBookingDetails() {
+        LocalDate today = LocalDate.now();
+        List<Booking> bookings = bookingRepository.findBookingsWhereAllDetailsBeforeNow(today);
+        for (Booking booking : bookings) {
+            boolean anyCompleted = booking.getBookingDetails().stream()
+                    .anyMatch(d -> "COMPLETED".equalsIgnoreCase(d.getStatus()));
+            if (!anyCompleted) {
+                if (!"CANCELED".equalsIgnoreCase(booking.getStatus())) {
+                    booking.setStatus("CANCELED");
+                    bookingRepository.save(booking);
+                }
+            } else {
+                if (!"COMPLETED".equalsIgnoreCase(booking.getStatus())) {
+                    booking.setStatus("COMPLETED");
+                    bookingRepository.save(booking);
+                }
+            }
+        }
+    }
+
+
+
+
 
 
 }

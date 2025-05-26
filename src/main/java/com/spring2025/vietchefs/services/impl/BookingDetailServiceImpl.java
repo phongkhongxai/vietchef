@@ -16,6 +16,8 @@ import com.spring2025.vietchefs.services.BookingDetailService;
 import com.spring2025.vietchefs.services.ChefService;
 import com.spring2025.vietchefs.services.PaymentCycleService;
 import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -75,6 +77,8 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     private ChefService chefService;
     @Autowired
     private ModelMapper modelMapper;
+    private static final Logger log = LoggerFactory.getLogger(BookingDetailServiceImpl.class);
+
     @Override
     public BookingDetail createBookingDetail(Booking booking, BookingDetailRequestDto dto) {
         if (isOverlappingWithExistingBookings(booking.getChef(), dto.getSessionDate(), dto.getTimeBeginTravel(), dto.getStartTime())) {
@@ -636,6 +640,9 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     private void refundSingleBooking(BookingDetail bookingDetail) {
         Booking booking = bookingDetail.getBooking();
         CustomerTransaction depositTransaction = getPaymentTransaction(bookingDetail);
+        if (depositTransaction == null) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Payment transaction not found.");
+        }
         Wallet customerWallet = depositTransaction.getWallet();
         BigDecimal refundAmount = depositTransaction.getAmount();
         CustomerTransaction refundTransaction = CustomerTransaction.builder()
@@ -763,13 +770,14 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         return depositTransaction.get();
     }
     private CustomerTransaction getPaymentTransaction(BookingDetail bookingDetail) {
-        List<CustomerTransaction> depositTransactions = customerTransactionRepository
-                .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(bookingDetail.getBooking().getId(), "PAYMENT", "COMPLETED");
-        if (depositTransactions.isEmpty()) {
-            throw new VchefApiException(HttpStatus.NOT_FOUND, "Payment transaction not found for this booking.");
-        }
-        return depositTransactions.get(0);
+        return customerTransactionRepository
+                .findByBookingIdAndTransactionTypeAndIsDeletedFalseAndStatus(
+                        bookingDetail.getBooking().getId(), "PAYMENT", "COMPLETED")
+                .stream()
+                .findFirst()
+                .orElse(null);
     }
+
     private PaymentCycle getPaymentCycleForBookingDetail(BookingDetail bookingDetail) {
         Booking booking = bookingDetail.getBooking();
         LocalDate sessionDate = bookingDetail.getSessionDate();
@@ -818,7 +826,6 @@ public class BookingDetailServiceImpl implements BookingDetailService {
     }
 
     @Scheduled(cron = "0 0 * * * *") // chạy mỗi giờ
-    @Transactional
     public void autoCompleteBookings() {
         LocalDateTime now = LocalDateTime.now();
 
@@ -828,7 +835,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         for (BookingDetail detail : pendingDetails) {
             LocalDateTime sessionDateTime = LocalDateTime.of(detail.getSessionDate(), detail.getStartTime());
 
-            if (sessionDateTime.plusHours(12).isBefore(now)) {
+            if (sessionDateTime.plusHours(6).isBefore(now)) {
                 try {
                     completeBookingDetail(detail);
                 } catch (Exception e) {
@@ -837,62 +844,112 @@ public class BookingDetailServiceImpl implements BookingDetailService {
             }
         }
     }
-    @Scheduled(cron = "0 5 0 * * *") //mỗi đêm 0h5p
-    @Transactional
-    public void markOverdueBookingDetails() {
-        LocalDate today = LocalDate.now();
+@Scheduled(cron = "0 5 0 * * *") // mỗi ngày lúc 00:05
+public void markOverdueBookingDetails() {
+    LocalDate today = LocalDate.now();
+    List<BookingDetail> overdueDetails = bookingDetailRepository.findOverdueBookingDetails(today);
 
-        List<BookingDetail> overdueDetails = bookingDetailRepository.findOverdueBookingDetails(today);
+    for (BookingDetail detail : overdueDetails) {
+            Booking booking = detail.getBooking();
+            detail.setStatus("OVERDUE");
+            bookingDetailRepository.save(detail);
 
-
-        for (BookingDetail detail : overdueDetails) {
-                Booking booking = detail.getBooking();
-                detail.setStatus("OVERDUE");
-                bookingDetailRepository.save(detail);
-                if(booking.getBookingType().equalsIgnoreCase("SINGLE")){
-                    booking.setStatus("OVERDUE");
-                    booking = bookingRepository.save(booking);
-                }
-                CustomerTransaction paymentTransaction = getPaymentTransaction(detail);
-                if (paymentTransaction != null) {
-                    Wallet customerWallet = paymentTransaction.getWallet();
-                    customerWallet.setBalance(customerWallet.getBalance().add(detail.getTotalPrice()));
-                    walletRepository.save(customerWallet);
-                    booking.setTotalPrice(booking.getTotalPrice().subtract(detail.getTotalPrice()));
-                    booking = bookingRepository.save(booking);
-                    CustomerTransaction refundTransaction = CustomerTransaction.builder()
-                            .wallet(customerWallet)
-                            .booking(booking)
-                            .transactionType("REFUND")
-                            .amount(detail.getTotalPrice())
-                            .description("Refund for session was not fulfilled on time.")
-                            .status("COMPLETED")
-                            .isDeleted(false)
-                            .build();
-                    customerTransactionRepository.save(refundTransaction);
-                }
-                NotificationRequest chefNotification = NotificationRequest.builder()
-                        .userId(booking.getChef().getUser().getId())
-                        .title("Missed Cooking Session")
-                        .body("You missed the scheduled cooking session on " + detail.getSessionDate() +
-                                ". It has been marked as overdue, and your reputation score has been reduced.")
-                        .bookingDetailId(detail.getId())
-                        .screen("BookingDetail")
-                        .build();
-                chefService.updateReputation(booking.getChef(), -3);
-                notificationService.sendPushNotification(chefNotification);
-                NotificationRequest customerNotification = NotificationRequest.builder()
-                        .userId(booking.getCustomer().getId())
-                        .title("Session Canceled")
-                        .body("Your session on " + detail.getSessionDate() +
-                                " was not fulfilled on time. A refund will be issued to your wallet.")
-                        .bookingDetailId(detail.getId())
-                        .screen("BookingDetail")
-                        .build();
-                notificationService.sendPushNotification(customerNotification);
-
+            if (booking.getBookingType().equalsIgnoreCase("SINGLE")) {
+                booking.setStatus("OVERDUE");
+                booking = bookingRepository.save(booking);
+            }
+            CustomerTransaction paymentTransaction = getPaymentTransaction(detail);
+        if (paymentTransaction == null) {
+            log.warn("No completed PAYMENT transaction found for bookingDetail ID {}", detail.getId());
+            continue;
         }
+        if ("SCHEDULED".equalsIgnoreCase(detail.getStatus())) continue;
+        Wallet customerWallet = paymentTransaction.getWallet();
+        customerWallet.setBalance(customerWallet.getBalance().add(detail.getTotalPrice()));
+        walletRepository.save(customerWallet);
+
+        booking.setTotalPrice(booking.getTotalPrice().subtract(detail.getTotalPrice()));
+        booking = bookingRepository.save(booking);
+
+        CustomerTransaction refundTransaction = CustomerTransaction.builder()
+                .wallet(customerWallet)
+                .booking(booking)
+                .transactionType("REFUND")
+                .amount(detail.getTotalPrice())
+                .description("Refund for session was not fulfilled on time.")
+                .status("COMPLETED")
+                .isDeleted(false)
+                .build();
+        customerTransactionRepository.save(refundTransaction);
+
+        NotificationRequest chefNotification = NotificationRequest.builder()
+                .userId(booking.getChef().getUser().getId())
+                .title("Missed Cooking Session")
+                .body("You missed the scheduled cooking session on " + detail.getSessionDate() +
+                        ". It has been marked as overdue, and your reputation score has been reduced.")
+                .bookingDetailId(detail.getId())
+                .screen("BookingDetail")
+                .build();
+        chefService.updateReputation(booking.getChef(), -3);
+        notificationService.sendPushNotification(chefNotification);
+
+        NotificationRequest customerNotification = NotificationRequest.builder()
+                .userId(booking.getCustomer().getId())
+                .title("Session Canceled")
+                .body("Your session on " + detail.getSessionDate() +
+                        " was not fulfilled on time. A refund will be issued to your wallet.")
+                .bookingDetailId(detail.getId())
+                .screen("BookingDetail")
+                .build();
+        notificationService.sendPushNotification(customerNotification);
     }
+}
+
+
+//    @Scheduled(cron = "0 32 15 * * *") // mỗi ngày lúc 15:10
+//    @Transactional
+//    public void markOverdueBookingDetailsRac() {
+//        LocalDate today = LocalDate.now();
+//        List<BookingDetail> overdueDetails = bookingDetailRepository.findOverdueBookingDetails(today.minusDays(10));
+//
+//        for (BookingDetail detail : overdueDetails) {
+//                Booking booking = detail.getBooking();
+//                detail.setStatus("OVERDUE");
+//                bookingDetailRepository.save(detail);
+//
+//                if (booking.getBookingType().equalsIgnoreCase("SINGLE")) {
+//                    booking.setStatus("OVERDUE");
+//                    booking = bookingRepository.save(booking);
+//                }
+//                    booking.setTotalPrice(booking.getTotalPrice().subtract(detail.getTotalPrice()));
+//                    booking = bookingRepository.save(booking);
+//
+//
+//
+//                NotificationRequest chefNotification = NotificationRequest.builder()
+//                        .userId(booking.getChef().getUser().getId())
+//                        .title("Missed Cooking Session")
+//                        .body("You missed the scheduled cooking session on " + detail.getSessionDate() +
+//                                ". It has been marked as overdue, and your reputation score has been reduced.")
+//                        .bookingDetailId(detail.getId())
+//                        .screen("BookingDetail")
+//                        .build();
+//                notificationService.sendPushNotification(chefNotification);
+//
+//                NotificationRequest customerNotification = NotificationRequest.builder()
+//                        .userId(booking.getCustomer().getId())
+//                        .title("Session Canceled")
+//                        .body("Your session on " + detail.getSessionDate() +
+//                                " was not fulfilled on time. A refund will be issued to your wallet.")
+//                        .bookingDetailId(detail.getId())
+//                        .screen("BookingDetail")
+//                        .build();
+//                notificationService.sendPushNotification(customerNotification);
+//
+//
+//        }
+//    }
+
 
 
     private void completeBookingDetail(BookingDetail detail) {
