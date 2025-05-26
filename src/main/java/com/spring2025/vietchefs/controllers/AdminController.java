@@ -10,10 +10,13 @@ import com.spring2025.vietchefs.services.BookingService;
 import com.spring2025.vietchefs.services.ChefService;
 import com.spring2025.vietchefs.services.PaymentCycleService;
 import com.spring2025.vietchefs.services.UserService;
+
 import com.spring2025.vietchefs.services.ReviewService;
 import com.spring2025.vietchefs.services.StatisticsService;
 import com.spring2025.vietchefs.services.AdvancedAnalyticsService;
 import com.spring2025.vietchefs.services.ExportService;
+
+import com.spring2025.vietchefs.services.impl.AzureBlobStorageService;
 import com.spring2025.vietchefs.utils.AppConstants;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
@@ -23,7 +26,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -37,6 +42,8 @@ public class AdminController {
     private ChefService chefService;
     @Autowired
     private UserService userService;
+    @Autowired
+    private AzureBlobStorageService azureBlobStorageService;
     @Autowired
     private BookingDetailRepository bookingDetailRepository;
     @Autowired
@@ -135,7 +142,6 @@ public class AdminController {
         userService.setUserBanStatus(id, banned);
         return ResponseEntity.ok("User " + (banned ? "banned" : "unbanned") + " successfully");
     }
-
     // ==================== STATISTICS APIs ====================
 
     @SecurityRequirement(name = "Bearer Authentication")
@@ -324,6 +330,15 @@ public class AdminController {
                 .header("Content-Disposition", "attachment; filename=\"" + resource.getFilename() + "\"")
                 .header("Content-Type", contentType)
                 .body(resource);
+    
+    }
+
+
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PostMapping("/upload/image/test")
+    public ResponseEntity<?> uploadImageTest(@RequestParam MultipartFile file) throws IOException {
+        return ResponseEntity.ok(azureBlobStorageService.uploadFile(file));
     }
 
 }
