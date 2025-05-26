@@ -53,11 +53,16 @@ public class ChefBlockedDateServiceImpl implements ChefBlockedDateService {
     @Autowired
     private ModelMapper modelMapper;
 
+    @Autowired
+    private TimeZoneService timeZoneService;
+
     @Override
     public ChefBlockedDateResponse getBlockedDateById(Long blockId) {
         ChefBlockedDate blockedDate = blockedDateRepository.findById(blockId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Blocked date not found with id: " + blockId));
-        return modelMapper.map(blockedDate, ChefBlockedDateResponse.class);
+        ChefBlockedDateResponse response = modelMapper.map(blockedDate, ChefBlockedDateResponse.class);
+        response.setTimezone(timeZoneService.getTimezoneFromAddress(blockedDate.getChef().getAddress()));
+        return response;
     }
 
     @Override
@@ -142,8 +147,13 @@ public class ChefBlockedDateServiceImpl implements ChefBlockedDateService {
     public List<ChefBlockedDateResponse> getBlockedDatesForCurrentChef() {
         Chef chef = getCurrentChef();
         List<ChefBlockedDate> blockedDates = blockedDateRepository.findByChefAndIsDeletedFalse(chef);
+        String timezone = timeZoneService.getTimezoneFromAddress(chef.getAddress());
         return blockedDates.stream()
-                .map(date -> modelMapper.map(date, ChefBlockedDateResponse.class))
+                .map(date -> {
+                    ChefBlockedDateResponse response = modelMapper.map(date, ChefBlockedDateResponse.class);
+                    response.setTimezone(timezone);
+                    return response;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -151,8 +161,13 @@ public class ChefBlockedDateServiceImpl implements ChefBlockedDateService {
     public List<ChefBlockedDateResponse> getBlockedDatesForCurrentChefBetween(LocalDate startDate, LocalDate endDate) {
         Chef chef = getCurrentChef();
         List<ChefBlockedDate> blockedDates = blockedDateRepository.findByChefAndBlockedDateBetweenAndIsDeletedFalse(chef, startDate, endDate);
+        String timezone = timeZoneService.getTimezoneFromAddress(chef.getAddress());
         return blockedDates.stream()
-                .map(date -> modelMapper.map(date, ChefBlockedDateResponse.class))
+                .map(date -> {
+                    ChefBlockedDateResponse response = modelMapper.map(date, ChefBlockedDateResponse.class);
+                    response.setTimezone(timezone);
+                    return response;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -160,8 +175,13 @@ public class ChefBlockedDateServiceImpl implements ChefBlockedDateService {
     public List<ChefBlockedDateResponse> getBlockedDatesForCurrentChefByDate(LocalDate date) {
         Chef chef = getCurrentChef();
         List<ChefBlockedDate> blockedDates = blockedDateRepository.findByChefAndBlockedDateAndIsDeletedFalse(chef, date);
+        String timezone = timeZoneService.getTimezoneFromAddress(chef.getAddress());
         return blockedDates.stream()
-                .map(date1 -> modelMapper.map(date1, ChefBlockedDateResponse.class))
+                .map(date1 -> {
+                    ChefBlockedDateResponse response = modelMapper.map(date1, ChefBlockedDateResponse.class);
+                    response.setTimezone(timezone);
+                    return response;
+                })
                 .collect(Collectors.toList());
     }
 

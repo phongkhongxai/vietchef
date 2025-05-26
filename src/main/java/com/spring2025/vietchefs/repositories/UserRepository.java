@@ -38,8 +38,20 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT u FROM User u WHERE u.role.roleName = :roleName AND u.isDelete = false")
     Page<User> findByRoleNameAndIsDeleteFalse(@Param("roleName") String roleName, Pageable pageable);
 
+    // Statistics queries
+    @Query("SELECT COUNT(u) FROM User u WHERE u.role.roleName = :roleName AND u.isDelete = false")
+    long countByRole(@Param("roleName") String roleName);
 
+    @Query("SELECT COUNT(u) FROM User u WHERE u.isBanned = true AND u.isDelete = false")
+    long countByIsBannedTrue();
 
+    @Query("SELECT COUNT(u) FROM User u WHERE u.isPremium = true AND u.isDelete = false")
+    long countByIsPremiumTrue();
 
+    @Query("SELECT COUNT(u) FROM User u WHERE u.isDelete = false")
+    long countActiveUsers();
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.createdAt >= :startDate AND u.isDelete = false")
+    long countNewUsersFromDate(@Param("startDate") java.time.LocalDateTime startDate);
 
 }

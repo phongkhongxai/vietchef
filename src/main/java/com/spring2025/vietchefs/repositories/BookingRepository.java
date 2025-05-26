@@ -45,10 +45,29 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 """)
     List<Booking> findBookingsWhereAllDetailsBeforeNow(@Param("now") LocalDate now);
 
+    // Statistics queries
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.status = :status AND b.isDeleted = false")
+    long countByStatus(@Param("status") String status);
 
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.isDeleted = false")
+    long countActiveBookings();
 
+    @Query("SELECT AVG(b.totalPrice) FROM Booking b WHERE b.status = 'COMPLETED' AND b.isDeleted = false")
+    java.math.BigDecimal findAverageBookingValue();
 
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.chef.id = :chefId AND b.status = :status AND b.isDeleted = false")
+    long countByChefIdAndStatus(@Param("chefId") Long chefId, @Param("status") String status);
 
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.chef.id = :chefId AND b.isDeleted = false")
+    long countByChefId(@Param("chefId") Long chefId);
 
+    @Query("SELECT COUNT(DISTINCT b.customer.id) FROM Booking b WHERE b.chef.id = :chefId AND b.status = 'COMPLETED' AND b.isDeleted = false")
+    long countUniqueCustomersByChef(@Param("chefId") Long chefId);
+
+    @Query("SELECT AVG(b.totalPrice) FROM Booking b WHERE b.chef.id = :chefId AND b.status = 'COMPLETED' AND b.isDeleted = false")
+    java.math.BigDecimal findAverageOrderValueByChef(@Param("chefId") Long chefId);
+
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.createdAt >= :startDate AND b.isDeleted = false")
+    long countBookingsFromDate(@Param("startDate") java.time.LocalDateTime startDate);
 
 }

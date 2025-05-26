@@ -57,6 +57,14 @@ public class User {
     private boolean isBanned = false;
     @Column(nullable = false)
     private boolean emailVerified;
+    
+    @Column
+    private LocalDateTime createdAt;
+    
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
 
     @Column(nullable = true)
     private String verificationCode;

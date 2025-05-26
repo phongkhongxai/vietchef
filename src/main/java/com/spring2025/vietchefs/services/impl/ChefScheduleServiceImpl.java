@@ -59,11 +59,16 @@ public class ChefScheduleServiceImpl implements ChefScheduleService {
     @Autowired
     private ModelMapper modelMapper;
 
+    @Autowired
+    private TimeZoneService timeZoneService;
+
     @Override
     public ChefScheduleResponse getScheduleById(Long scheduleId) {
         ChefSchedule schedule = chefScheduleRepository.findById(scheduleId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef schedule not found with id: " + scheduleId));
-        return modelMapper.map(schedule, ChefScheduleResponse.class);
+        ChefScheduleResponse response = modelMapper.map(schedule, ChefScheduleResponse.class);
+        response.setTimezone(timeZoneService.getTimezoneFromAddress(schedule.getChef().getAddress()));
+        return response;
     }
 
     @Override
@@ -154,8 +159,13 @@ public class ChefScheduleServiceImpl implements ChefScheduleService {
         Chef chef = chefRepository.findByUser(user)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef profile not found for user id: " + userId));
         List<ChefSchedule> schedules = chefScheduleRepository.findByChefAndIsDeletedFalse(chef);
+        String timezone = timeZoneService.getTimezoneFromAddress(chef.getAddress());
         return schedules.stream()
-                .map(schedule -> modelMapper.map(schedule, ChefScheduleResponse.class))
+                .map(schedule -> {
+                    ChefScheduleResponse response = modelMapper.map(schedule, ChefScheduleResponse.class);
+                    response.setTimezone(timezone);
+                    return response;
+                })
                 .collect(Collectors.toList());
     }
 
