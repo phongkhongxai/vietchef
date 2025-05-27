@@ -32,6 +32,10 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
     
     @Autowired
     private ChefRepository chefRepository;
+    @Autowired
+    private BookingDetailRepository bookingDetailRepository;
+    @Autowired
+    private PaymentRepository paymentRepository;
 
     @Override
     public TrendAnalyticsDto getTrendAnalytics(LocalDate startDate, LocalDate endDate) {
@@ -39,12 +43,15 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
         List<TrendAnalyticsDto.BookingDataPoint> bookingChart = generateBookingChart(startDate, endDate);
         List<TrendAnalyticsDto.UserGrowthDataPoint> userGrowthChart = generateUserGrowthChart(startDate, endDate);
         List<TrendAnalyticsDto.PerformanceDataPoint> performanceChart = generatePerformanceChart(startDate, endDate);
+        List<TrendAnalyticsDto.PaymentDataPoint> paymentDataPoints = generatePaymentChart(startDate, endDate);
+
 
         return TrendAnalyticsDto.builder()
                 .revenueChart(revenueChart)
                 .bookingChart(bookingChart)
                 .userGrowthChart(userGrowthChart)
                 .performanceChart(performanceChart)
+                .paymentChart(paymentDataPoints)
                 .build();
     }
 
@@ -254,9 +261,9 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
         
         LocalDate currentDate = startDate;
         while (!currentDate.isAfter(endDate)) {
-            BigDecimal revenue = BigDecimal.valueOf(Math.random() * 5000 + 2000);
-            BigDecimal commission = revenue.multiply(BigDecimal.valueOf(0.1));
-            Long transactionCount = Math.round(Math.random() * 50 + 20);
+            BigDecimal revenue =bookingDetailRepository.findTotalRevenue();
+            BigDecimal commission = bookingDetailRepository.findSystemCommission();
+            Long transactionCount = bookingDetailRepository.countCompletedTransactions();
 
             dataPoints.add(TrendAnalyticsDto.RevenueDataPoint.builder()
                     .date(currentDate)
@@ -276,10 +283,14 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
         
         LocalDate currentDate = startDate;
         while (!currentDate.isAfter(endDate)) {
-            Long totalBookings = Math.round(Math.random() * 30 + 10);
-            Long completedBookings = Math.round(totalBookings * 0.8);
-            Long canceledBookings = totalBookings - completedBookings;
-            BigDecimal averageValue = BigDecimal.valueOf(Math.random() * 100 + 50);
+            Long totalBookings = bookingRepository.countBookingsByDate(currentDate);
+            Long completedBookings = bookingRepository.countCompletedBookingsByDate(currentDate);
+            Long canceledBookings = bookingRepository.countCanceledBookingsByDate(currentDate);
+            BigDecimal averageValue = bookingRepository.averageBookingValueByDate(currentDate);
+            BigDecimal averageCompleteValue = bookingRepository.averageBookingCompletedValueByDate(currentDate);
+            if (averageValue == null) averageValue = BigDecimal.ZERO;
+            if (averageCompleteValue == null) averageCompleteValue = BigDecimal.ZERO;
+
 
             dataPoints.add(TrendAnalyticsDto.BookingDataPoint.builder()
                     .date(currentDate)
@@ -287,6 +298,7 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
                     .completedBookings(completedBookings)
                     .canceledBookings(canceledBookings)
                     .averageValue(averageValue)
+                    .averageCompletedValue(averageCompleteValue)
                     .build());
 
             currentDate = currentDate.plusDays(1);
@@ -344,6 +356,26 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
         
         return dataPoints;
     }
+    private List<TrendAnalyticsDto.PaymentDataPoint> generatePaymentChart(LocalDate startDate, LocalDate endDate) {
+        List<TrendAnalyticsDto.PaymentDataPoint> dataPoints = new ArrayList<>();
+
+        LocalDate currentDate = startDate;
+        while (!currentDate.isAfter(endDate)) {
+            BigDecimal deposit = paymentRepository.getTotalDepositByDate(currentDate);
+            BigDecimal payout = paymentRepository.getTotalPayoutByDate(currentDate);
+
+            dataPoints.add(TrendAnalyticsDto.PaymentDataPoint.builder()
+                    .date(currentDate)
+                    .totalDeposit(deposit)
+                    .totalPayout(payout)
+                    .build());
+
+            currentDate = currentDate.plusDays(1);
+        }
+
+        return dataPoints;
+    }
+
 
     // Helper methods for chef rankings
     private List<ChefRankingDto.TopChef> generateTopEarningChefs(int limit) {

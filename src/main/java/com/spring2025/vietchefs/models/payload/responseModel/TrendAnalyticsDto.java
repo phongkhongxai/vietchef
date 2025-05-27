@@ -18,7 +18,9 @@ public class TrendAnalyticsDto {
     private List<BookingDataPoint> bookingChart;
     private List<UserGrowthDataPoint> userGrowthChart;
     private List<PerformanceDataPoint> performanceChart;
-    
+    private List<PaymentDataPoint> paymentChart;
+
+
     @Data
     @Builder
     @NoArgsConstructor
@@ -40,6 +42,7 @@ public class TrendAnalyticsDto {
         private Long completedBookings;
         private Long canceledBookings;
         private BigDecimal averageValue;
+        private BigDecimal averageCompletedValue;
     }
     
     @Data
@@ -65,4 +68,14 @@ public class TrendAnalyticsDto {
         private Long totalReviews;
         private BigDecimal customerSatisfaction;
     }
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class PaymentDataPoint {
+        private LocalDate date;
+        private BigDecimal totalDeposit;
+        private BigDecimal totalPayout;
+    }
+
 } 
