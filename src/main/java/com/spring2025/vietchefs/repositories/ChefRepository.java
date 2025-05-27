@@ -104,6 +104,11 @@ public interface ChefRepository extends JpaRepository<Chef, Long> {
             Pageable pageable
     );
 
+    // Statistics queries
+    @Query("SELECT COUNT(c) FROM Chef c WHERE c.status = :status AND c.isDeleted = false")
+    long countByStatus(@Param("status") String status);
 
+    @Query("SELECT COUNT(c) FROM Chef c WHERE c.isDeleted = false")
+    long countActiveChefs();
 
 }
