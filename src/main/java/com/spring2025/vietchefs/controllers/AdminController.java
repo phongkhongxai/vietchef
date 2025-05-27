@@ -143,7 +143,7 @@ public class AdminController {
         return ResponseEntity.ok("User " + (banned ? "banned" : "unbanned") + " successfully");
     }
     // ==================== STATISTICS APIs ====================
-// chú ý 1 2 3
+
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     @GetMapping("/statistics/overview")
