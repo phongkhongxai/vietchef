@@ -356,14 +356,21 @@ public class ChefServiceImpl implements ChefService {
         Chef chef = chefRepository.findById(chefId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found with id: " + chefId));
 
-        chef.setBio(requestDto.getBio() != null ? requestDto.getBio() : chef.getBio());
-        chef.setDescription(requestDto.getDescription() != null ? requestDto.getDescription() : chef.getDescription());
-        chef.setAddress(requestDto.getAddress() != null ? requestDto.getAddress() : chef.getAddress());
-        chef.setPrice(requestDto.getPrice() != null ? requestDto.getPrice() : chef.getPrice());
-        chef.setMaxServingSize(requestDto.getMaxServingSize() != null ? requestDto.getMaxServingSize() : chef.getMaxServingSize());
-        double[] latLng = distanceService.getLatLngFromAddress(requestDto.getAddress());
-        chef.setLatitude(latLng[0]);
-        chef.setLongitude(latLng[1]);
+        if (requestDto.getBio() != null) chef.setBio(requestDto.getBio());
+        if (requestDto.getDescription() != null) chef.setDescription(requestDto.getDescription());
+        if (requestDto.getAddress() != null) {
+            chef.setAddress(requestDto.getAddress());
+            double[] latLng = distanceService.getLatLngFromAddress(requestDto.getAddress());
+            chef.setLatitude(latLng[0]);
+            chef.setLongitude(latLng[1]);
+        }
+        if (requestDto.getPrice() != null) chef.setPrice(requestDto.getPrice());
+        if (requestDto.getMaxServingSize() != null) chef.setMaxServingSize(requestDto.getMaxServingSize());
+        if (requestDto.getSpecialization() != null) chef.setSpecialization(requestDto.getSpecialization());
+        if (requestDto.getYearsOfExperience() != null) chef.setYearsOfExperience(requestDto.getYearsOfExperience());
+        if (requestDto.getCertification() != null) chef.setCertification(requestDto.getCertification());
+
+        chefRepository.save(chef);
         chefRepository.save(chef);
         return modelMapper.map(chef, ChefResponseDto.class);
     }
@@ -372,15 +379,24 @@ public class ChefServiceImpl implements ChefService {
     public ChefResponseDto updateChefBySelf(Long userId, ChefRequestDto requestDto) {
         Chef chef = chefRepository.findByUserId(userId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found with user: " + userId));
+        if (chef.getStatus().equalsIgnoreCase("REJECTED")){
+            chef.setStatus("PENDING");
+        }
+        if (requestDto.getBio() != null) chef.setBio(requestDto.getBio());
+        if (requestDto.getDescription() != null) chef.setDescription(requestDto.getDescription());
+        if (requestDto.getAddress() != null) {
+            chef.setAddress(requestDto.getAddress());
+            double[] latLng = distanceService.getLatLngFromAddress(requestDto.getAddress());
+            chef.setLatitude(latLng[0]);
+            chef.setLongitude(latLng[1]);
+        }
+        if (requestDto.getPrice() != null) chef.setPrice(requestDto.getPrice());
+        if (requestDto.getMaxServingSize() != null) chef.setMaxServingSize(requestDto.getMaxServingSize());
+        if (requestDto.getSpecialization() != null) chef.setSpecialization(requestDto.getSpecialization());
+        if (requestDto.getYearsOfExperience() != null) chef.setYearsOfExperience(requestDto.getYearsOfExperience());
+        if (requestDto.getCertification() != null) chef.setCertification(requestDto.getCertification());
 
-        chef.setBio(requestDto.getBio() != null ? requestDto.getBio() : chef.getBio());
-        chef.setDescription(requestDto.getDescription() != null ? requestDto.getDescription() : chef.getDescription());
-        chef.setAddress(requestDto.getAddress() != null ? requestDto.getAddress() : chef.getAddress());
-        chef.setPrice(requestDto.getPrice() != null ? requestDto.getPrice() : chef.getPrice());
-        chef.setMaxServingSize(requestDto.getMaxServingSize() != null ? requestDto.getMaxServingSize() : chef.getMaxServingSize());
-        double[] latLng = distanceService.getLatLngFromAddress(requestDto.getAddress());
-        chef.setLatitude(latLng[0]);
-        chef.setLongitude(latLng[1]);
+        chefRepository.save(chef);
         chefRepository.save(chef);
         return modelMapper.map(chef, ChefResponseDto.class);
     }
@@ -390,7 +406,7 @@ public class ChefServiceImpl implements ChefService {
         Chef chef = chefRepository.findById(chefId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Chef not found with id: " + chefId));
 
-        chef.setStatus("BLOCKED");
+        chef.setStatus("BANNED");
         chef.setIsDeleted(true);
         chefRepository.save(chef);
     }
