@@ -122,10 +122,10 @@ public class ChefServiceImpl implements ChefService {
         chef.setYearsOfExperience(requestDto.getYearsOfExperience());
         chef.setBio(requestDto.getBio());
         chef.setDescription(requestDto.getDescription());
-        chef.setAddress(requestDto.getAddress());
         chef.setCountry(requestDto.getCountry());
         chef.setPrice(requestDto.getPrice() != null ? requestDto.getPrice() : BigDecimal.valueOf(10));
         chef.setMaxServingSize(requestDto.getMaxServingSize() != null ? requestDto.getMaxServingSize() : 10);
+        chef.setAddress(requestDto.getAddress());
         double[] latLng = distanceService.getLatLngFromAddress(requestDto.getAddress());
         chef.setLatitude(latLng[0]);
         chef.setLongitude(latLng[1]);

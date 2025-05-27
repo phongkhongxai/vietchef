@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -86,6 +87,34 @@ public interface BookingDetailRepository extends JpaRepository<BookingDetail, Lo
             "AND bd.booking.isDeleted = false " +
             "GROUP BY bd.sessionDate")
     List<Object[]> countFutureBookingsByChef(@Param("chef") Chef chef, @Param("today") LocalDate today);
+    // Tổng doanh thu từ các buổi ăn đã hoàn tất
+    @Query("SELECT COALESCE(SUM(b.totalPrice), 0) FROM BookingDetail b WHERE b.isDeleted = false AND b.status = 'COMPLETED'")
+    BigDecimal findTotalRevenue();
+
+    // Doanh thu tháng hiện tại từ các buổi ăn đã hoàn tất
+    @Query("SELECT COALESCE(SUM(b.totalPrice), 0) FROM BookingDetail b WHERE b.isDeleted = false AND b.status = 'COMPLETED' AND MONTH(b.sessionDate) = MONTH(CURRENT_DATE) AND YEAR(b.sessionDate) = YEAR(CURRENT_DATE)")
+    BigDecimal findMonthlyRevenue();
+
+    // Hoa hồng nền tảng đã nhận được từ các buổi ăn hoàn tất
+    @Query("SELECT COALESCE(SUM(b.platformFee - COALESCE(b.discountAmout, 0)), 0) " +
+            "FROM BookingDetail b " +
+            "WHERE b.isDeleted = false AND b.status = 'COMPLETED'")
+    BigDecimal findSystemCommission();
+    // Tổng số tiền đã trả cho đầu bếp
+    @Query("SELECT COALESCE(SUM(b.totalChefFeePrice), 0) FROM BookingDetail b WHERE b.isDeleted = false AND b.status = 'COMPLETED'")
+    BigDecimal findTotalPayoutsToChefs();
+    @Query("SELECT SUM(bd.totalPrice) FROM BookingDetail bd " +
+            "WHERE bd.status = 'COMPLETED' AND bd.sessionDate BETWEEN :start AND :end")
+    BigDecimal findRevenueBetweenDates(@Param("start") LocalDate start, @Param("end") LocalDate end);
+    @Query("SELECT SUM(bd.totalPrice) FROM BookingDetail bd " +
+            "WHERE bd.status = 'COMPLETED' AND bd.sessionDate = :today")
+    BigDecimal findRevenueForDate(@Param("today") LocalDate today);
+    @Query("SELECT COUNT(b) FROM BookingDetail b " +
+            "WHERE b.status = 'COMPLETED' AND b.isDeleted = false")
+    Long countCompletedTransactions();
+
+
+
 
 
 
