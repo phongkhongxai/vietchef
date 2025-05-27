@@ -9,4 +9,5 @@ public class ChefScheduleResponse {
     private Integer dayOfWeek;
     private LocalTime startTime;
     private LocalTime endTime;
+    private String timezone;
 }
