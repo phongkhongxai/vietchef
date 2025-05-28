@@ -70,4 +70,33 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Query("SELECT COUNT(b) FROM Booking b WHERE b.createdAt >= :startDate AND b.isDeleted = false")
     long countBookingsFromDate(@Param("startDate") java.time.LocalDateTime startDate);
 
+    // Date-based analytics queries for trend charts
+    @Query("SELECT COUNT(b) FROM Booking b WHERE DATE(b.createdAt) = :date AND b.isDeleted = false")
+    Long countBookingsByDate(@Param("date") java.time.LocalDate date);
+
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.status = 'COMPLETED' AND DATE(b.createdAt) = :date AND b.isDeleted = false")
+    Long countCompletedBookingsByDate(@Param("date") java.time.LocalDate date);
+
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.status IN ('CANCELED', 'OVERDUE') AND DATE(b.createdAt) = :date AND b.isDeleted = false")
+    Long countCanceledBookingsByDate(@Param("date") java.time.LocalDate date);
+
+    @Query("SELECT AVG(b.totalPrice) FROM Booking b WHERE b.status = 'COMPLETED' AND DATE(b.createdAt) = :date AND b.isDeleted = false")
+    java.math.BigDecimal findAverageBookingValueByDate(@Param("date") java.time.LocalDate date);
+
+    @Query("SELECT AVG(r.rating) FROM Review r JOIN r.booking b WHERE DATE(b.createdAt) = :date AND b.isDeleted = false")
+    java.math.BigDecimal findAverageRatingByDate(@Param("date") java.time.LocalDate date);
+
+    @Query("SELECT COUNT(r) FROM Review r JOIN r.booking b WHERE DATE(b.createdAt) = :date AND b.isDeleted = false")
+    Long countReviewsByDate(@Param("date") java.time.LocalDate date);
+
+    @Query("SELECT COALESCE(SUM(r.rating), 0) FROM Review r JOIN r.booking b WHERE b.status = 'COMPLETED' AND b.isDeleted = false")
+    java.math.BigDecimal findTotalRatingSum();
+
+    @Query("SELECT COUNT(r) FROM Review r JOIN r.booking b WHERE b.status = 'COMPLETED' AND b.isDeleted = false")
+    Long countTotalRatings();
+
+    // Date range queries for seasonal analysis
+    @Query("SELECT COUNT(b) FROM Booking b WHERE DATE(b.createdAt) BETWEEN :startDate AND :endDate AND b.isDeleted = false")
+    Long countBookingsByDateRange(@Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate);
+
 }

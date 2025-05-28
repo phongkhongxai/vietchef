@@ -89,6 +89,11 @@ class StatisticsServiceTest {
         when(bookingRepository.countBookingsFromDate(any(LocalDateTime.class))).thenReturn(15L);
         
         when(chefRepository.countByStatus("PENDING")).thenReturn(25L);
+        when(chefRepository.countByStatus("ACTIVE")).thenReturn(135L);
+
+        // Mock for real customer satisfaction calculation using existing methods
+        when(bookingRepository.findTotalRatingSum()).thenReturn(BigDecimal.valueOf(840));
+        when(bookingRepository.countTotalRatings()).thenReturn(200L);
 
         // When
         AdminOverviewDto result = statisticsService.getAdminOverview();
@@ -105,7 +110,17 @@ class StatisticsServiceTest {
         assertEquals(200L, result.getCompletedBookings());
         assertEquals(25L, result.getPendingApprovals());
         assertEquals("Excellent", result.getSystemHealth());
-        assertEquals(85.0, result.getChefRetentionRate());
+        
+        // Real chef retention rate: 135/150 * 100 = 90.0
+        assertEquals(90.0, result.getChefRetentionRate());
+        
+        // Real customer satisfaction: 840/200 = 4.2
+        assertEquals(4.2, result.getCustomerSatisfaction());
+        
+        // Verify interactions with real data methods
+        verify(bookingRepository).findTotalRatingSum();
+        verify(bookingRepository).countTotalRatings();
+        verify(chefRepository, times(1)).countByStatus("ACTIVE"); // Called once for retention calculation only
     }
 
     @Test
@@ -119,6 +134,10 @@ class StatisticsServiceTest {
         when(bookingRepository.countByStatus(anyString())).thenReturn(0L);
         when(bookingRepository.countBookingsFromDate(any(LocalDateTime.class))).thenReturn(0L);
         when(chefRepository.countByStatus(anyString())).thenReturn(0L);
+        
+        // Mock null/zero values for real calculations
+        when(bookingRepository.findTotalRatingSum()).thenReturn(BigDecimal.ZERO);
+        when(bookingRepository.countTotalRatings()).thenReturn(0L);
 
         // When
         AdminOverviewDto result = statisticsService.getAdminOverview();
@@ -132,6 +151,10 @@ class StatisticsServiceTest {
         assertEquals(0L, result.getActiveBookings());
         assertEquals(Double.valueOf(0.0), result.getPlatformGrowth());
         assertEquals("Good", result.getSystemHealth()); // 0.0 growth falls into "Good" category (< 5)
+        
+        // Real calculations with null/zero data
+        assertEquals(0.0, result.getChefRetentionRate()); // 0/0 = 0
+        assertEquals(4.0, result.getCustomerSatisfaction()); // Default value when no ratings exist
     }
 
     // ==================== USER STATISTICS TESTS ====================
@@ -159,7 +182,7 @@ class StatisticsServiceTest {
         assertEquals(50L, result.getPendingChefs());
         assertEquals(25L, result.getBannedUsers());
         assertEquals(100L, result.getPremiumUsers());
-        assertEquals(0L, result.getNewUsersThisMonth()); // Placeholder
+        assertEquals(0L, result.getNewUsersThisMonth()); // Still placeholder
         assertNotNull(result.getUserGrowthChart());
         assertTrue(result.getUserGrowthChart().isEmpty());
     }
@@ -246,7 +269,7 @@ class StatisticsServiceTest {
         when(bookingRepository.countUniqueCustomersByChef(testChef.getId())).thenReturn(50L);
         when(bookingRepository.findAverageOrderValueByChef(testChef.getId())).thenReturn(averageOrderValue);
 
-        // Review statistics
+        // Review statistics - using ReviewService as before
         when(reviewService.getAverageRatingForChef(testChef.getId())).thenReturn(averageRating);
         when(reviewService.getReviewCountForChef(testChef.getId())).thenReturn(75L);
 
@@ -270,12 +293,18 @@ class StatisticsServiceTest {
         assertEquals(50L, result.getTotalCustomers());
         assertEquals(averageOrderValue, result.getAverageOrderValue());
         assertEquals(80.0, result.getCompletionRate()); // 80/100 * 100
-        assertEquals(240, result.getActiveHours()); // 80 * 3
+        
+        // Real calculation: 80 completed bookings * 3 hours per booking = 240 hours
+        assertEquals(240, result.getActiveHours()); 
         assertEquals("Average", result.getPerformanceStatus());
         
         // Verify growth calculations
         assertNotNull(result.getMonthlyGrowth());
         assertNotNull(result.getWeeklyGrowth());
+        
+        // Verify ReviewService method calls
+        verify(reviewService).getAverageRatingForChef(testChef.getId());
+        verify(reviewService).getReviewCountForChef(testChef.getId());
     }
 
     @Test
@@ -305,7 +334,7 @@ class StatisticsServiceTest {
         when(bookingRepository.countUniqueCustomersByChef(testChef.getId())).thenReturn(0L);
         when(bookingRepository.findAverageOrderValueByChef(testChef.getId())).thenReturn(null);
 
-        // Mock review data
+        // Mock review data with null values
         when(reviewService.getAverageRatingForChef(testChef.getId())).thenReturn(null);
         when(reviewService.getReviewCountForChef(testChef.getId())).thenReturn(0L);
 
@@ -323,6 +352,11 @@ class StatisticsServiceTest {
         assertEquals(0.0, result.getWeeklyGrowth());
         assertEquals(0.0, result.getCompletionRate());
         assertEquals("Average", result.getPerformanceStatus());
+        
+        // Real calculation results with null/zero data
+        assertNull(result.getAverageRating()); // reviewService returns null when no ratings
+        assertEquals(0L, result.getTotalReviews());
+        assertEquals(0, result.getActiveHours()); // 0 completed bookings * 3 = 0
     }
 
     @Test
@@ -360,6 +394,37 @@ class StatisticsServiceTest {
 
         // Then
         assertEquals("Poor", result.getPerformanceStatus());
+        assertEquals(lowRating, result.getAverageRating());
+        assertEquals(10L, result.getTotalReviews());
+    }
+
+    @Test
+    void getChefOverview_ShouldCalculateRealActiveHours() {
+        // Given
+        Long chefUserId = 100L;
+        when(chefRepository.findByUserId(chefUserId)).thenReturn(Optional.of(testChef));
+        when(chefTransactionRepository.findTotalEarningsByChef(chefUserId)).thenReturn(BigDecimal.valueOf(5000));
+        when(chefTransactionRepository.findEarningsByChefFromDate(eq(chefUserId), any(LocalDateTime.class)))
+                .thenReturn(BigDecimal.valueOf(500));
+        when(chefTransactionRepository.findTodayEarningsByChef(chefUserId)).thenReturn(BigDecimal.valueOf(50));
+
+        // Set up 50 completed bookings for active hours calculation
+        when(bookingRepository.countByChefId(testChef.getId())).thenReturn(60L);
+        when(bookingRepository.countByChefIdAndStatus(eq(testChef.getId()), anyString())).thenReturn(5L);
+        when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "COMPLETED")).thenReturn(50L);
+        when(bookingRepository.countUniqueCustomersByChef(testChef.getId())).thenReturn(30L);
+        when(bookingRepository.findAverageOrderValueByChef(testChef.getId())).thenReturn(BigDecimal.valueOf(100));
+
+        when(reviewService.getAverageRatingForChef(testChef.getId())).thenReturn(BigDecimal.valueOf(4.0));
+        when(reviewService.getReviewCountForChef(testChef.getId())).thenReturn(45L);
+
+        // When
+        ChefOverviewDto result = statisticsService.getChefOverview(chefUserId);
+
+        // Then
+        // Real calculation: 50 completed bookings * 3 hours per booking = 150 active hours
+        assertEquals(150, result.getActiveHours());
+        assertEquals(50L, result.getCompletedBookings());
     }
 
     // ==================== INTEGRATION TESTS ====================
@@ -419,5 +484,9 @@ class StatisticsServiceTest {
         // Review service mocks
         when(reviewService.getAverageRatingForChef(anyLong())).thenReturn(BigDecimal.valueOf(4.5));
         when(reviewService.getReviewCountForChef(anyLong())).thenReturn(50L);
+        
+        // Real data calculation mocks
+        when(bookingRepository.findTotalRatingSum()).thenReturn(BigDecimal.valueOf(800));
+        when(bookingRepository.countTotalRatings()).thenReturn(200L);
     }
 } 

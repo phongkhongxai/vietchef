@@ -26,4 +26,7 @@ public interface ChefTransactionRepository extends JpaRepository<ChefTransaction
     @Query("SELECT COALESCE(SUM(ct.amount), 0) FROM ChefTransaction ct WHERE ct.wallet.user.id = :chefUserId AND ct.transactionType = 'EARNING' AND ct.status = 'COMPLETED' AND DATE(ct.createdAt) = CURRENT_DATE")
     java.math.BigDecimal findTodayEarningsByChef(@Param("chefUserId") Long chefUserId);
 
+    @Query("SELECT COALESCE(SUM(ct.amount), 0) FROM ChefTransaction ct WHERE ct.transactionType = 'EARNING' AND ct.status = 'COMPLETED'")
+    java.math.BigDecimal findTotalEarnings();
+
 }
