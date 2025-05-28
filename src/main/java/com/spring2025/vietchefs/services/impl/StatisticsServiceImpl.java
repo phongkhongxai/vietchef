@@ -1,6 +1,7 @@
 package com.spring2025.vietchefs.services.impl;
 
 import com.spring2025.vietchefs.models.entity.Chef;
+import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.responseModel.AdminOverviewDto;
 import com.spring2025.vietchefs.models.payload.responseModel.BookingStatisticsDto;
 import com.spring2025.vietchefs.models.payload.responseModel.ChefOverviewDto;
@@ -9,11 +10,14 @@ import com.spring2025.vietchefs.repositories.*;
 import com.spring2025.vietchefs.services.ReviewService;
 import com.spring2025.vietchefs.services.StatisticsService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Optional;
 
 @Service
 public class StatisticsServiceImpl implements StatisticsService {
@@ -32,6 +36,8 @@ public class StatisticsServiceImpl implements StatisticsService {
     
     @Autowired
     private ChefTransactionRepository chefTransactionRepository;
+    @Autowired
+    private BookingDetailRepository bookingDetailRepository;
     
     @Autowired
     private ReviewService reviewService;
@@ -39,28 +45,24 @@ public class StatisticsServiceImpl implements StatisticsService {
     @Override
     public AdminOverviewDto getAdminOverview() {
         // Calculate platform revenue metrics
-        BigDecimal totalRevenue = customerTransactionRepository.findTotalRevenue();
+        BigDecimal totalRevenue = bookingDetailRepository.findTotalRevenue();
         if (totalRevenue == null) totalRevenue = BigDecimal.ZERO;
-        
         // Calculate monthly revenue (last 30 days)
-        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
-        BigDecimal monthlyRevenue = customerTransactionRepository.findRevenueFromDate(thirtyDaysAgo);
+        BigDecimal monthlyRevenue = bookingDetailRepository.findMonthlyRevenue();
         if (monthlyRevenue == null) monthlyRevenue = BigDecimal.ZERO;
-        
-        // Calculate platform commission (assuming 10% commission rate)
-        BigDecimal systemCommission = totalRevenue.multiply(BigDecimal.valueOf(0.1));
-        BigDecimal totalPayouts = totalRevenue.subtract(systemCommission);
+        BigDecimal systemCommission = bookingDetailRepository.findSystemCommission();
+        if (systemCommission == null) monthlyRevenue = BigDecimal.ZERO;
+        BigDecimal totalPayouts = bookingDetailRepository.findTotalPayoutsToChefs();
+        if (totalPayouts == null) monthlyRevenue = BigDecimal.ZERO;
         
         // Calculate growth percentage (compare with previous 30 days)
-        LocalDateTime sixtyDaysAgo = LocalDateTime.now().minusDays(60);
-        BigDecimal previousMonthRevenue = customerTransactionRepository.findRevenueFromDate(sixtyDaysAgo);
-        if (previousMonthRevenue != null) {
-            previousMonthRevenue = previousMonthRevenue.subtract(monthlyRevenue);
-        } else {
-            previousMonthRevenue = BigDecimal.ZERO;
-        }
+        LocalDate endOfPreviousPeriod = LocalDate.now().minusDays(30);
+        LocalDate startOfPreviousPeriod = LocalDate.now().minusDays(60);
+        BigDecimal previousMonthRevenue = Optional.ofNullable(
+                bookingDetailRepository.findRevenueBetweenDates(startOfPreviousPeriod, endOfPreviousPeriod)
+        ).orElse(BigDecimal.ZERO);
         
-        Double platformGrowth = 0.0;
+        double platformGrowth = 0.0;
         if (previousMonthRevenue.compareTo(BigDecimal.ZERO) > 0) {
             platformGrowth = monthlyRevenue.subtract(previousMonthRevenue)
                     .divide(previousMonthRevenue, 4, BigDecimal.ROUND_HALF_UP)
@@ -76,9 +78,7 @@ public class StatisticsServiceImpl implements StatisticsService {
         // Use correct booking statuses based on the codebase
         Long activeBookings = bookingRepository.countByStatus("CONFIRMED") + 
                              bookingRepository.countByStatus("CONFIRMED_PAID") +
-                             bookingRepository.countByStatus("CONFIRMED_PARTIALLY_PAID") +
-                             bookingRepository.countByStatus("PAID") +
-                             bookingRepository.countByStatus("DEPOSITED");
+                             bookingRepository.countByStatus("CONFIRMED_PARTIALLY_PAID");
         
         Long completedBookings = bookingRepository.countByStatus("COMPLETED");
         Long pendingApprovals = chefRepository.countByStatus("PENDING");
@@ -87,8 +87,9 @@ public class StatisticsServiceImpl implements StatisticsService {
         LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
         Long newSignupsToday = userRepository.countNewUsersFromDate(todayStart);
         Long bookingsToday = bookingRepository.countBookingsFromDate(todayStart);
-        BigDecimal revenueToday = customerTransactionRepository.findRevenueFromDate(todayStart);
-        if (revenueToday == null) revenueToday = BigDecimal.ZERO;
+        BigDecimal revenueToday = Optional.ofNullable(
+                bookingDetailRepository.findRevenueForDate(LocalDate.now())
+        ).orElse(BigDecimal.ZERO);
         
         // Calculate customer satisfaction (average rating across platform)
         // Get real customer satisfaction from completed bookings with ratings
@@ -174,7 +175,7 @@ public class StatisticsServiceImpl implements StatisticsService {
     @Override
     public ChefOverviewDto getChefOverview(Long chefUserId) {
         Chef chef = chefRepository.findByUserId(chefUserId)
-                .orElseThrow(() -> new RuntimeException("Chef not found"));
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"Chef not found"));
 
         // Calculate earnings metrics
         BigDecimal totalEarnings = chefTransactionRepository.findTotalEarningsByChef(chefUserId);
@@ -229,20 +230,21 @@ public class StatisticsServiceImpl implements StatisticsService {
         }
 
         // Get booking statistics using correct statuses
-        Long totalBookings = bookingRepository.countByChefId(chef.getId());
+        Long totalBookings = bookingRepository.countByChefIdExcludingPending(chef.getId());
         Long completedBookings = bookingRepository.countByChefIdAndStatus(chef.getId(), "COMPLETED");
         
         // Upcoming bookings include all confirmed statuses
         Long upcomingBookings = bookingRepository.countByChefIdAndStatus(chef.getId(), "CONFIRMED") +
                                bookingRepository.countByChefIdAndStatus(chef.getId(), "CONFIRMED_PAID") +
-                               bookingRepository.countByChefIdAndStatus(chef.getId(), "CONFIRMED_PARTIALLY_PAID") +
-                               bookingRepository.countByChefIdAndStatus(chef.getId(), "PAID") +
-                               bookingRepository.countByChefIdAndStatus(chef.getId(), "DEPOSITED");
+                               bookingRepository.countByChefIdAndStatus(chef.getId(), "CONFIRMED_PARTIALLY_PAID");
         
         Long canceledBookings = bookingRepository.countByChefIdAndStatus(chef.getId(), "CANCELED") +
-                               bookingRepository.countByChefIdAndStatus(chef.getId(), "OVERDUE");
+                               bookingRepository.countByChefIdAndStatus(chef.getId(), "OVERDUE") +
+                                bookingRepository.countByChefIdAndStatus(chef.getId(),"REJECTED");
         
-        Long pendingBookings = bookingRepository.countByChefIdAndStatus(chef.getId(), "PENDING");
+        Long pendingBookings = bookingRepository.countByChefIdAndStatus(chef.getId(), "PAID") +
+                bookingRepository.countByChefIdAndStatus(chef.getId(), "DEPOSITED") +
+                bookingRepository.countByChefIdAndStatus(chef.getId(), "PAID_FIRST_CYCLE");
 
         // Calculate completion rate
         Double completionRate = 0.0;

@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -60,6 +61,9 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     @Query("SELECT COUNT(b) FROM Booking b WHERE b.chef.id = :chefId AND b.isDeleted = false")
     long countByChefId(@Param("chefId") Long chefId);
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.chef.id = :chefId AND b.isDeleted = false AND b.status <> 'PENDING'")
+    long countByChefIdExcludingPending(@Param("chefId") Long chefId);
+
 
     @Query("SELECT COUNT(DISTINCT b.customer.id) FROM Booking b WHERE b.chef.id = :chefId AND b.status = 'COMPLETED' AND b.isDeleted = false")
     long countUniqueCustomersByChef(@Param("chefId") Long chefId);
@@ -69,6 +73,24 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     @Query("SELECT COUNT(b) FROM Booking b WHERE b.createdAt >= :startDate AND b.isDeleted = false")
     long countBookingsFromDate(@Param("startDate") java.time.LocalDateTime startDate);
+    @Query("SELECT COUNT(b) FROM Booking b WHERE DATE(b.createdAt) = :date")
+    Long countBookingsByDate(@Param("date") LocalDate date);
+
+    @Query("SELECT COUNT(b) FROM Booking b WHERE DATE(b.createdAt) = :date AND b.status = 'COMPLETED'")
+    Long countCompletedBookingsByDate(@Param("date") LocalDate date);
+
+    @Query("SELECT COUNT(b) FROM Booking b " +
+            "WHERE DATE(b.createdAt) = :date " +
+            "AND b.status IN ('CANCELED', 'REJECTED', 'OVERDUE')")
+    Long countCanceledBookingsByDate(@Param("date") LocalDate date);
+
+    @Query("SELECT AVG(b.totalPrice) FROM Booking b WHERE DATE(b.createdAt) = :date")
+    BigDecimal averageBookingValueByDate(@Param("date") LocalDate date);
+    @Query("SELECT AVG(b.totalPrice) FROM Booking b " +
+            "WHERE DATE(b.createdAt) = :date AND b.status = 'COMPLETED'")
+    BigDecimal averageBookingCompletedValueByDate(@Param("date") LocalDate date);
+
+
 
     // Date-based analytics queries for trend charts
     @Query("SELECT COUNT(b) FROM Booking b WHERE DATE(b.createdAt) = :date AND b.isDeleted = false")

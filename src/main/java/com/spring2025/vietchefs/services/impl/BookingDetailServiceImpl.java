@@ -583,6 +583,14 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                     notificationService.sendPushNotification(notification);
                 }
                 booking =bookingRepository.save(booking);
+                NotificationRequest notification = NotificationRequest.builder()
+                        .userId(booking.getCustomer().getId())
+                        .title("Booking Session Completed")
+                        .body("Completed Booking Sessions with Chef "+ booking.getChef().getUser().getFullName()+".")
+                        .bookingId(booking.getId())
+                        .screen("Booking")
+                        .build();
+                notificationService.sendPushNotification(notification);
 
             }
         }
@@ -1010,6 +1018,14 @@ public void markOverdueBookingDetails() {
                 }
                 bookingRepository.save(booking);
             }
+            NotificationRequest notification = NotificationRequest.builder()
+                    .userId(booking.getCustomer().getId())
+                    .title("Booking Session Completed")
+                    .body("Completed Booking Session with Chef "+ booking.getChef().getUser().getFullName()+".")
+                    .bookingId(booking.getId())
+                    .screen("Booking")
+                    .build();
+            notificationService.sendPushNotification(notification);
         }
 
         // Chuyển tiền cho chef
@@ -1034,7 +1050,7 @@ public void markOverdueBookingDetails() {
 
         notificationService.sendPushNotification(NotificationRequest.builder()
                 .userId(chef.getUser().getId())
-                .title("Booking Completed")
+                .title("Booking Session Completed")
                 .body("System has auto-confirmed the completion and sent payment.")
                 .screen("ChefEarningsScreen")
                 .bookingId(booking.getId())

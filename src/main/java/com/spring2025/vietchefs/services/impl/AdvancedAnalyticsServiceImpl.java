@@ -33,6 +33,10 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
     
     @Autowired
     private ChefRepository chefRepository;
+    @Autowired
+    private BookingDetailRepository bookingDetailRepository;
+    @Autowired
+    private PaymentRepository paymentRepository;
 
     @Override
     public TrendAnalyticsDto getTrendAnalytics(LocalDate startDate, LocalDate endDate) {
@@ -40,12 +44,15 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
         List<TrendAnalyticsDto.BookingDataPoint> bookingChart = generateBookingChart(startDate, endDate);
         List<TrendAnalyticsDto.UserGrowthDataPoint> userGrowthChart = generateUserGrowthChart(startDate, endDate);
         List<TrendAnalyticsDto.PerformanceDataPoint> performanceChart = generatePerformanceChart(startDate, endDate);
+        List<TrendAnalyticsDto.PaymentDataPoint> paymentDataPoints = generatePaymentChart(startDate, endDate);
+
 
         return TrendAnalyticsDto.builder()
                 .revenueChart(revenueChart)
                 .bookingChart(bookingChart)
                 .userGrowthChart(userGrowthChart)
                 .performanceChart(performanceChart)
+                .paymentChart(paymentDataPoints)
                 .build();
     }
 
@@ -290,6 +297,7 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
         
         LocalDate currentDate = startDate;
         while (!currentDate.isAfter(endDate)) {
+          
             // Get real revenue data for this date
             BigDecimal revenue = customerTransactionRepository.findRevenueByDate(currentDate);
             if (revenue == null) revenue = BigDecimal.ZERO;
@@ -297,7 +305,7 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
             BigDecimal commission = revenue.multiply(BigDecimal.valueOf(0.1)); // 10% commission
             Long transactionCount = customerTransactionRepository.countTransactionsByDate(currentDate);
             if (transactionCount == null) transactionCount = 0L;
-
+          
             dataPoints.add(TrendAnalyticsDto.RevenueDataPoint.builder()
                     .date(currentDate)
                     .revenue(revenue)
@@ -335,6 +343,7 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
                     .completedBookings(completedBookings)
                     .canceledBookings(canceledBookings)
                     .averageValue(averageValue)
+                    .averageCompletedValue(averageCompleteValue)
                     .build());
 
             currentDate = currentDate.plusDays(1);
@@ -409,6 +418,26 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
         
         return dataPoints;
     }
+    private List<TrendAnalyticsDto.PaymentDataPoint> generatePaymentChart(LocalDate startDate, LocalDate endDate) {
+        List<TrendAnalyticsDto.PaymentDataPoint> dataPoints = new ArrayList<>();
+
+        LocalDate currentDate = startDate;
+        while (!currentDate.isAfter(endDate)) {
+            BigDecimal deposit = paymentRepository.getTotalDepositByDate(currentDate);
+            BigDecimal payout = paymentRepository.getTotalPayoutByDate(currentDate);
+
+            dataPoints.add(TrendAnalyticsDto.PaymentDataPoint.builder()
+                    .date(currentDate)
+                    .totalDeposit(deposit)
+                    .totalPayout(payout)
+                    .build());
+
+            currentDate = currentDate.plusDays(1);
+        }
+
+        return dataPoints;
+    }
+
 
     // Helper methods for chef rankings with REAL DATABASE QUERIES (simplified)
     private List<ChefRankingDto.TopChef> generateTopEarningChefs(int limit) {
