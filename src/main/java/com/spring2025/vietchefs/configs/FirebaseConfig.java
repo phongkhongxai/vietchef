@@ -18,7 +18,7 @@ import java.io.InputStream;
 public class FirebaseConfig {
     @PostConstruct
     public void initFirebase() throws IOException {
-        InputStream serviceAccount = getClass().getClassLoader().getResourceAsStream("secure-grammar-456201-n8-firebase-adminsdk-fbsvc-cd3a329fcb.json");
+        InputStream serviceAccount = getClass().getClassLoader().getResourceAsStream("vietchef-25533-firebase-adminsdk-fbsvc-7b58169474.json");
 
         if (serviceAccount == null) {
             throw new FileNotFoundException("serviceAccountKey.json not found in resources folder");

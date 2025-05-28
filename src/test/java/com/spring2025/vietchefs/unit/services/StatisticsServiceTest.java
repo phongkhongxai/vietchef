@@ -2,6 +2,7 @@ package com.spring2025.vietchefs.unit.services;
 
 import com.spring2025.vietchefs.models.entity.Chef;
 import com.spring2025.vietchefs.models.entity.User;
+import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.responseModel.AdminOverviewDto;
 import com.spring2025.vietchefs.models.payload.responseModel.BookingStatisticsDto;
 import com.spring2025.vietchefs.models.payload.responseModel.ChefOverviewDto;
@@ -17,6 +18,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -75,10 +77,8 @@ class StatisticsServiceTest {
         BigDecimal actualPlatformFee = BigDecimal.valueOf(7500); // ✅ ACTUAL commission from booking details
         BigDecimal actualChefPayouts = BigDecimal.valueOf(42500); // ✅ ACTUAL chef payouts from booking details
         
-        when(customerTransactionRepository.findTotalRevenue()).thenReturn(totalRevenue);
-        when(customerTransactionRepository.findRevenueFromDate(any(LocalDateTime.class)))
-                .thenReturn(monthlyRevenue)
-                .thenReturn(BigDecimal.valueOf(9000)); // 60 days ago total
+        when(bookingDetailRepository.findTotalRevenue()).thenReturn(totalRevenue);
+        when(bookingDetailRepository.findMonthlyRevenue()).thenReturn(monthlyRevenue);
         
         // ✅ Mock accurate financial calculations from BookingDetailRepository
         when(bookingDetailRepository.findTotalActualPlatformFee()).thenReturn(actualPlatformFee);
@@ -95,8 +95,6 @@ class StatisticsServiceTest {
         when(bookingRepository.countByStatus("CONFIRMED")).thenReturn(50L);
         when(bookingRepository.countByStatus("CONFIRMED_PAID")).thenReturn(30L);
         when(bookingRepository.countByStatus("CONFIRMED_PARTIALLY_PAID")).thenReturn(20L);
-        when(bookingRepository.countByStatus("PAID")).thenReturn(40L);
-        when(bookingRepository.countByStatus("DEPOSITED")).thenReturn(10L);
         when(bookingRepository.countByStatus("COMPLETED")).thenReturn(200L);
         when(bookingRepository.countBookingsFromDate(any(LocalDateTime.class))).thenReturn(15L);
         
@@ -106,6 +104,8 @@ class StatisticsServiceTest {
         // Mock for real customer satisfaction calculation using existing methods
         when(bookingRepository.findTotalRatingSum()).thenReturn(BigDecimal.valueOf(840));
         when(bookingRepository.countTotalRatings()).thenReturn(200L);
+        
+        when(customerTransactionRepository.findRevenueByDate(any(LocalDate.class))).thenReturn(BigDecimal.valueOf(500));
 
         // When
         AdminOverviewDto result = statisticsService.getAdminOverview();
@@ -122,7 +122,7 @@ class StatisticsServiceTest {
         assertEquals(1000L, result.getTotalUsers());
         assertEquals(150L, result.getTotalChefs());
         assertEquals(850L, result.getTotalCustomers());
-        assertEquals(150L, result.getActiveBookings()); // Sum of all active statuses
+        assertEquals(100L, result.getActiveBookings()); // Sum of all active statuses
         assertEquals(200L, result.getCompletedBookings());
         assertEquals(25L, result.getPendingApprovals());
         assertEquals("Excellent", result.getSystemHealth());
@@ -147,8 +147,8 @@ class StatisticsServiceTest {
     @Test
     void getAdminOverview_ShouldHandleNullValues_WhenNoDataExists() {
         // Given
-        when(customerTransactionRepository.findTotalRevenue()).thenReturn(null);
-        when(customerTransactionRepository.findRevenueFromDate(any(LocalDateTime.class))).thenReturn(null);
+        when(bookingDetailRepository.findTotalRevenue()).thenReturn(null);
+        when(bookingDetailRepository.findMonthlyRevenue()).thenReturn(null);
         
         // ✅ Mock null values from BookingDetailRepository
         when(bookingDetailRepository.findTotalActualPlatformFee()).thenReturn(null);
@@ -165,6 +165,7 @@ class StatisticsServiceTest {
         // Mock null/zero values for real calculations
         when(bookingRepository.findTotalRatingSum()).thenReturn(BigDecimal.ZERO);
         when(bookingRepository.countTotalRatings()).thenReturn(0L);
+        when(customerTransactionRepository.findRevenueByDate(any(LocalDate.class))).thenReturn(null);
 
         // When
         AdminOverviewDto result = statisticsService.getAdminOverview();
@@ -200,8 +201,8 @@ class StatisticsServiceTest {
         BigDecimal actualPlatformFee = BigDecimal.valueOf(15000); // Not 10% of revenue (would be 10000)
         BigDecimal actualChefPayouts = BigDecimal.valueOf(85000); // Actual payouts from booking details
         
-        when(customerTransactionRepository.findTotalRevenue()).thenReturn(totalRevenue);
-        when(customerTransactionRepository.findRevenueFromDate(any(LocalDateTime.class))).thenReturn(BigDecimal.valueOf(10000));
+        when(bookingDetailRepository.findTotalRevenue()).thenReturn(totalRevenue);
+        when(bookingDetailRepository.findMonthlyRevenue()).thenReturn(BigDecimal.valueOf(10000));
         
         when(bookingDetailRepository.findTotalActualPlatformFee()).thenReturn(actualPlatformFee);
         when(bookingDetailRepository.findTotalChefPayouts()).thenReturn(actualChefPayouts);
@@ -216,6 +217,7 @@ class StatisticsServiceTest {
         when(chefRepository.countByStatus(anyString())).thenReturn(5L);
         when(bookingRepository.findTotalRatingSum()).thenReturn(BigDecimal.valueOf(80));
         when(bookingRepository.countTotalRatings()).thenReturn(20L);
+        when(customerTransactionRepository.findRevenueByDate(any(LocalDate.class))).thenReturn(BigDecimal.valueOf(1000));
 
         // When
         AdminOverviewDto result = statisticsService.getAdminOverview();
@@ -332,17 +334,18 @@ class StatisticsServiceTest {
                 .thenReturn(BigDecimal.valueOf(700)); // 14 days ago
         when(chefTransactionRepository.findTodayEarningsByChef(chefUserId)).thenReturn(todayEarnings);
 
-        // Booking statistics
-        when(bookingRepository.countByChefId(testChef.getId())).thenReturn(100L);
+        // ✅ UPDATED: Use countByChefIdExcludingPending instead of countByChefId
+        when(bookingRepository.countByChefIdExcludingPending(testChef.getId())).thenReturn(100L);
         when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "COMPLETED")).thenReturn(80L);
         when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "CONFIRMED")).thenReturn(10L);
         when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "CONFIRMED_PAID")).thenReturn(5L);
         when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "CONFIRMED_PARTIALLY_PAID")).thenReturn(3L);
         when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "PAID")).thenReturn(2L);
         when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "DEPOSITED")).thenReturn(0L);
+        when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "PAID_FIRST_CYCLE")).thenReturn(1L);
         when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "CANCELED")).thenReturn(5L);
         when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "OVERDUE")).thenReturn(2L);
-        when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "PENDING")).thenReturn(8L);
+        when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "REJECTED")).thenReturn(1L);
 
         when(bookingRepository.countUniqueCustomersByChef(testChef.getId())).thenReturn(50L);
         when(bookingRepository.findAverageOrderValueByChef(testChef.getId())).thenReturn(averageOrderValue);
@@ -362,9 +365,9 @@ class StatisticsServiceTest {
         assertEquals(todayEarnings, result.getTodayEarnings());
         assertEquals(100L, result.getTotalBookings());
         assertEquals(80L, result.getCompletedBookings());
-        assertEquals(20L, result.getUpcomingBookings()); // Sum of confirmed statuses
-        assertEquals(7L, result.getCanceledBookings()); // CANCELED + OVERDUE
-        assertEquals(8L, result.getPendingBookings());
+        assertEquals(18L, result.getUpcomingBookings()); // Sum of confirmed statuses (10+5+3)
+        assertEquals(8L, result.getCanceledBookings()); // CANCELED + OVERDUE + REJECTED (5+2+1)
+        assertEquals(3L, result.getPendingBookings()); // PAID + DEPOSITED + PAID_FIRST_CYCLE (2+0+1)
         assertEquals(averageRating, result.getAverageRating());
         assertEquals(75L, result.getTotalReviews());
         assertEquals(1500, result.getReputationPoints());
@@ -383,6 +386,9 @@ class StatisticsServiceTest {
         // Verify ReviewService method calls
         verify(reviewService).getAverageRatingForChef(testChef.getId());
         verify(reviewService).getReviewCountForChef(testChef.getId());
+        
+        // ✅ VERIFY: New method is called
+        verify(bookingRepository).countByChefIdExcludingPending(testChef.getId());
     }
 
     @Test
@@ -391,8 +397,8 @@ class StatisticsServiceTest {
         Long chefUserId = 999L;
         when(chefRepository.findByUserId(chefUserId)).thenReturn(Optional.empty());
 
-        // When & Then
-        RuntimeException exception = assertThrows(RuntimeException.class, 
+        // When & Then - ✅ UPDATED: Expect VchefApiException instead of RuntimeException
+        VchefApiException exception = assertThrows(VchefApiException.class, 
             () -> statisticsService.getChefOverview(chefUserId));
         assertEquals("Chef not found", exception.getMessage());
     }
@@ -406,8 +412,8 @@ class StatisticsServiceTest {
         when(chefTransactionRepository.findEarningsByChefFromDate(eq(chefUserId), any(LocalDateTime.class))).thenReturn(null);
         when(chefTransactionRepository.findTodayEarningsByChef(chefUserId)).thenReturn(null);
 
-        // Mock booking data
-        when(bookingRepository.countByChefId(testChef.getId())).thenReturn(0L);
+        // ✅ UPDATED: Mock booking data with new method
+        when(bookingRepository.countByChefIdExcludingPending(testChef.getId())).thenReturn(0L);
         when(bookingRepository.countByChefIdAndStatus(eq(testChef.getId()), anyString())).thenReturn(0L);
         when(bookingRepository.countUniqueCustomersByChef(testChef.getId())).thenReturn(0L);
         when(bookingRepository.findAverageOrderValueByChef(testChef.getId())).thenReturn(null);
@@ -435,6 +441,9 @@ class StatisticsServiceTest {
         assertNull(result.getAverageRating()); // reviewService returns null when no ratings
         assertEquals(0L, result.getTotalReviews());
         assertEquals(0, result.getActiveHours()); // 0 completed bookings * 3 = 0
+        
+        // ✅ VERIFY: New method is called
+        verify(bookingRepository).countByChefIdExcludingPending(testChef.getId());
     }
 
     @Test
@@ -449,17 +458,18 @@ class StatisticsServiceTest {
                 .thenReturn(BigDecimal.valueOf(100));
         when(chefTransactionRepository.findTodayEarningsByChef(chefUserId)).thenReturn(BigDecimal.valueOf(10));
 
-        // Minimal booking data needed for the service to run
-        when(bookingRepository.countByChefId(testChef.getId())).thenReturn(10L);
+        // ✅ UPDATED: Minimal booking data needed for the service to run
+        when(bookingRepository.countByChefIdExcludingPending(testChef.getId())).thenReturn(10L);
         when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "COMPLETED")).thenReturn(5L);
         when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "CONFIRMED")).thenReturn(1L);
         when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "CONFIRMED_PAID")).thenReturn(1L);
         when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "CONFIRMED_PARTIALLY_PAID")).thenReturn(1L);
         when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "PAID")).thenReturn(1L);
         when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "DEPOSITED")).thenReturn(1L);
+        when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "PAID_FIRST_CYCLE")).thenReturn(0L);
         when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "CANCELED")).thenReturn(0L);
         when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "OVERDUE")).thenReturn(0L);
-        when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "PENDING")).thenReturn(0L);
+        when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "REJECTED")).thenReturn(0L);
         when(bookingRepository.countUniqueCustomersByChef(testChef.getId())).thenReturn(5L);
         when(bookingRepository.findAverageOrderValueByChef(testChef.getId())).thenReturn(BigDecimal.valueOf(50));
 
@@ -486,8 +496,8 @@ class StatisticsServiceTest {
                 .thenReturn(BigDecimal.valueOf(500));
         when(chefTransactionRepository.findTodayEarningsByChef(chefUserId)).thenReturn(BigDecimal.valueOf(50));
 
-        // Set up 50 completed bookings for active hours calculation
-        when(bookingRepository.countByChefId(testChef.getId())).thenReturn(60L);
+        // ✅ UPDATED: Set up 50 completed bookings for active hours calculation
+        when(bookingRepository.countByChefIdExcludingPending(testChef.getId())).thenReturn(60L);
         when(bookingRepository.countByChefIdAndStatus(eq(testChef.getId()), anyString())).thenReturn(5L);
         when(bookingRepository.countByChefIdAndStatus(testChef.getId(), "COMPLETED")).thenReturn(50L);
         when(bookingRepository.countUniqueCustomersByChef(testChef.getId())).thenReturn(30L);
@@ -529,11 +539,9 @@ class StatisticsServiceTest {
     }
 
     private void setupValidMockData() {
-        // Customer transaction mocks
-        when(customerTransactionRepository.findTotalRevenue()).thenReturn(BigDecimal.valueOf(50000));
-        when(customerTransactionRepository.findRevenueFromDate(any(LocalDateTime.class))).thenReturn(BigDecimal.valueOf(5000));
-
-        // ✅ BookingDetailRepository mocks for accurate calculations
+        // ✅ UPDATED: BookingDetailRepository mocks for accurate calculations
+        when(bookingDetailRepository.findTotalRevenue()).thenReturn(BigDecimal.valueOf(50000));
+        when(bookingDetailRepository.findMonthlyRevenue()).thenReturn(BigDecimal.valueOf(5000));
         when(bookingDetailRepository.findTotalActualPlatformFee()).thenReturn(BigDecimal.valueOf(7500));
         when(bookingDetailRepository.findTotalChefPayouts()).thenReturn(BigDecimal.valueOf(42500));
         when(bookingDetailRepository.findActualPlatformFeeFromDate(any(LocalDateTime.class))).thenReturn(BigDecimal.valueOf(750));
@@ -554,7 +562,7 @@ class StatisticsServiceTest {
         when(bookingRepository.countActiveBookings()).thenReturn(200L);
         when(bookingRepository.findAverageBookingValue()).thenReturn(BigDecimal.valueOf(150));
         when(bookingRepository.countBookingsFromDate(any(LocalDateTime.class))).thenReturn(20L);
-        when(bookingRepository.countByChefId(anyLong())).thenReturn(50L);
+        when(bookingRepository.countByChefIdExcludingPending(anyLong())).thenReturn(50L); // ✅ UPDATED
         when(bookingRepository.countByChefIdAndStatus(anyLong(), anyString())).thenReturn(10L);
         when(bookingRepository.countUniqueCustomersByChef(anyLong())).thenReturn(25L);
         when(bookingRepository.findAverageOrderValueByChef(anyLong())).thenReturn(BigDecimal.valueOf(200));
@@ -563,6 +571,9 @@ class StatisticsServiceTest {
         when(chefTransactionRepository.findTotalEarningsByChef(anyLong())).thenReturn(BigDecimal.valueOf(10000));
         when(chefTransactionRepository.findEarningsByChefFromDate(anyLong(), any(LocalDateTime.class))).thenReturn(BigDecimal.valueOf(1000));
         when(chefTransactionRepository.findTodayEarningsByChef(anyLong())).thenReturn(BigDecimal.valueOf(100));
+
+        // Customer transaction mocks
+        when(customerTransactionRepository.findRevenueByDate(any(LocalDate.class))).thenReturn(BigDecimal.valueOf(500));
 
         // Review service mocks
         when(reviewService.getAverageRatingForChef(anyLong())).thenReturn(BigDecimal.valueOf(4.5));

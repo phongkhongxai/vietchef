@@ -866,7 +866,7 @@ public class BookingServiceImpl implements BookingService {
         BigDecimal depositPaid = booking.getDepositPaid(); // Số tiền đặt cọc
         BigDecimal remainingAmount = amountDue;
 
-        if (depositPaid.compareTo(BigDecimal.ZERO) > 0) {
+        if (depositPaid.compareTo(BigDecimal.ZERO) > 0 && "PENDING_FIRST_CYCLE".equalsIgnoreCase(booking.getStatus())) {
                 remainingAmount = amountDue.add(depositPaid);
         }
 
@@ -1008,6 +1008,15 @@ public class BookingServiceImpl implements BookingService {
             booking.setStatus("PENDING_FIRST_CYCLE");
             booking.setDepositPaid(depositAmount);
             bookingRepository.save(booking);
+            NotificationRequest notification = NotificationRequest.builder()
+                    .userId(userId)
+                    .title("Complete First Cycle Payment")
+                    .body("Please complete the first cycle payment for this booking along with the deposit of " + depositAmount + "₫ to finalize your booking with Chef "
+                            + booking.getChef().getUser().getFullName() + ".")
+                    .bookingId(booking.getId())
+                    .screen("BookingScreen")
+                    .build();
+            notificationService.sendPushNotification(notification);
             return ApiResponse.<BookingResponseDto>builder()
                     .success(false)
                     .message("Session is too close. Status updated to PENDING_FIRST_CYCLE. Please proceed with first payment.")
@@ -1698,7 +1707,7 @@ public class BookingServiceImpl implements BookingService {
     }
 
 
-    @Scheduled(cron = "0 0/10 * * * *") // chạy mỗi 10 phút
+    @Scheduled(cron = "0 0/10 * * * *") // chạy mỗi 10 phúts
     public void markOverdueAndRefundBookings() {
         LocalDateTime now = LocalDateTime.now();
 

@@ -1,8 +1,6 @@
 package com.spring2025.vietchefs.services.impl;
 
-import com.google.firebase.messaging.FirebaseMessaging;
-import com.google.firebase.messaging.FirebaseMessagingException;
-import com.google.firebase.messaging.Message;
+import com.google.firebase.messaging.*;
 import com.spring2025.vietchefs.models.entity.Dish;
 import com.spring2025.vietchefs.models.entity.Notification;
 import com.spring2025.vietchefs.models.entity.User;
@@ -99,7 +97,7 @@ public class NotificationService {
 
         return notificationDtos;
     }
-    public void sendPushNotification(NotificationRequest request) {
+    public void sendPushNotificationExpo(NotificationRequest request) {
         Long userId = request.getUserId();
         String title = request.getTitle();
         String body = request.getBody();
@@ -162,6 +160,81 @@ public class NotificationService {
         notificationRepository.save(notification);
         messagingTemplate.convertAndSendToUser(user.getUsername(), "/queue/notifications", notification);
     }
+    public void sendPushNotification(NotificationRequest request) {
+        Long userId = request.getUserId();
+        String title = request.getTitle();
+        String body = request.getBody();
+
+        Optional<User> optionalUser = userRepository.findById(userId);
+        if (optionalUser.isEmpty()) {
+            System.out.println("User not found for userId: " + userId);
+            return;
+        }
+
+        User user = optionalUser.get();
+        String fcmToken = user.getExpoToken();
+
+        if (fcmToken == null || fcmToken.isEmpty()) {
+            System.out.println("FCM token not found for user " + userId);
+            return;
+        }
+        com.google.firebase.messaging.Notification firebaseNotification = com.google.firebase.messaging.Notification.builder()
+                .setTitle(title)
+                .setBody(body)
+                .build();
+
+        // Prepare data payload
+        Map<String, String> data = new HashMap<>();
+        if (request.getScreen() != null) {
+            data.put("screen", request.getScreen());
+        }
+        if (request.getBookingId() != null) {
+            data.put("bookingId", String.valueOf(request.getBookingId()));
+        }
+        if (request.getBookingDetailId() != null) {
+            data.put("bookingDetailId", String.valueOf(request.getBookingDetailId()));
+        }
+        // Build message to send
+        Message message = Message.builder()
+                .setToken(fcmToken)
+                .setNotification(firebaseNotification)
+                .putAllData(data)
+                .setAndroidConfig(AndroidConfig.builder()
+                        .setNotification(AndroidNotification.builder()
+                                .setSound("default")
+                                .build())
+                        .build())
+                .setApnsConfig(ApnsConfig.builder()
+                        .setAps(Aps.builder()
+                                .setSound("default")
+                                .build())
+                        .build())
+                .build();
+        try {
+            String response = FirebaseMessaging.getInstance().send(message);
+            System.out.println("Successfully sent message: " + response);
+        } catch (Exception e) {
+            System.err.println("Error sending FCM notification: " + e.getMessage());
+        }
+        Notification notification = new Notification();
+        notification.setUserId(userId);
+        notification.setTitle(title);
+        notification.setMessage(body);
+        notification.setScreen(request.getScreen());
+
+        if (request.getBookingId() != null) {
+            notification.setBookingId(request.getBookingId());
+        }
+        if (request.getNotiType() != null) {
+            notification.setNotiType(request.getNotiType());
+        }
+        if (request.getBookingDetailId() != null) {
+            notification.setBookingDetailId(request.getBookingDetailId());
+        }
+        notificationRepository.save(notification);
+        messagingTemplate.convertAndSendToUser(user.getUsername(), "/queue/notifications", notification);
+    }
+
     public void markAsReadByIds(List<Long> ids) {
         List<Notification> notifications = notificationRepository.findAllById(ids);
 
