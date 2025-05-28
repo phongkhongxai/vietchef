@@ -325,17 +325,20 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
         LocalDate currentDate = startDate;
         while (!currentDate.isAfter(endDate)) {
             // Get real booking data for this date
-            Long totalBookings = bookingRepository.countBookingsByDate(currentDate);
+            Long totalBookings = bookingRepository.countBookingsBySpecificDate(currentDate);
             if (totalBookings == null) totalBookings = 0L;
             
-            Long completedBookings = bookingRepository.countCompletedBookingsByDate(currentDate);
+            Long completedBookings = bookingRepository.countCompletedBookingsBySpecificDate(currentDate);
             if (completedBookings == null) completedBookings = 0L;
             
-            Long canceledBookings = bookingRepository.countCanceledBookingsByDate(currentDate);
+            Long canceledBookings = bookingRepository.countCanceledBookingsBySpecificDate(currentDate);
             if (canceledBookings == null) canceledBookings = 0L;
             
-            BigDecimal averageValue = bookingRepository.findAverageBookingValueByDate(currentDate);
+            BigDecimal averageValue = bookingRepository.findAverageBookingValueBySpecificDate(currentDate);
             if (averageValue == null) averageValue = BigDecimal.ZERO;
+            
+            BigDecimal averageCompleteValue = bookingRepository.averageBookingCompletedValueByDate(currentDate);
+            if (averageCompleteValue == null) averageCompleteValue = BigDecimal.ZERO;
 
             dataPoints.add(TrendAnalyticsDto.BookingDataPoint.builder()
                     .date(currentDate)
@@ -394,8 +397,8 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
             BigDecimal averageRating = bookingRepository.findAverageRatingByDate(currentDate);
             if (averageRating == null) averageRating = BigDecimal.ZERO;
             
-            Long totalBookings = bookingRepository.countBookingsByDate(currentDate);
-            Long completedBookings = bookingRepository.countCompletedBookingsByDate(currentDate);
+            Long totalBookings = bookingRepository.countBookingsBySpecificDate(currentDate);
+            Long completedBookings = bookingRepository.countCompletedBookingsBySpecificDate(currentDate);
             
             Double completionRate = totalBookings != null && totalBookings > 0 ? 
                 (completedBookings != null ? completedBookings.doubleValue() / totalBookings.doubleValue() * 100 : 0.0) : 0.0;
@@ -423,8 +426,13 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
 
         LocalDate currentDate = startDate;
         while (!currentDate.isAfter(endDate)) {
-            BigDecimal deposit = paymentRepository.getTotalDepositByDate(currentDate);
-            BigDecimal payout = paymentRepository.getTotalPayoutByDate(currentDate);
+            BigDecimal deposit = BigDecimal.ZERO;
+            BigDecimal payout = BigDecimal.ZERO;
+            
+            if (paymentRepository != null) {
+                deposit = paymentRepository.getTotalDepositByDate(currentDate);
+                payout = paymentRepository.getTotalPayoutByDate(currentDate);
+            }
 
             dataPoints.add(TrendAnalyticsDto.PaymentDataPoint.builder()
                     .date(currentDate)

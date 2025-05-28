@@ -50,22 +50,33 @@ public class StatisticsServiceImpl implements StatisticsService {
         // Calculate monthly revenue (last 30 days)
         BigDecimal monthlyRevenue = bookingDetailRepository.findMonthlyRevenue();
         if (monthlyRevenue == null) monthlyRevenue = BigDecimal.ZERO;
-        BigDecimal systemCommission = bookingDetailRepository.findSystemCommission();
-        if (systemCommission == null) monthlyRevenue = BigDecimal.ZERO;
-        BigDecimal totalPayouts = bookingDetailRepository.findTotalPayoutsToChefs();
-        if (totalPayouts == null) monthlyRevenue = BigDecimal.ZERO;
         
-        // Calculate growth percentage (compare with previous 30 days)
-        LocalDate endOfPreviousPeriod = LocalDate.now().minusDays(30);
-        LocalDate startOfPreviousPeriod = LocalDate.now().minusDays(60);
-        BigDecimal previousMonthRevenue = Optional.ofNullable(
-                bookingDetailRepository.findRevenueBetweenDates(startOfPreviousPeriod, endOfPreviousPeriod)
-        ).orElse(BigDecimal.ZERO);
+        // ✅ EXACT CALCULATION: Use actual platform fee from booking details
+        BigDecimal systemCommission = bookingDetailRepository.findTotalActualPlatformFee();
+        if (systemCommission == null) systemCommission = BigDecimal.ZERO;
         
-        double platformGrowth = 0.0;
-        if (previousMonthRevenue.compareTo(BigDecimal.ZERO) > 0) {
-            platformGrowth = monthlyRevenue.subtract(previousMonthRevenue)
-                    .divide(previousMonthRevenue, 4, BigDecimal.ROUND_HALF_UP)
+        // ✅ EXACT CALCULATION: Use actual chef payouts from booking details  
+        BigDecimal totalPayouts = bookingDetailRepository.findTotalChefPayouts();
+        if (totalPayouts == null) totalPayouts = BigDecimal.ZERO;
+        
+        // Calculate monthly commission for growth percentage (last 30 days)
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+        BigDecimal monthlyCommission = bookingDetailRepository.findActualPlatformFeeFromDate(thirtyDaysAgo);
+        if (monthlyCommission == null) monthlyCommission = BigDecimal.ZERO;
+        
+        // Calculate growth percentage based on commission (compare with previous 30 days)
+        LocalDateTime sixtyDaysAgo = LocalDateTime.now().minusDays(60);
+        BigDecimal previousMonthCommission = bookingDetailRepository.findActualPlatformFeeFromDate(sixtyDaysAgo);
+        if (previousMonthCommission != null) {
+            previousMonthCommission = previousMonthCommission.subtract(monthlyCommission);
+        } else {
+            previousMonthCommission = BigDecimal.ZERO;
+        }
+        
+        Double platformGrowth = 0.0;
+        if (previousMonthCommission.compareTo(BigDecimal.ZERO) > 0) {
+            platformGrowth = monthlyCommission.subtract(previousMonthCommission)
+                    .divide(previousMonthCommission, 4, BigDecimal.ROUND_HALF_UP)
                     .multiply(BigDecimal.valueOf(100))
                     .doubleValue();
         }
@@ -88,7 +99,7 @@ public class StatisticsServiceImpl implements StatisticsService {
         Long newSignupsToday = userRepository.countNewUsersFromDate(todayStart);
         Long bookingsToday = bookingRepository.countBookingsFromDate(todayStart);
         BigDecimal revenueToday = Optional.ofNullable(
-                bookingDetailRepository.findRevenueForDate(LocalDate.now())
+                customerTransactionRepository.findRevenueByDate(LocalDate.now())
         ).orElse(BigDecimal.ZERO);
         
         // Calculate customer satisfaction (average rating across platform)
