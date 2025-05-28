@@ -57,7 +57,7 @@ public class User {
     private boolean isBanned = false;
     @Column(nullable = false)
     private boolean emailVerified;
-    
+
     @Column
     private LocalDateTime createdAt;
     

@@ -27,4 +27,15 @@ public interface CustomerTransactionRepository extends JpaRepository<CustomerTra
     @Query("SELECT COALESCE(SUM(ct.amount), 0) FROM CustomerTransaction ct WHERE ct.transactionType = 'PAYMENT' AND ct.status = 'COMPLETED' AND ct.createdAt >= :startDate")
     java.math.BigDecimal findRevenueFromDate(@Param("startDate") java.time.LocalDateTime startDate);
 
+    // Date-based analytics queries for trend charts
+    @Query("SELECT COALESCE(SUM(ct.amount), 0) FROM CustomerTransaction ct WHERE ct.transactionType = 'PAYMENT' AND ct.status = 'COMPLETED' AND DATE(ct.createdAt) = :date")
+    java.math.BigDecimal findRevenueByDate(@Param("date") java.time.LocalDate date);
+
+    @Query("SELECT COUNT(ct) FROM CustomerTransaction ct WHERE ct.transactionType = 'PAYMENT' AND ct.status = 'COMPLETED' AND DATE(ct.createdAt) = :date")
+    Long countTransactionsByDate(@Param("date") java.time.LocalDate date);
+
+    // Date range queries for seasonal analysis
+    @Query("SELECT COALESCE(SUM(ct.amount), 0) FROM CustomerTransaction ct WHERE ct.transactionType = 'PAYMENT' AND ct.status = 'COMPLETED' AND DATE(ct.createdAt) BETWEEN :startDate AND :endDate")
+    java.math.BigDecimal findRevenueByDateRange(@Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate);
+
 }
