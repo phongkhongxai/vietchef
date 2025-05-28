@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Optional;
+import java.time.LocalDate;
 
 @Service
 public class StatisticsServiceImpl implements StatisticsService {
@@ -98,8 +100,9 @@ public class StatisticsServiceImpl implements StatisticsService {
         LocalDateTime todayStart = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
         Long newSignupsToday = userRepository.countNewUsersFromDate(todayStart);
         Long bookingsToday = bookingRepository.countBookingsFromDate(todayStart);
-        BigDecimal revenueToday = customerTransactionRepository.findRevenueFromDate(todayStart);
-        if (revenueToday == null) revenueToday = BigDecimal.ZERO;
+        BigDecimal revenueToday = Optional.ofNullable(
+                customerTransactionRepository.findRevenueByDate(LocalDate.now())
+        ).orElse(BigDecimal.ZERO);
         
         // Calculate customer satisfaction (average rating across platform)
         // Get real customer satisfaction from completed bookings with ratings

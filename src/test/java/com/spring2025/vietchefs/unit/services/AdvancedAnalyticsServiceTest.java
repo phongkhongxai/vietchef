@@ -77,10 +77,10 @@ class AdvancedAnalyticsServiceTest {
         // Given - Mock repository responses for real data queries
         when(customerTransactionRepository.findRevenueByDate(any())).thenReturn(BigDecimal.valueOf(1000));
         when(customerTransactionRepository.countTransactionsByDate(any())).thenReturn(10L);
-        when(bookingRepository.countBookingsByDate(any())).thenReturn(5L);
-        when(bookingRepository.countCompletedBookingsByDate(any())).thenReturn(4L);
-        when(bookingRepository.countCanceledBookingsByDate(any())).thenReturn(1L);
-        when(bookingRepository.findAverageBookingValueByDate(any())).thenReturn(BigDecimal.valueOf(200));
+        when(bookingRepository.countBookingsBySpecificDate(any())).thenReturn(5L);
+        when(bookingRepository.countCompletedBookingsBySpecificDate(any())).thenReturn(4L);
+        when(bookingRepository.countCanceledBookingsBySpecificDate(any())).thenReturn(1L);
+        when(bookingRepository.findAverageBookingValueBySpecificDate(any())).thenReturn(BigDecimal.valueOf(200));
         when(userRepository.countNewUsersByDate(any())).thenReturn(3L);
         when(userRepository.countNewChefsByDate(any())).thenReturn(1L);
         when(userRepository.countNewCustomersByDate(any())).thenReturn(2L);
@@ -114,10 +114,10 @@ class AdvancedAnalyticsServiceTest {
         // Verify repository interactions for real data queries
         verify(customerTransactionRepository, times(expectedDays)).findRevenueByDate(any());
         verify(customerTransactionRepository, times(expectedDays)).countTransactionsByDate(any());
-        verify(bookingRepository, times(expectedDays * 2)).countBookingsByDate(any()); // Called by both generateBookingChart() and generatePerformanceChart()
-        verify(bookingRepository, times(expectedDays * 2)).countCompletedBookingsByDate(any()); // Called by both generateBookingChart() and generatePerformanceChart()
-        verify(bookingRepository, times(expectedDays)).countCanceledBookingsByDate(any()); // Only called by generateBookingChart()
-        verify(bookingRepository, times(expectedDays)).findAverageBookingValueByDate(any()); // Only called by generateBookingChart()
+        verify(bookingRepository, times(expectedDays * 2)).countBookingsBySpecificDate(any()); // Called by both generateBookingChart() and generatePerformanceChart()
+        verify(bookingRepository, times(expectedDays * 2)).countCompletedBookingsBySpecificDate(any()); // Called by both generateBookingChart() and generatePerformanceChart()
+        verify(bookingRepository, times(expectedDays)).countCanceledBookingsBySpecificDate(any()); // Only called by generateBookingChart()
+        verify(bookingRepository, times(expectedDays)).findAverageBookingValueBySpecificDate(any()); // Only called by generateBookingChart()
         verify(userRepository, times(expectedDays)).countNewUsersByDate(any());
         verify(userRepository, times(expectedDays)).countNewChefsByDate(any());
         verify(userRepository, times(expectedDays)).countNewCustomersByDate(any());
@@ -344,10 +344,10 @@ class AdvancedAnalyticsServiceTest {
         // Mock repository responses for real data queries
         when(customerTransactionRepository.findRevenueByDate(any())).thenReturn(BigDecimal.valueOf(500));
         when(customerTransactionRepository.countTransactionsByDate(any())).thenReturn(5L);
-        when(bookingRepository.countBookingsByDate(any())).thenReturn(3L);
-        when(bookingRepository.countCompletedBookingsByDate(any())).thenReturn(2L);
-        when(bookingRepository.countCanceledBookingsByDate(any())).thenReturn(1L);
-        when(bookingRepository.findAverageBookingValueByDate(any())).thenReturn(BigDecimal.valueOf(150));
+        when(bookingRepository.countBookingsBySpecificDate(any())).thenReturn(3L);
+        when(bookingRepository.countCompletedBookingsBySpecificDate(any())).thenReturn(2L);
+        when(bookingRepository.countCanceledBookingsBySpecificDate(any())).thenReturn(1L);
+        when(bookingRepository.findAverageBookingValueBySpecificDate(any())).thenReturn(BigDecimal.valueOf(150));
         when(userRepository.countNewUsersByDate(any())).thenReturn(2L);
         when(userRepository.countNewChefsByDate(any())).thenReturn(1L);
         when(userRepository.countNewCustomersByDate(any())).thenReturn(1L);
@@ -372,10 +372,10 @@ class AdvancedAnalyticsServiceTest {
         // Implementation currently just calls getTrendAnalytics, but now uses real data
         verify(customerTransactionRepository, times(expectedDays)).findRevenueByDate(any());
         verify(customerTransactionRepository, times(expectedDays)).countTransactionsByDate(any());
-        verify(bookingRepository, times(expectedDays * 2)).countBookingsByDate(any()); // Called by both generateBookingChart() and generatePerformanceChart()
-        verify(bookingRepository, times(expectedDays * 2)).countCompletedBookingsByDate(any()); // Called by both generateBookingChart() and generatePerformanceChart()
-        verify(bookingRepository, times(expectedDays)).countCanceledBookingsByDate(any()); 
-        verify(bookingRepository, times(expectedDays)).findAverageBookingValueByDate(any());
+        verify(bookingRepository, times(expectedDays * 2)).countBookingsBySpecificDate(any()); // Called by both generateBookingChart() and generatePerformanceChart()
+        verify(bookingRepository, times(expectedDays * 2)).countCompletedBookingsBySpecificDate(any()); // Called by both generateBookingChart() and generatePerformanceChart()
+        verify(bookingRepository, times(expectedDays)).countCanceledBookingsBySpecificDate(any()); 
+        verify(bookingRepository, times(expectedDays)).findAverageBookingValueBySpecificDate(any());
         verify(userRepository, times(expectedDays)).countNewUsersByDate(any());
         verify(userRepository, times(expectedDays)).countNewChefsByDate(any());
         verify(userRepository, times(expectedDays)).countNewCustomersByDate(any());

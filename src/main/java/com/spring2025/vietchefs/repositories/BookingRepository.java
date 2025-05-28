@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -70,18 +71,18 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Query("SELECT COUNT(b) FROM Booking b WHERE b.createdAt >= :startDate AND b.isDeleted = false")
     long countBookingsFromDate(@Param("startDate") java.time.LocalDateTime startDate);
 
-    // Date-based analytics queries for trend charts
+    // Renamed date-based analytics queries to avoid conflicts with remote
     @Query("SELECT COUNT(b) FROM Booking b WHERE DATE(b.createdAt) = :date AND b.isDeleted = false")
-    Long countBookingsByDate(@Param("date") java.time.LocalDate date);
+    Long countBookingsBySpecificDate(@Param("date") java.time.LocalDate date);
 
     @Query("SELECT COUNT(b) FROM Booking b WHERE b.status = 'COMPLETED' AND DATE(b.createdAt) = :date AND b.isDeleted = false")
-    Long countCompletedBookingsByDate(@Param("date") java.time.LocalDate date);
+    Long countCompletedBookingsBySpecificDate(@Param("date") java.time.LocalDate date);
 
     @Query("SELECT COUNT(b) FROM Booking b WHERE b.status IN ('CANCELED', 'OVERDUE') AND DATE(b.createdAt) = :date AND b.isDeleted = false")
-    Long countCanceledBookingsByDate(@Param("date") java.time.LocalDate date);
+    Long countCanceledBookingsBySpecificDate(@Param("date") java.time.LocalDate date);
 
     @Query("SELECT AVG(b.totalPrice) FROM Booking b WHERE b.status = 'COMPLETED' AND DATE(b.createdAt) = :date AND b.isDeleted = false")
-    java.math.BigDecimal findAverageBookingValueByDate(@Param("date") java.time.LocalDate date);
+    java.math.BigDecimal findAverageBookingValueBySpecificDate(@Param("date") java.time.LocalDate date);
 
     @Query("SELECT AVG(r.rating) FROM Review r JOIN r.booking b WHERE DATE(b.createdAt) = :date AND b.isDeleted = false")
     java.math.BigDecimal findAverageRatingByDate(@Param("date") java.time.LocalDate date);
