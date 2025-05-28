@@ -45,6 +45,9 @@ class StatisticsServiceTest {
     @Mock
     private ReviewService reviewService;
 
+    @Mock
+    private BookingDetailRepository bookingDetailRepository;
+
     @InjectMocks
     private StatisticsServiceImpl statisticsService;
 
@@ -69,11 +72,20 @@ class StatisticsServiceTest {
         // Given
         BigDecimal totalRevenue = BigDecimal.valueOf(50000);
         BigDecimal monthlyRevenue = BigDecimal.valueOf(5000);
+        BigDecimal actualPlatformFee = BigDecimal.valueOf(7500); // ✅ ACTUAL commission from booking details
+        BigDecimal actualChefPayouts = BigDecimal.valueOf(42500); // ✅ ACTUAL chef payouts from booking details
         
         when(customerTransactionRepository.findTotalRevenue()).thenReturn(totalRevenue);
         when(customerTransactionRepository.findRevenueFromDate(any(LocalDateTime.class)))
                 .thenReturn(monthlyRevenue)
                 .thenReturn(BigDecimal.valueOf(9000)); // 60 days ago total
+        
+        // ✅ Mock accurate financial calculations from BookingDetailRepository
+        when(bookingDetailRepository.findTotalActualPlatformFee()).thenReturn(actualPlatformFee);
+        when(bookingDetailRepository.findTotalChefPayouts()).thenReturn(actualChefPayouts);
+        when(bookingDetailRepository.findActualPlatformFeeFromDate(any(LocalDateTime.class)))
+                .thenReturn(BigDecimal.valueOf(750)) // Monthly commission
+                .thenReturn(BigDecimal.valueOf(1350)); // 60 days ago commission
         
         when(userRepository.countActiveUsers()).thenReturn(1000L);
         when(userRepository.countByRole("ROLE_CHEF")).thenReturn(150L);
@@ -102,7 +114,11 @@ class StatisticsServiceTest {
         assertNotNull(result);
         assertEquals(totalRevenue, result.getTotalRevenue());
         assertEquals(monthlyRevenue, result.getMonthlyRevenue());
-        assertEquals(totalRevenue.multiply(BigDecimal.valueOf(0.1)), result.getSystemCommission());
+        
+        // ✅ UPDATED: Now using actual values instead of 10% estimate
+        assertEquals(actualPlatformFee, result.getSystemCommission());
+        assertEquals(actualChefPayouts, result.getTotalPayouts());
+        
         assertEquals(1000L, result.getTotalUsers());
         assertEquals(150L, result.getTotalChefs());
         assertEquals(850L, result.getTotalCustomers());
@@ -121,6 +137,11 @@ class StatisticsServiceTest {
         verify(bookingRepository).findTotalRatingSum();
         verify(bookingRepository).countTotalRatings();
         verify(chefRepository, times(1)).countByStatus("ACTIVE"); // Called once for retention calculation only
+        
+        // ✅ VERIFY: New BookingDetailRepository methods are called
+        verify(bookingDetailRepository).findTotalActualPlatformFee();
+        verify(bookingDetailRepository).findTotalChefPayouts();
+        verify(bookingDetailRepository, times(2)).findActualPlatformFeeFromDate(any(LocalDateTime.class));
     }
 
     @Test
@@ -128,6 +149,12 @@ class StatisticsServiceTest {
         // Given
         when(customerTransactionRepository.findTotalRevenue()).thenReturn(null);
         when(customerTransactionRepository.findRevenueFromDate(any(LocalDateTime.class))).thenReturn(null);
+        
+        // ✅ Mock null values from BookingDetailRepository
+        when(bookingDetailRepository.findTotalActualPlatformFee()).thenReturn(null);
+        when(bookingDetailRepository.findTotalChefPayouts()).thenReturn(null);
+        when(bookingDetailRepository.findActualPlatformFeeFromDate(any(LocalDateTime.class))).thenReturn(null);
+        
         when(userRepository.countActiveUsers()).thenReturn(0L);
         when(userRepository.countByRole(anyString())).thenReturn(0L);
         when(userRepository.countNewUsersFromDate(any(LocalDateTime.class))).thenReturn(0L);
@@ -146,7 +173,11 @@ class StatisticsServiceTest {
         assertNotNull(result);
         assertEquals(BigDecimal.ZERO, result.getTotalRevenue());
         assertEquals(BigDecimal.ZERO, result.getMonthlyRevenue());
-        assertEquals(0, result.getSystemCommission().compareTo(BigDecimal.ZERO)); // Use compareTo for BigDecimal
+        
+        // ✅ UPDATED: Now checking actual BigDecimal.ZERO instead of calculated values
+        assertEquals(BigDecimal.ZERO, result.getSystemCommission());
+        assertEquals(BigDecimal.ZERO, result.getTotalPayouts());
+        
         assertEquals(0L, result.getTotalUsers());
         assertEquals(0L, result.getActiveBookings());
         assertEquals(Double.valueOf(0.0), result.getPlatformGrowth());
@@ -155,6 +186,53 @@ class StatisticsServiceTest {
         // Real calculations with null/zero data
         assertEquals(0.0, result.getChefRetentionRate()); // 0/0 = 0
         assertEquals(4.0, result.getCustomerSatisfaction()); // Default value when no ratings exist
+        
+        // ✅ VERIFY: BookingDetailRepository methods called even with null data
+        verify(bookingDetailRepository).findTotalActualPlatformFee();
+        verify(bookingDetailRepository).findTotalChefPayouts();
+    }
+
+    @Test
+    void getAdminOverview_ShouldUseExactCalculations_NotEstimates() {
+        // ✅ NEW TEST: Verify that exact calculations are used instead of 10% estimates
+        // Given
+        BigDecimal totalRevenue = BigDecimal.valueOf(100000);
+        BigDecimal actualPlatformFee = BigDecimal.valueOf(15000); // Not 10% of revenue (would be 10000)
+        BigDecimal actualChefPayouts = BigDecimal.valueOf(85000); // Actual payouts from booking details
+        
+        when(customerTransactionRepository.findTotalRevenue()).thenReturn(totalRevenue);
+        when(customerTransactionRepository.findRevenueFromDate(any(LocalDateTime.class))).thenReturn(BigDecimal.valueOf(10000));
+        
+        when(bookingDetailRepository.findTotalActualPlatformFee()).thenReturn(actualPlatformFee);
+        when(bookingDetailRepository.findTotalChefPayouts()).thenReturn(actualChefPayouts);
+        when(bookingDetailRepository.findActualPlatformFeeFromDate(any(LocalDateTime.class))).thenReturn(BigDecimal.valueOf(1500));
+        
+        // Setup minimal required mocks
+        when(userRepository.countActiveUsers()).thenReturn(100L);
+        when(userRepository.countByRole(anyString())).thenReturn(50L);
+        when(userRepository.countNewUsersFromDate(any(LocalDateTime.class))).thenReturn(5L);
+        when(bookingRepository.countByStatus(anyString())).thenReturn(10L);
+        when(bookingRepository.countBookingsFromDate(any(LocalDateTime.class))).thenReturn(2L);
+        when(chefRepository.countByStatus(anyString())).thenReturn(5L);
+        when(bookingRepository.findTotalRatingSum()).thenReturn(BigDecimal.valueOf(80));
+        when(bookingRepository.countTotalRatings()).thenReturn(20L);
+
+        // When
+        AdminOverviewDto result = statisticsService.getAdminOverview();
+
+        // Then
+        // ✅ VERIFY: Uses actual values, not 10% estimate
+        assertEquals(actualPlatformFee, result.getSystemCommission()); // 15000, not 10000 (10% of 100000)
+        assertEquals(actualChefPayouts, result.getTotalPayouts()); // 85000, not 90000 (90% of 100000)
+        
+        // ✅ VERIFY: Sum should equal total revenue (or close to it, accounting for other fees)
+        // Note: In real system, totalRevenue might not equal systemCommission + totalPayouts 
+        // due to other factors like discounts, refunds, etc.
+        assertNotNull(result.getSystemCommission());
+        assertNotNull(result.getTotalPayouts());
+        
+        verify(bookingDetailRepository).findTotalActualPlatformFee();
+        verify(bookingDetailRepository).findTotalChefPayouts();
     }
 
     // ==================== USER STATISTICS TESTS ====================
@@ -454,6 +532,11 @@ class StatisticsServiceTest {
         // Customer transaction mocks
         when(customerTransactionRepository.findTotalRevenue()).thenReturn(BigDecimal.valueOf(50000));
         when(customerTransactionRepository.findRevenueFromDate(any(LocalDateTime.class))).thenReturn(BigDecimal.valueOf(5000));
+
+        // ✅ BookingDetailRepository mocks for accurate calculations
+        when(bookingDetailRepository.findTotalActualPlatformFee()).thenReturn(BigDecimal.valueOf(7500));
+        when(bookingDetailRepository.findTotalChefPayouts()).thenReturn(BigDecimal.valueOf(42500));
+        when(bookingDetailRepository.findActualPlatformFeeFromDate(any(LocalDateTime.class))).thenReturn(BigDecimal.valueOf(750));
 
         // User repository mocks
         when(userRepository.countActiveUsers()).thenReturn(1000L);

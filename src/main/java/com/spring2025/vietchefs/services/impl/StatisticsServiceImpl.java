@@ -35,10 +35,13 @@ public class StatisticsServiceImpl implements StatisticsService {
     
     @Autowired
     private ReviewService reviewService;
+    
+    @Autowired
+    private BookingDetailRepository bookingDetailRepository;
 
     @Override
     public AdminOverviewDto getAdminOverview() {
-        // Calculate platform revenue metrics
+        // Calculate platform revenue metrics - EXACT VALUES FROM ACTUAL DATA
         BigDecimal totalRevenue = customerTransactionRepository.findTotalRevenue();
         if (totalRevenue == null) totalRevenue = BigDecimal.ZERO;
         
@@ -47,23 +50,31 @@ public class StatisticsServiceImpl implements StatisticsService {
         BigDecimal monthlyRevenue = customerTransactionRepository.findRevenueFromDate(thirtyDaysAgo);
         if (monthlyRevenue == null) monthlyRevenue = BigDecimal.ZERO;
         
-        // Calculate platform commission (assuming 10% commission rate)
-        BigDecimal systemCommission = totalRevenue.multiply(BigDecimal.valueOf(0.1));
-        BigDecimal totalPayouts = totalRevenue.subtract(systemCommission);
+        // ✅ EXACT CALCULATION: Use actual platform fee from booking details
+        BigDecimal systemCommission = bookingDetailRepository.findTotalActualPlatformFee();
+        if (systemCommission == null) systemCommission = BigDecimal.ZERO;
+        
+        // ✅ EXACT CALCULATION: Use actual chef payouts from booking details  
+        BigDecimal totalPayouts = bookingDetailRepository.findTotalChefPayouts();
+        if (totalPayouts == null) totalPayouts = BigDecimal.ZERO;
+        
+        // Calculate monthly commission for growth percentage (last 30 days)
+        BigDecimal monthlyCommission = bookingDetailRepository.findActualPlatformFeeFromDate(thirtyDaysAgo);
+        if (monthlyCommission == null) monthlyCommission = BigDecimal.ZERO;
         
         // Calculate growth percentage (compare with previous 30 days)
         LocalDateTime sixtyDaysAgo = LocalDateTime.now().minusDays(60);
-        BigDecimal previousMonthRevenue = customerTransactionRepository.findRevenueFromDate(sixtyDaysAgo);
-        if (previousMonthRevenue != null) {
-            previousMonthRevenue = previousMonthRevenue.subtract(monthlyRevenue);
+        BigDecimal previousMonthCommission = bookingDetailRepository.findActualPlatformFeeFromDate(sixtyDaysAgo);
+        if (previousMonthCommission != null) {
+            previousMonthCommission = previousMonthCommission.subtract(monthlyCommission);
         } else {
-            previousMonthRevenue = BigDecimal.ZERO;
+            previousMonthCommission = BigDecimal.ZERO;
         }
         
         Double platformGrowth = 0.0;
-        if (previousMonthRevenue.compareTo(BigDecimal.ZERO) > 0) {
-            platformGrowth = monthlyRevenue.subtract(previousMonthRevenue)
-                    .divide(previousMonthRevenue, 4, BigDecimal.ROUND_HALF_UP)
+        if (previousMonthCommission.compareTo(BigDecimal.ZERO) > 0) {
+            platformGrowth = monthlyCommission.subtract(previousMonthCommission)
+                    .divide(previousMonthCommission, 4, BigDecimal.ROUND_HALF_UP)
                     .multiply(BigDecimal.valueOf(100))
                     .doubleValue();
         }

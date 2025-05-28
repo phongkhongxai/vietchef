@@ -87,6 +87,17 @@ public interface BookingDetailRepository extends JpaRepository<BookingDetail, Lo
             "GROUP BY bd.sessionDate")
     List<Object[]> countFutureBookingsByChef(@Param("chef") Chef chef, @Param("today") LocalDate today);
 
+    // Statistics queries for accurate financial calculations
+    @Query("SELECT COALESCE(SUM(bd.platformFee - COALESCE(bd.discountAmout, 0)), 0) FROM BookingDetail bd WHERE bd.isDeleted = false AND bd.status NOT IN ('CANCELED', 'OVERDUE')")
+    java.math.BigDecimal findTotalActualPlatformFee();
 
+    @Query("SELECT COALESCE(SUM(bd.platformFee - COALESCE(bd.discountAmout, 0)), 0) FROM BookingDetail bd WHERE bd.isDeleted = false AND bd.status NOT IN ('CANCELED', 'OVERDUE') AND bd.booking.createdAt >= :startDate")
+    java.math.BigDecimal findActualPlatformFeeFromDate(@Param("startDate") java.time.LocalDateTime startDate);
+
+    @Query("SELECT COALESCE(SUM(bd.totalChefFeePrice), 0) FROM BookingDetail bd WHERE bd.isDeleted = false AND bd.status NOT IN ('CANCELED', 'OVERDUE')")
+    java.math.BigDecimal findTotalChefPayouts();
+
+    @Query("SELECT COALESCE(SUM(bd.totalChefFeePrice), 0) FROM BookingDetail bd WHERE bd.isDeleted = false AND bd.status NOT IN ('CANCELED', 'OVERDUE') AND bd.booking.createdAt >= :startDate")
+    java.math.BigDecimal findChefPayoutsFromDate(@Param("startDate") java.time.LocalDateTime startDate);
 
 }
