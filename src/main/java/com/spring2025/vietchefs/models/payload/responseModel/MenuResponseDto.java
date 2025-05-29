@@ -19,6 +19,7 @@ public class MenuResponseDto {
     private String name;
     private ChefResponseDto chef;
     private String description;
+    private BigDecimal totalCookTime;
     private BigDecimal beforePrice;
     private Boolean hasDiscount;
     private Double discountPercentage;
