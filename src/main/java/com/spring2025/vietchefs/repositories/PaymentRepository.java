@@ -24,6 +24,14 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
     @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p " +
             "WHERE DATE(p.createdAt) = :date AND p.status = 'COMPLETED' AND p.paymentType = 'PAYOUT'")
     BigDecimal getTotalPayoutByDate(@Param("date") LocalDate date);
+    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p " +
+            "WHERE p.status = 'COMPLETED' AND p.paymentType = 'DEPOSIT'")
+    BigDecimal getTotalDepositAllTime();
+
+    @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p " +
+            "WHERE p.status = 'COMPLETED' AND p.paymentType = 'PAYOUT'")
+    BigDecimal getTotalPayoutAllTime();
+
 
 }
 
