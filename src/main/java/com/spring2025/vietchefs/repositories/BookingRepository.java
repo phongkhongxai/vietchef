@@ -92,4 +92,33 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
 
 
+    // Renamed date-based analytics queries to avoid conflicts with remote
+    @Query("SELECT COUNT(b) FROM Booking b WHERE DATE(b.createdAt) = :date AND b.isDeleted = false")
+    Long countBookingsBySpecificDate(@Param("date") java.time.LocalDate date);
+
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.status = 'COMPLETED' AND DATE(b.createdAt) = :date AND b.isDeleted = false")
+    Long countCompletedBookingsBySpecificDate(@Param("date") java.time.LocalDate date);
+
+    @Query("SELECT COUNT(b) FROM Booking b WHERE b.status IN ('CANCELED', 'OVERDUE') AND DATE(b.createdAt) = :date AND b.isDeleted = false")
+    Long countCanceledBookingsBySpecificDate(@Param("date") java.time.LocalDate date);
+
+    @Query("SELECT AVG(b.totalPrice) FROM Booking b WHERE b.status = 'COMPLETED' AND DATE(b.createdAt) = :date AND b.isDeleted = false")
+    java.math.BigDecimal findAverageBookingValueBySpecificDate(@Param("date") java.time.LocalDate date);
+
+    @Query("SELECT AVG(r.rating) FROM Review r JOIN r.booking b WHERE DATE(b.createdAt) = :date AND b.isDeleted = false")
+    java.math.BigDecimal findAverageRatingByDate(@Param("date") java.time.LocalDate date);
+
+    @Query("SELECT COUNT(r) FROM Review r JOIN r.booking b WHERE DATE(b.createdAt) = :date AND b.isDeleted = false")
+    Long countReviewsByDate(@Param("date") java.time.LocalDate date);
+
+    @Query("SELECT COALESCE(SUM(r.rating), 0) FROM Review r JOIN r.booking b WHERE b.status = 'COMPLETED' AND b.isDeleted = false")
+    java.math.BigDecimal findTotalRatingSum();
+
+    @Query("SELECT COUNT(r) FROM Review r JOIN r.booking b WHERE b.status = 'COMPLETED' AND b.isDeleted = false")
+    Long countTotalRatings();
+
+    // Date range queries for seasonal analysis
+    @Query("SELECT COUNT(b) FROM Booking b WHERE DATE(b.createdAt) BETWEEN :startDate AND :endDate AND b.isDeleted = false")
+    Long countBookingsByDateRange(@Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate);
+
 }

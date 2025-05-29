@@ -54,4 +54,17 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("SELECT COUNT(u) FROM User u WHERE u.createdAt >= :startDate AND u.isDelete = false")
     long countNewUsersFromDate(@Param("startDate") java.time.LocalDateTime startDate);
 
+    // Date-based analytics queries for trend charts
+    @Query("SELECT COUNT(u) FROM User u WHERE DATE(u.createdAt) <= :date AND u.isDelete = false")
+    Long countUsersByDate(@Param("date") java.time.LocalDate date);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE DATE(u.createdAt) = :date AND u.isDelete = false")
+    Long countNewUsersByDate(@Param("date") java.time.LocalDate date);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.role.roleName = 'ROLE_CHEF' AND DATE(u.createdAt) = :date AND u.isDelete = false")
+    Long countNewChefsByDate(@Param("date") java.time.LocalDate date);
+
+    @Query("SELECT COUNT(u) FROM User u WHERE u.role.roleName = 'ROLE_CUSTOMER' AND DATE(u.createdAt) = :date AND u.isDelete = false")
+    Long countNewCustomersByDate(@Param("date") java.time.LocalDate date);
+
 }
