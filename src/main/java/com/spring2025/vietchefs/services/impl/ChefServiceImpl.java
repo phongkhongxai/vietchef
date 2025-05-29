@@ -4,6 +4,7 @@ import com.spring2025.vietchefs.models.entity.*;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.dto.ChefDto;
 import com.spring2025.vietchefs.models.payload.requestModel.ChefRequestDto;
+import com.spring2025.vietchefs.models.payload.requestModel.NotificationRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.ChefResponseDto;
 import com.spring2025.vietchefs.models.payload.responseModel.ChefsResponse;
 import com.spring2025.vietchefs.repositories.*;
@@ -45,6 +46,8 @@ public class ChefServiceImpl implements ChefService {
     private ChefTransactionRepository chefTransactionRepository;
     @Autowired
     private DistanceService distanceService;
+    @Autowired
+    private NotificationService notificationService;
     @Autowired
     private CalculateService calculateService;
     @Autowired
@@ -92,7 +95,25 @@ public class ChefServiceImpl implements ChefService {
         if (updated < 60) {
             chef.setStatus("LOCKED");
         }
-        chefRepository.save(chef);
+        chef = chefRepository.save(chef);
+        String title = "Reputation Updated";
+        String action = (delta > 0) ? "increased" : "decreased";
+        String body = "Your reputation score has been " + action + " by " + Math.abs(delta) + " points. "
+                + "Current reputation: " + chef.getReputationPoints() + ".";
+        if (chef.getReputationPoints() < 60) {
+            body += " Your account has been locked due to low reputation.";
+        }
+        NotificationRequest notification = NotificationRequest.builder()
+                .userId(chef.getUser().getId())
+                .title(title)
+                .body(body)
+                .screen("ChefProfile")
+                .build();
+
+        notificationService.sendPushNotification(notification);
+
+        notificationService.sendPushNotification(notification);
+
     }
 
     @Override
