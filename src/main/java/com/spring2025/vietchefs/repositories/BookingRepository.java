@@ -121,4 +121,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     @Query("SELECT COUNT(b) FROM Booking b WHERE DATE(b.createdAt) BETWEEN :startDate AND :endDate AND b.isDeleted = false")
     Long countBookingsByDateRange(@Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate);
 
+    @Query("SELECT COALESCE(SUM(b.depositPaid), 0) FROM Booking b WHERE b.status = 'completed'")
+    BigDecimal getTotalDepositPaidForCompletedBookings();
+
 }

@@ -83,8 +83,9 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByUsernameOrEmail(loginDto.getUsernameOrEmail(), loginDto.getUsernameOrEmail())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.BAD_REQUEST, "User not found"));
         if (!user.isEmailVerified()) {
-            throw new VchefApiException(HttpStatus.FORBIDDEN, "Email is not verified. Please verify your email.");
+            throw new VchefApiException(HttpStatus.FORBIDDEN, "Email is not verified. Please forgot password to continue.");
         }
+
         if (user.isBanned()) {
             throw new VchefApiException(HttpStatus.FORBIDDEN, "User is banned.");
         }
@@ -475,6 +476,12 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new VchefApiException(HttpStatus.BAD_REQUEST, "User not found with this email."));
 
         emailVerificationService.sendPasswordResetToken(user);
+        if(!user.isEmailVerified()){
+            user.setEmailVerified(true);
+            user.setVerificationCode(null);
+            user.setVerificationCodeExpiry(null);
+            userRepository.save(user);
+        }
 
         return "Password reset token sent to your email.";
     }

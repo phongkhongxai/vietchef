@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -38,4 +39,19 @@ public interface CustomerTransactionRepository extends JpaRepository<CustomerTra
     @Query("SELECT COALESCE(SUM(ct.amount), 0) FROM CustomerTransaction ct WHERE ct.transactionType = 'PAYMENT' AND ct.status = 'COMPLETED' AND DATE(ct.createdAt) BETWEEN :startDate AND :endDate")
     java.math.BigDecimal findRevenueByDateRange(@Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate);
 
+    // Tổng tiền giao dịch theo nhiều loại (VD: DEPOSIT, PAYMENT)
+    @Query("SELECT SUM(t.amount) FROM CustomerTransaction t " +
+            "WHERE t.transactionType IN :types AND t.isDeleted = false AND t.status = 'COMPLETED'")
+    java.math.BigDecimal findTotalAmountByTypes(@Param("types") List<String> types);
+
+    // Tổng tiền giao dịch theo 1 loại (VD: REFUND)
+    @Query("SELECT SUM(t.amount) FROM CustomerTransaction t " +
+            "WHERE t.transactionType = :type AND t.isDeleted = false AND t.status = 'COMPLETED'")
+    java.math.BigDecimal findTotalAmountByType(@Param("type") String type);
+
+    // Tổng tiền giao dịch trong 1 tháng (paymentIn)
+    @Query("SELECT SUM(t.amount) FROM CustomerTransaction t " +
+            "WHERE t.transactionType IN :types AND MONTH(t.createdAt) = MONTH(CURRENT_DATE) " +
+            "AND YEAR(t.createdAt) = YEAR(CURRENT_DATE) AND t.isDeleted = false AND t.status = 'COMPLETED'")
+    java.math.BigDecimal findMonthlyTotalByTypes(@Param("types") List<String> types);
 }

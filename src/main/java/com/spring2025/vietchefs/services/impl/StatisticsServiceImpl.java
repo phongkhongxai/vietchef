@@ -17,6 +17,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -30,6 +31,8 @@ public class StatisticsServiceImpl implements StatisticsService {
     
     @Autowired
     private BookingRepository bookingRepository;
+    @Autowired
+    private PaymentRepository paymentRepository;
     
     @Autowired
     private CustomerTransactionRepository customerTransactionRepository;
@@ -58,11 +61,22 @@ public class StatisticsServiceImpl implements StatisticsService {
         // ✅ EXACT CALCULATION: Use actual chef payouts from booking details  
         BigDecimal totalPayouts = bookingDetailRepository.findTotalChefPayouts();
         if (totalPayouts == null) totalPayouts = BigDecimal.ZERO;
-        
+        BigDecimal paymentIn = customerTransactionRepository.findTotalAmountByTypes(List.of("INITIAL_PAYMENT", "PAYMENT"));
+        if (paymentIn == null) paymentIn = BigDecimal.ZERO;
+        BigDecimal refund = customerTransactionRepository.findTotalAmountByType("REFUND");
+        if (refund == null) refund = BigDecimal.ZERO;
+        BigDecimal totalDiscount = bookingDetailRepository.findTotalDiscount();
+        if (totalDiscount == null) totalDiscount = BigDecimal.ZERO;
         // Calculate monthly commission for growth percentage (last 30 days)
         LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
         BigDecimal monthlyCommission = bookingDetailRepository.findActualPlatformFeeFromDate(thirtyDaysAgo);
         if (monthlyCommission == null) monthlyCommission = BigDecimal.ZERO;
+        BigDecimal totalDepositPaid = bookingRepository.getTotalDepositPaidForCompletedBookings();
+        if (totalDepositPaid == null) totalDepositPaid = BigDecimal.ZERO;
+        BigDecimal totalDeposit = paymentRepository.getTotalDepositAllTime();
+        if (totalDeposit == null) totalDeposit = BigDecimal.ZERO;
+        BigDecimal totalPayout = paymentRepository.getTotalPayoutAllTime();
+        if (totalPayout == null) totalPayout = BigDecimal.ZERO;
         
         // Calculate growth percentage based on commission (compare with previous 30 days)
         LocalDateTime sixtyDaysAgo = LocalDateTime.now().minusDays(60);
@@ -131,6 +145,12 @@ public class StatisticsServiceImpl implements StatisticsService {
                 .monthlyRevenue(monthlyRevenue)
                 .systemCommission(systemCommission)
                 .totalPayouts(totalPayouts)
+                .paymentIn(paymentIn)
+                .refund(refund)
+                .totalDiscount(totalDiscount)
+                .totalDeposit(totalDeposit)
+                .totalPayout(totalPayout)
+                .totalDepositPaid(totalDepositPaid)
                 .totalUsers(totalUsers)
                 .totalChefs(totalChefs)
                 .totalCustomers(totalCustomers)
