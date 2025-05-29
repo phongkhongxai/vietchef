@@ -109,24 +109,32 @@ public interface BookingDetailRepository extends JpaRepository<BookingDetail, Lo
     @Query("SELECT SUM(bd.totalPrice) FROM BookingDetail bd " +
             "WHERE bd.status = 'COMPLETED' AND bd.sessionDate = :today")
     BigDecimal findRevenueForDate(@Param("today") LocalDate today);
+    @Query("SELECT COALESCE(SUM(b.platformFee - COALESCE(b.discountAmout, 0)), 0) " +
+            "FROM BookingDetail b " +
+            "WHERE b.isDeleted = false AND b.status = 'COMPLETED' AND b.sessionDate = :today")
+    BigDecimal findSystemCommissionForDate(@Param("today") LocalDate today);
+
     @Query("SELECT COUNT(b) FROM BookingDetail b " +
             "WHERE b.status = 'COMPLETED' AND b.isDeleted = false")
     Long countCompletedTransactions();
-
-
-
-
+    @Query("SELECT COUNT(b) FROM BookingDetail b " +
+            "WHERE b.status = 'COMPLETED' AND b.isDeleted = false AND b.sessionDate = :today")
+    Long countCompletedTransactionsForDate(@Param("today") LocalDate today);
     // Statistics queries for accurate financial calculations
-    @Query("SELECT COALESCE(SUM(bd.platformFee - COALESCE(bd.discountAmout, 0)), 0) FROM BookingDetail bd WHERE bd.isDeleted = false AND bd.status NOT IN ('CANCELED', 'OVERDUE')")
+    @Query("SELECT COALESCE(SUM(bd.platformFee - COALESCE(bd.discountAmout, 0)), 0) FROM BookingDetail bd WHERE bd.isDeleted = false AND bd.status = 'COMPLETED'")
     java.math.BigDecimal findTotalActualPlatformFee();
 
     @Query("SELECT COALESCE(SUM(bd.platformFee - COALESCE(bd.discountAmout, 0)), 0) FROM BookingDetail bd WHERE bd.isDeleted = false AND bd.status NOT IN ('CANCELED', 'OVERDUE') AND bd.booking.createdAt >= :startDate")
     java.math.BigDecimal findActualPlatformFeeFromDate(@Param("startDate") java.time.LocalDateTime startDate);
 
-    @Query("SELECT COALESCE(SUM(bd.totalChefFeePrice), 0) FROM BookingDetail bd WHERE bd.isDeleted = false AND bd.status NOT IN ('CANCELED', 'OVERDUE')")
+    @Query("SELECT COALESCE(SUM(bd.totalChefFeePrice), 0) FROM BookingDetail bd WHERE bd.isDeleted = false AND bd.status = 'COMPLETED'")
     java.math.BigDecimal findTotalChefPayouts();
+
 
     @Query("SELECT COALESCE(SUM(bd.totalChefFeePrice), 0) FROM BookingDetail bd WHERE bd.isDeleted = false AND bd.status NOT IN ('CANCELED', 'OVERDUE') AND bd.booking.createdAt >= :startDate")
     java.math.BigDecimal findChefPayoutsFromDate(@Param("startDate") java.time.LocalDateTime startDate);
+    @Query("SELECT SUM(bd.discountAmout) FROM BookingDetail bd WHERE bd.status = 'COMPLETED'")
+    java.math.BigDecimal findTotalDiscount();
+
 
 }

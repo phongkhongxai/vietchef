@@ -4,6 +4,7 @@ import com.spring2025.vietchefs.models.entity.Booking;
 import com.spring2025.vietchefs.models.entity.BookingDetail;
 import com.spring2025.vietchefs.models.entity.PaymentCycle;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
+import com.spring2025.vietchefs.models.payload.requestModel.NotificationRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.PaymentCycleResponseDto;
 import com.spring2025.vietchefs.repositories.BookingDetailRepository;
 import com.spring2025.vietchefs.repositories.BookingRepository;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -31,6 +33,8 @@ public class PaymentCycleServiceImpl implements PaymentCycleService {
     private BookingDetailRepository bookingDetailRepository;
     @Autowired
     private BookingRepository bookingRepository;
+    @Autowired
+    private NotificationService notificationService;
     @Autowired
     private ModelMapper modelMapper;
 
@@ -242,5 +246,40 @@ public class PaymentCycleServiceImpl implements PaymentCycleService {
         }
         System.out.println("✅ Checked overdue payment cycles at " + today);
     }
+    @Scheduled(cron = "0 0 9 * * *") // Chạy hàng ngày lúc 09:00 sáng
+    @Transactional
+    public void notifyUpcomingPaymentCycles() {
+        LocalDate today = LocalDate.now();
+        List<LocalDate> reminderDates = List.of(today, today.plusDays(1), today.plusDays(2));
+
+        List<PaymentCycle> upcomingCycles = paymentCycleRepository
+                .findByDueDateInAndStatus(reminderDates, "PENDING");
+
+        for (PaymentCycle cycle : upcomingCycles) {
+            Booking booking = cycle.getBooking();
+            String title = "Payment Cycle Due Soon";
+            String body = String.format(
+                    "Your payment for booking %s with Chef %s is due on %s. Please complete it on time to avoid any service interruption.",
+                    booking.getBookingType(),
+                    booking.getChef().getUser().getFullName(),
+                    cycle.getDueDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+            );
+
+
+
+            NotificationRequest notification = NotificationRequest.builder()
+                    .userId(cycle.getBooking().getCustomer().getId())
+                    .title(title)
+                    .body(body)
+                    .bookingId(cycle.getBooking().getId())
+                    .screen("PaymentCycle")
+                    .build();
+
+            notificationService.sendPushNotification(notification);
+        }
+
+        System.out.println("📢 Sent payment reminders for upcoming due dates at " + today);
+    }
+
 
 }

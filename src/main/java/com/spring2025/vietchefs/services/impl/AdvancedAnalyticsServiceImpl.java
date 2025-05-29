@@ -299,11 +299,11 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
         while (!currentDate.isAfter(endDate)) {
           
             // Get real revenue data for this date
-            BigDecimal revenue = customerTransactionRepository.findRevenueByDate(currentDate);
+            BigDecimal revenue = bookingDetailRepository.findRevenueForDate(currentDate);
             if (revenue == null) revenue = BigDecimal.ZERO;
             
-            BigDecimal commission = revenue.multiply(BigDecimal.valueOf(0.1)); // 10% commission
-            Long transactionCount = customerTransactionRepository.countTransactionsByDate(currentDate);
+            BigDecimal commission = bookingDetailRepository.findSystemCommissionForDate(currentDate);
+            Long transactionCount = bookingDetailRepository.countCompletedTransactionsForDate(currentDate);
             if (transactionCount == null) transactionCount = 0L;
           
             dataPoints.add(TrendAnalyticsDto.RevenueDataPoint.builder()

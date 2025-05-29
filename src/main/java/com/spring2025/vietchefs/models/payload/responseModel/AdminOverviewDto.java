@@ -17,6 +17,12 @@ public class AdminOverviewDto {
     private BigDecimal monthlyRevenue; // Revenue this month
     private BigDecimal systemCommission; // ✅ ACTUAL platform commission from booking details (25% cooking fee + 20% dish price - discounts)
     private BigDecimal totalPayouts; // ✅ ACTUAL total paid to chefs from booking details (cooking fee + 80% dish price + travel fee)
+    private BigDecimal paymentIn;
+    private BigDecimal refund;
+    private BigDecimal totalDiscount;
+    private BigDecimal totalDepositPaid;
+    private BigDecimal totalDeposit;
+    private BigDecimal totalPayout;
     
     // Platform statistics
     private Long totalUsers;
