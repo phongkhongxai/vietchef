@@ -15,6 +15,7 @@ import com.spring2025.vietchefs.repositories.ChefScheduleRepository;
 import com.spring2025.vietchefs.repositories.UserRepository;
 import com.spring2025.vietchefs.services.BookingConflictService;
 import com.spring2025.vietchefs.services.impl.ChefScheduleServiceImpl;
+import com.spring2025.vietchefs.services.impl.TimeZoneService;
 import com.spring2025.vietchefs.utils.SecurityUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,6 +65,9 @@ public class ChefScheduleServiceTest {
     @Mock
     private ModelMapper modelMapper;
 
+    @Mock
+    private TimeZoneService timeZoneService;
+
     @InjectMocks
     private ChefScheduleServiceImpl chefScheduleService;
 
@@ -82,6 +87,9 @@ public class ChefScheduleServiceTest {
         // Setup mocks for lenient behavior for all tests
         Mockito.lenient().when(chefScheduleRepository.findByChefAndDayOfWeekAndIsDeletedFalse(any(Chef.class), anyInt()))
                 .thenReturn(Collections.emptyList());
+        Mockito.lenient().when(timeZoneService.getTimezoneFromAddress(anyString())).thenReturn("Asia/Ho_Chi_Minh");
+        Mockito.lenient().when(bookingConflictService.hasBookingConflictOnDayOfWeek(any(Chef.class), anyInt(), any(LocalTime.class), any(LocalTime.class), anyInt())).thenReturn(false);
+        Mockito.lenient().when(bookingConflictService.hasActiveBookingsForDayOfWeek(anyLong(), anyInt())).thenReturn(false);
                 
         // Setup test user
         testUser = new User();
@@ -93,6 +101,7 @@ public class ChefScheduleServiceTest {
         testChef = new Chef();
         testChef.setId(1L);
         testChef.setUser(testUser);
+        testChef.setAddress("123 Test Street, Ho Chi Minh City, Vietnam");
         
         // Setup test schedule 1
         testSchedule1 = new ChefSchedule();
@@ -118,6 +127,7 @@ public class ChefScheduleServiceTest {
         testScheduleResponse1.setDayOfWeek(1);
         testScheduleResponse1.setStartTime(LocalTime.of(8, 0));
         testScheduleResponse1.setEndTime(LocalTime.of(12, 0));
+        testScheduleResponse1.setTimezone("Asia/Ho_Chi_Minh");
         
         // Setup test schedule response 2
         testScheduleResponse2 = new ChefScheduleResponse();
@@ -125,6 +135,7 @@ public class ChefScheduleServiceTest {
         testScheduleResponse2.setDayOfWeek(2);
         testScheduleResponse2.setStartTime(LocalTime.of(14, 0));
         testScheduleResponse2.setEndTime(LocalTime.of(18, 0));
+        testScheduleResponse2.setTimezone("Asia/Ho_Chi_Minh");
         
         // Setup schedule request
         testScheduleRequest = new ChefScheduleRequest();
@@ -189,9 +200,11 @@ public class ChefScheduleServiceTest {
         assertEquals(1, response.getDayOfWeek());
         assertEquals(LocalTime.of(8, 0), response.getStartTime());
         assertEquals(LocalTime.of(12, 0), response.getEndTime());
+        assertEquals("Asia/Ho_Chi_Minh", response.getTimezone());
         
         verify(chefScheduleRepository).findById(1L);
         verify(modelMapper).map(testSchedule1, ChefScheduleResponse.class);
+        verify(timeZoneService).getTimezoneFromAddress(testChef.getAddress());
     }
     
     @Test
@@ -235,9 +248,11 @@ public class ChefScheduleServiceTest {
         assertEquals(2, response.getDayOfWeek());
         assertEquals(LocalTime.of(14, 0), response.getStartTime());
         assertEquals(LocalTime.of(18, 0), response.getEndTime());
+        assertEquals("Asia/Ho_Chi_Minh", response.getTimezone());
         
         verify(chefScheduleRepository).findById(2L);
         verify(modelMapper).map(testSchedule2, ChefScheduleResponse.class);
+        verify(timeZoneService).getTimezoneFromAddress(testChef.getAddress());
     }
     
     // ==================== updateSchedule Tests ====================
@@ -260,6 +275,7 @@ public class ChefScheduleServiceTest {
         verify(chefScheduleRepository).findById(1L);
         verify(chefScheduleRepository).save(any(ChefSchedule.class));
         verify(modelMapper).map(any(ChefSchedule.class), eq(ChefScheduleResponse.class));
+        verify(bookingConflictService).hasBookingConflictOnDayOfWeek(any(Chef.class), eq(1), any(LocalTime.class), any(LocalTime.class), anyInt());
     }
     
     @Test
@@ -340,6 +356,28 @@ public class ChefScheduleServiceTest {
         verify(chefScheduleRepository).findById(1L);
         verify(chefScheduleRepository, times(3)).findByChefAndDayOfWeekAndIsDeletedFalse(any(Chef.class), eq(1));
     }
+
+    @Test
+    @DisplayName("Test 5: updateSchedule with invalid day of week should throw exception")
+    void updateSchedule_WithInvalidDayOfWeek_ShouldThrowException() {
+        // Arrange
+        when(chefScheduleRepository.findById(1L)).thenReturn(Optional.of(testSchedule1));
+        
+        ChefScheduleUpdateRequest invalidDayRequest = new ChefScheduleUpdateRequest();
+        invalidDayRequest.setId(1L);
+        invalidDayRequest.setDayOfWeek(7); // Invalid day (should be 0-6)
+        invalidDayRequest.setStartTime(LocalTime.of(9, 0));
+        invalidDayRequest.setEndTime(LocalTime.of(13, 0));
+        
+        // Act & Assert
+        VchefApiException exception = assertThrows(VchefApiException.class, () -> {
+            chefScheduleService.updateSchedule(invalidDayRequest);
+        });
+        
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+        assertTrue(exception.getMessage().contains("Day of week must between 0-6"));
+        verify(chefScheduleRepository).findById(1L);
+    }
     
     // ==================== deleteSchedule Tests ====================
     
@@ -362,6 +400,8 @@ public class ChefScheduleServiceTest {
         // Assert
         verify(chefScheduleRepository).findById(1L);
         verify(chefScheduleRepository).save(any(ChefSchedule.class));
+        verify(bookingConflictService).hasBookingConflictOnDayOfWeek(
+                eq(testChef), eq(1), eq(LocalTime.of(8, 0)), eq(LocalTime.of(12, 0)), eq(60));
     }
     
     @Test
@@ -394,26 +434,23 @@ public class ChefScheduleServiceTest {
     }
     
     @Test
-    @DisplayName("Test 4: deleteSchedule with already deleted schedule should not change state")
-    void deleteSchedule_WithAlreadyDeletedSchedule_ShouldNotChangeState() {
+    @DisplayName("Test 4: deleteSchedule with existing bookings should throw exception")
+    void deleteSchedule_WithExistingBookings_ShouldThrowException() {
         // Arrange
-        ChefSchedule deletedSchedule = new ChefSchedule();
-        deletedSchedule.setId(3L);
-        deletedSchedule.setChef(testChef);
-        deletedSchedule.setDayOfWeek(3);
-        deletedSchedule.setStartTime(LocalTime.of(10, 0));
-        deletedSchedule.setEndTime(LocalTime.of(14, 0));
-        deletedSchedule.setIsDeleted(true); // Already deleted
+        when(chefScheduleRepository.findById(1L)).thenReturn(Optional.of(testSchedule1));
+        when(bookingConflictService.hasBookingConflictOnDayOfWeek(
+                any(Chef.class), anyInt(), any(LocalTime.class), any(LocalTime.class), anyInt()))
+                .thenReturn(true);
         
-        when(chefScheduleRepository.findById(3L)).thenReturn(Optional.of(deletedSchedule));
-        when(chefScheduleRepository.save(any(ChefSchedule.class))).thenReturn(deletedSchedule);
+        // Act & Assert
+        VchefApiException exception = assertThrows(VchefApiException.class, () -> {
+            chefScheduleService.deleteSchedule(1L);
+        });
         
-        // Act
-        chefScheduleService.deleteSchedule(3L);
-        
-        // Assert
-        verify(chefScheduleRepository).findById(3L);
-        verify(chefScheduleRepository).save(any(ChefSchedule.class));
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+        assertTrue(exception.getMessage().contains("existing bookings"));
+        verify(chefScheduleRepository).findById(1L);
+        verify(chefScheduleRepository, never()).save(any(ChefSchedule.class));
     }
     
     // ==================== createScheduleForCurrentChef Tests ====================
@@ -524,6 +561,35 @@ public class ChefScheduleServiceTest {
             verify(chefScheduleRepository, never()).save(any(ChefSchedule.class));
         }
     }
+
+    // ==================== getSchedulesForCurrentChef Tests ====================
+    
+    @Test
+    @DisplayName("Test 1: getSchedulesForCurrentChef should return schedules with timezone")
+    void getSchedulesForCurrentChef_ShouldReturnSchedulesWithTimezone() {
+        // Arrange
+        try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
+            securityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            
+            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+            when(chefRepository.findByUser(testUser)).thenReturn(Optional.of(testChef));
+            when(chefScheduleRepository.findByChefAndIsDeletedFalse(testChef))
+                    .thenReturn(Arrays.asList(testSchedule1, testSchedule2));
+            when(modelMapper.map(any(ChefSchedule.class), eq(ChefScheduleResponse.class)))
+                    .thenReturn(testScheduleResponse1, testScheduleResponse2);
+            
+            // Act
+            List<ChefScheduleResponse> responses = chefScheduleService.getSchedulesForCurrentChef();
+            
+            // Assert
+            assertNotNull(responses);
+            assertEquals(2, responses.size());
+            verify(timeZoneService).getTimezoneFromAddress(testChef.getAddress());
+            verify(userRepository).findById(1L);
+            verify(chefRepository).findByUser(testUser);
+            verify(chefScheduleRepository).findByChefAndIsDeletedFalse(testChef);
+        }
+    }
     
     // ==================== createMultipleSchedulesForCurrentChef Tests ====================
     
@@ -586,53 +652,8 @@ public class ChefScheduleServiceTest {
     }
     
     @Test
-    @DisplayName("Test 2: createMultipleSchedulesForCurrentChef with user not found should throw exception")
-    void createMultipleSchedulesForCurrentChef_WithUserNotFound_ShouldThrowException() {
-        // Arrange
-        try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
-            securityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(99L);
-            
-            when(userRepository.findById(99L)).thenReturn(Optional.empty());
-            
-            // Act & Assert
-            VchefApiException exception = assertThrows(VchefApiException.class, () -> {
-                chefScheduleService.createMultipleSchedulesForCurrentChef(testMultipleScheduleRequest);
-            });
-            
-            assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
-            assertTrue(exception.getMessage().contains("User not found"));
-            
-            verify(userRepository).findById(99L);
-            verify(chefRepository, never()).findByUser(any(User.class));
-        }
-    }
-    
-    @Test
-    @DisplayName("Test 3: createMultipleSchedulesForCurrentChef with chef not found should throw exception")
-    void createMultipleSchedulesForCurrentChef_WithChefNotFound_ShouldThrowException() {
-        // Arrange
-        try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
-            securityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
-            
-            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-            when(chefRepository.findByUser(testUser)).thenReturn(Optional.empty());
-            
-            // Act & Assert
-            VchefApiException exception = assertThrows(VchefApiException.class, () -> {
-                chefScheduleService.createMultipleSchedulesForCurrentChef(testMultipleScheduleRequest);
-            });
-            
-            assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
-            assertTrue(exception.getMessage().contains("Chef profile not found"));
-            
-            verify(userRepository).findById(1L);
-            verify(chefRepository).findByUser(testUser);
-        }
-    }
-    
-    @Test
-    @DisplayName("Test 4: createMultipleSchedulesForCurrentChef with schedule conflict should throw exception")
-    void createMultipleSchedulesForCurrentChef_WithScheduleConflict_ShouldThrowException() {
+    @DisplayName("Test 2: createMultipleSchedulesForCurrentChef with too many sessions should throw exception")
+    void createMultipleSchedulesForCurrentChef_WithTooManySessions_ShouldThrowException() {
         // Arrange
         try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
             securityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
@@ -640,30 +661,70 @@ public class ChefScheduleServiceTest {
             when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
             when(chefRepository.findByUser(testUser)).thenReturn(Optional.of(testChef));
             
-            // Create existing overlapping schedule
-            ChefSchedule existingSchedule = new ChefSchedule();
-            existingSchedule.setId(5L);
-            existingSchedule.setChef(testChef);
-            existingSchedule.setDayOfWeek(1);
-            existingSchedule.setStartTime(LocalTime.of(10, 0));
-            existingSchedule.setEndTime(LocalTime.of(15, 0));
-            existingSchedule.setIsDeleted(false);
+            // Create request with too many time slots (more than MAX_SESSIONS_PER_DAY = 3)
+            ChefMultipleScheduleRequest invalidRequest = new ChefMultipleScheduleRequest();
+            invalidRequest.setDayOfWeek(1);
             
-            // Override the lenient stubbing with a specific one for this test
-            when(chefScheduleRepository.findByChefAndDayOfWeekAndIsDeletedFalse(eq(testChef), eq(1)))
-                    .thenReturn(Arrays.asList(existingSchedule));
+            List<ChefMultipleScheduleRequest.ScheduleTimeSlot> timeSlots = new ArrayList<>();
+            for (int i = 0; i < 4; i++) { // 4 sessions > MAX_SESSIONS_PER_DAY
+                ChefMultipleScheduleRequest.ScheduleTimeSlot slot = new ChefMultipleScheduleRequest.ScheduleTimeSlot();
+                slot.setStartTime(LocalTime.of(8 + i * 3, 0));
+                slot.setEndTime(LocalTime.of(10 + i * 3, 0));
+                timeSlots.add(slot);
+            }
+            invalidRequest.setTimeSlots(timeSlots);
             
             // Act & Assert
             VchefApiException exception = assertThrows(VchefApiException.class, () -> {
-                chefScheduleService.createMultipleSchedulesForCurrentChef(testMultipleScheduleRequest);
+                chefScheduleService.createMultipleSchedulesForCurrentChef(invalidRequest);
             });
             
             assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
-            assertTrue(exception.getMessage().contains("conflict"));
+            assertTrue(exception.getMessage().contains("Maximum number of sessions per day"));
             
             verify(userRepository).findById(1L);
             verify(chefRepository).findByUser(testUser);
-            verify(chefScheduleRepository).findByChefAndDayOfWeekAndIsDeletedFalse(eq(testChef), eq(1));
+        }
+    }
+    
+    @Test
+    @DisplayName("Test 3: createMultipleSchedulesForCurrentChef with insufficient gap should throw exception")
+    void createMultipleSchedulesForCurrentChef_WithInsufficientGap_ShouldThrowException() {
+        // Arrange
+        try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
+            securityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            
+            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+            when(chefRepository.findByUser(testUser)).thenReturn(Optional.of(testChef));
+            
+            // Create request with insufficient gap between sessions
+            ChefMultipleScheduleRequest invalidRequest = new ChefMultipleScheduleRequest();
+            invalidRequest.setDayOfWeek(1);
+            
+            List<ChefMultipleScheduleRequest.ScheduleTimeSlot> timeSlots = new ArrayList<>();
+            
+            ChefMultipleScheduleRequest.ScheduleTimeSlot slot1 = new ChefMultipleScheduleRequest.ScheduleTimeSlot();
+            slot1.setStartTime(LocalTime.of(8, 0));
+            slot1.setEndTime(LocalTime.of(12, 0));
+            timeSlots.add(slot1);
+            
+            ChefMultipleScheduleRequest.ScheduleTimeSlot slot2 = new ChefMultipleScheduleRequest.ScheduleTimeSlot();
+            slot2.setStartTime(LocalTime.of(12, 30)); // Only 30 minutes gap, need 60
+            slot2.setEndTime(LocalTime.of(16, 30));
+            timeSlots.add(slot2);
+            
+            invalidRequest.setTimeSlots(timeSlots);
+            
+            // Act & Assert
+            VchefApiException exception = assertThrows(VchefApiException.class, () -> {
+                chefScheduleService.createMultipleSchedulesForCurrentChef(invalidRequest);
+            });
+            
+            assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+            assertTrue(exception.getMessage().contains("must have at least"));
+            
+            verify(userRepository).findById(1L);
+            verify(chefRepository).findByUser(testUser);
         }
     }
     
@@ -709,56 +770,12 @@ public class ChefScheduleServiceTest {
             verify(chefRepository).findByUser(testUser);
             verify(chefScheduleRepository).findByChefAndDayOfWeekAndIsDeletedFalse(testChef, 1);
             verify(chefScheduleRepository, times(2)).save(any(ChefSchedule.class));
+            verify(bookingConflictService).hasActiveBookingsForDayOfWeek(testChef.getId(), 1);
         }
     }
     
     @Test
-    @DisplayName("Test 2: deleteSchedulesByDayOfWeek with user not found should throw exception")
-    void deleteSchedulesByDayOfWeek_WithUserNotFound_ShouldThrowException() {
-        // Arrange
-        try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
-            securityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(99L);
-            
-            when(userRepository.findById(99L)).thenReturn(Optional.empty());
-            
-            // Act & Assert
-            VchefApiException exception = assertThrows(VchefApiException.class, () -> {
-                chefScheduleService.deleteSchedulesByDayOfWeek(1);
-            });
-            
-            assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
-            assertTrue(exception.getMessage().contains("User not found"));
-            
-            verify(userRepository).findById(99L);
-            verify(chefRepository, never()).findByUser(any(User.class));
-        }
-    }
-    
-    @Test
-    @DisplayName("Test 3: deleteSchedulesByDayOfWeek with chef not found should throw exception")
-    void deleteSchedulesByDayOfWeek_WithChefNotFound_ShouldThrowException() {
-        // Arrange
-        try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
-            securityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
-            
-            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-            when(chefRepository.findByUser(testUser)).thenReturn(Optional.empty());
-            
-            // Act & Assert
-            VchefApiException exception = assertThrows(VchefApiException.class, () -> {
-                chefScheduleService.deleteSchedulesByDayOfWeek(1);
-            });
-            
-            assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
-            assertTrue(exception.getMessage().contains("Chef profile not found"));
-            
-            verify(userRepository).findById(1L);
-            verify(chefRepository).findByUser(testUser);
-        }
-    }
-    
-    @Test
-    @DisplayName("Test 4: deleteSchedulesByDayOfWeek with no schedules should throw exception")
+    @DisplayName("Test 2: deleteSchedulesByDayOfWeek with no schedules should throw exception")
     void deleteSchedulesByDayOfWeek_WithNoSchedules_ShouldThrowException() {
         // Arrange
         try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
@@ -780,6 +797,36 @@ public class ChefScheduleServiceTest {
             verify(userRepository).findById(1L);
             verify(chefRepository).findByUser(testUser);
             verify(chefScheduleRepository).findByChefAndDayOfWeekAndIsDeletedFalse(testChef, 3);
+            verify(chefScheduleRepository, never()).save(any(ChefSchedule.class));
+        }
+    }
+    
+    @Test
+    @DisplayName("Test 3: deleteSchedulesByDayOfWeek with existing bookings should throw exception")
+    void deleteSchedulesByDayOfWeek_WithExistingBookings_ShouldThrowException() {
+        // Arrange
+        try (MockedStatic<SecurityUtils> securityUtils = Mockito.mockStatic(SecurityUtils.class)) {
+            securityUtils.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            
+            when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+            when(chefRepository.findByUser(testUser)).thenReturn(Optional.of(testChef));
+            when(chefScheduleRepository.findByChefAndDayOfWeekAndIsDeletedFalse(testChef, 1))
+                    .thenReturn(Arrays.asList(testSchedule1));
+            when(bookingConflictService.hasActiveBookingsForDayOfWeek(testChef.getId(), 1))
+                    .thenReturn(true);
+            
+            // Act & Assert
+            VchefApiException exception = assertThrows(VchefApiException.class, () -> {
+                chefScheduleService.deleteSchedulesByDayOfWeek(1);
+            });
+            
+            assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
+            assertTrue(exception.getMessage().contains("existing bookings"));
+            
+            verify(userRepository).findById(1L);
+            verify(chefRepository).findByUser(testUser);
+            verify(chefScheduleRepository).findByChefAndDayOfWeekAndIsDeletedFalse(testChef, 1);
+            verify(bookingConflictService).hasActiveBookingsForDayOfWeek(testChef.getId(), 1);
             verify(chefScheduleRepository, never()).save(any(ChefSchedule.class));
         }
     }

@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -110,5 +111,12 @@ public interface ChefRepository extends JpaRepository<Chef, Long> {
 
     @Query("SELECT COUNT(c) FROM Chef c WHERE c.isDeleted = false")
     long countActiveChefs();
+
+    // Chef ranking queries
+    @Query("SELECT c FROM Chef c WHERE c.status = :status AND c.isDeleted = false ORDER BY c.id LIMIT :limit")
+    List<Chef> findByStatusAndLimit(@Param("status") String status, @Param("limit") int limit);
+
+    @Query("SELECT c FROM Chef c WHERE c.status = :status AND c.isDeleted = false ORDER BY c.reputationPoints DESC LIMIT :limit")
+    List<Chef> findByStatusOrderByReputationDesc(@Param("status") String status, @Param("limit") int limit);
 
 }
