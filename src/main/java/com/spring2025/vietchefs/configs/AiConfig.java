@@ -41,7 +41,6 @@ public class AiConfig {
     }
 
 
-
     @Bean
     public VertexAI vertexAI() throws Exception {
         vertexAIClient = new VertexAI(projectId, location);
