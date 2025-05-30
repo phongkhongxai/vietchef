@@ -100,7 +100,7 @@ public class CalculateService {
                     .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Menu not found"));
 
             // Lấy thời gian nấu tổng của menu
-            totalCookTime = menu.getTotalCookTime();  // Giả sử Menu có trường totalCookTime
+            totalCookTime = menu.getTotalCookTime();
             BigDecimal multiplier = getCookTimeMultiplier(guestCount);
             totalCookTime = totalCookTime.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
 
