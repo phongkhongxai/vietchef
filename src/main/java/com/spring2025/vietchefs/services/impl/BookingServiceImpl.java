@@ -322,12 +322,12 @@ public class BookingServiceImpl implements BookingService {
                 .filter(detail -> {
                     Booking booking = detail.getBooking();
                     return !booking.getIsDeleted() &&
-                            !List.of("CANCELED", "OVERDUE").contains(booking.getStatus()) &&
+                            !List.of("CANCELED", "OVERDUE","REJECTED").contains(booking.getStatus()) &&
                             !detail.getIsDeleted() &&
-                            !List.of("CANCELED", "OVERDUE").contains(detail.getStatus());
+                            !List.of("CANCELED", "OVERDUE","REFUNDED").contains(detail.getStatus());
                 })
                 .sorted(Comparator.comparing(BookingDetail::getStartTime))
-                .collect(Collectors.toList());
+                .toList();
 
         // Tính khoảng thời gian cần kiểm tra (cho phép lố 10 phút)
         LocalTime checkStart = timeBeginTravel.minusSeconds(10);
@@ -463,7 +463,7 @@ public class BookingServiceImpl implements BookingService {
                     "The number of guests can not bigger than " + bookingPackage.getMaxGuestCountPerMeal() + ".");
         }
 
-        // 🔹 Tính phí di chuyển
+        //  Tính phí di chuyển
         DistanceFeeResponse travelFeeResponse = calculateService.calculateTravelFee(chef.getAddress(), dto.getLocation());
         if(travelFeeResponse.getDistanceKm().compareTo(BigDecimal.valueOf(50))>0){
             throw new VchefApiException(HttpStatus.BAD_REQUEST,"Distance between you and chef cannot bigger than 50km.");
@@ -495,13 +495,13 @@ public class BookingServiceImpl implements BookingService {
                     invalidDates.add(detailDto.getSessionDate());
                 }
             }
-            // 🔹 Kiểm tra xem BookingDetail đã chọn món chưa
+            //  Kiểm tra xem BookingDetail đã chọn món chưa
             if (Boolean.FALSE.equals(detailDto.getIsDishSelected()) && detailDto.getDishes()==null) {
                 //  Nếu chưa chọn món, lấy tổng thời gian nấu của 3 món lâu nhất của đầu bếp
                 totalCookTime = calculateService.calculateMaxCookTime(chef.getId(),bookingPackage.getMaxDishesPerMeal(),dto.getGuestCount());
 
             } else {
-                // 🔹 Nếu đã chọn món, tính thời gian nấu dựa trên món ăn đã chọn
+                //  Nếu đã chọn món, tính thời gian nấu dựa trên món ăn đã chọn
                 if (detailDto.getMenuId() != null || (detailDto.getExtraDishIds() != null && !detailDto.getExtraDishIds().isEmpty())) {
                     Set<Long> uniqueDishIds = new HashSet<>();
 
