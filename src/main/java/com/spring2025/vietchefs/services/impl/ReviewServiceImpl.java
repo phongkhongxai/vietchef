@@ -346,7 +346,7 @@ public class ReviewServiceImpl implements ReviewService {
                 .orElseThrow(() -> new ResourceNotFoundException("Review not found with id: " + reviewId));
         
         // Verify the chef is the one being reviewed
-        if (!review.getChef().getUser().getId().equals(chefId)) {
+        if (!review.getChef().getUser().getId().equals(chefId)) { 
             throw new IllegalArgumentException("Only the chef being reviewed can respond to the review");
         }
         
