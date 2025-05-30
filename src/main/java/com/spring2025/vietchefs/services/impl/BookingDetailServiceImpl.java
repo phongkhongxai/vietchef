@@ -129,9 +129,9 @@ public class BookingDetailServiceImpl implements BookingDetailService {
                 .filter(detail -> {
                     Booking booking = detail.getBooking();
                     return !booking.getIsDeleted() &&
-                            !List.of("CANCELED", "OVERDUE").contains(booking.getStatus()) &&
+                            !List.of("CANCELED", "OVERDUE","REJECTED").contains(booking.getStatus()) &&
                             !detail.getIsDeleted() &&
-                            !List.of("CANCELED", "OVERDUE").contains(detail.getStatus());
+                            !List.of("CANCELED", "OVERDUE","REFUNDED").contains(detail.getStatus());
                 })
                 .sorted(Comparator.comparing(BookingDetail::getStartTime))
                 .collect(Collectors.toList());
@@ -378,6 +378,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
             }
         }
 
+
         BigDecimal cookingFee = calculateService.calculateChefServiceFee(chef.getPrice(), totalCookTime);
 
         BigDecimal dishPrice = calculateService.calculateDishPrice(dto.getMenuId(), bookingDetail.getBooking().getGuestCount(), dto.getExtraDishIds());
@@ -390,8 +391,20 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         }
         BigDecimal travelFee = travelFeeResponse.getTravelFee();
         TimeTravelResponse timeTravelResponse = calculateService.calculateArrivalTime(bookingDetail.getStartTime(), totalCookTime, travelFeeResponse.getDurationHours());
+        BigDecimal currentCookTime = bookingDetail.getTotalCookTime();
 
-
+        if (totalCookTime.compareTo(currentCookTime) > 0) {
+            boolean isOverlap = isOverlappingWithExistingBookingDetail(
+                    chef,
+                    bookingDetail.getSessionDate(),
+                    timeTravelResponse.getTimeBeginTravel(),
+                    bookingDetail.getStartTime(),
+                    bookingDetail.getId()
+            );
+            if (isOverlap) {
+                throw new VchefApiException(HttpStatus.BAD_REQUEST, "Extending the cooking time will cause a scheduling conflict with another booking of the chef.");
+            }
+        }
         BigDecimal discountAmountDetail = BigDecimal.ZERO;
         BigDecimal totalChefFeePrice = cookingFee.add(dishPrice.multiply(BigDecimal.valueOf(0.8))).add(travelFee) ;
         BigDecimal totalPrice = calculateService.calculateFinalPrice(cookingFee, dishPrice, travelFee);
@@ -416,6 +429,39 @@ public class BookingDetailServiceImpl implements BookingDetailService {
 
         return reviewResponse;
     }
+    private boolean isOverlappingWithExistingBookingDetail(Chef chef, LocalDate sessionDate, LocalTime timeBeginTravel, LocalTime startTime, Long excludeBookingDetailId) {
+        // Lấy toàn bộ bookingDetails của chef trong ngày đó
+        List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking_ChefAndSessionDateAndIsDeletedFalse(chef, sessionDate);
+
+        List<BookingDetail> activeBookings = bookingDetails.stream()
+                .filter(detail -> {
+                    Booking booking = detail.getBooking();
+                    return !booking.getIsDeleted()
+                            && !List.of("CANCELED", "OVERDUE", "REJECTED").contains(booking.getStatus())
+                            && !detail.getIsDeleted()
+                            && !List.of("CANCELED", "OVERDUE", "REFUNDED").contains(detail.getStatus())
+                            && !detail.getId().equals(excludeBookingDetailId);
+                })
+                .sorted(Comparator.comparing(BookingDetail::getStartTime))
+                .toList();
+
+        // Tính khoảng thời gian cần kiểm tra (cho phép lố 10 phút)
+        LocalTime checkStart = timeBeginTravel.minusSeconds(10);
+        LocalTime checkEnd = startTime.plusMinutes(10);
+
+        for (BookingDetail detail : activeBookings) {
+            LocalTime existingStart = detail.getTimeBeginTravel();
+            LocalTime existingEnd = detail.getStartTime();
+
+            boolean isOverlap = !(checkEnd.isBefore(existingStart) || checkStart.isAfter(existingEnd));
+            if (isOverlap) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
 
     @Override
     @Transactional
@@ -428,6 +474,20 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         }
         if (bookingDetailUpdateRequest.getDishes() == null || bookingDetailUpdateRequest.getDishes().isEmpty()) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Dishes cannot empty.");
+        }
+        BigDecimal currentCookTime = bookingDetail.getTotalCookTime();
+        if (bookingDetailUpdateRequest.getTotalCookTime().compareTo(currentCookTime) > 0) {
+            // Kiểm tra overlap với các booking khác, loại trừ booking hiện tại
+            boolean isOverlap = isOverlappingWithExistingBookingDetail(
+                    booking.getChef(),
+                    bookingDetail.getSessionDate(),
+                    bookingDetailUpdateRequest.getTimeBeginTravel(),
+                    bookingDetail.getStartTime(),
+                    bookingDetail.getId()
+            );
+            if (isOverlap) {
+                throw new VchefApiException(HttpStatus.BAD_REQUEST, "Extending the cooking time will cause a scheduling conflict with another booking of the chef.");
+            }
         }
         // Xóa danh sách món ăn cũ
         if (!bookingDetail.getDishes().isEmpty()) {
