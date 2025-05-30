@@ -1003,7 +1003,9 @@ public class BookingServiceImpl implements BookingService {
                     .message("Cannot deposit. The first session has already started or is today.")
                     .build();
         }
-        BigDecimal depositAmount = booking.getTotalPrice().multiply(BigDecimal.valueOf(0.05));
+        BigDecimal depositAmount = booking.getTotalPrice() != null
+                ? booking.getTotalPrice().multiply(BigDecimal.valueOf(0.05))
+                : BigDecimal.valueOf(10);
         if (!firstSession.isAfter(now.plusDays(2))) {
             booking.setStatus("PENDING_FIRST_CYCLE");
             booking.setDepositPaid(depositAmount);
@@ -1067,8 +1069,6 @@ public class BookingServiceImpl implements BookingService {
                 .screen("ChefBookingManagementScreen")
                 .build();
         notificationService.sendPushNotification(chefNotification);
-
-
         return ApiResponse.<BookingResponseDto>builder()
                 .success(true)
                 .message("Deposit successfully.")
