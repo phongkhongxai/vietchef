@@ -24,8 +24,8 @@ public class PaymentController {
             @RequestParam String currency,
             @RequestParam Long bookingId) {
 
-        String returnUrl = "https://vietchef-api.ddns.net/api/v1/payment/success";
-        String cancelUrl = "https://vietchef-api.ddns.net/api/v1/payment/cancel";
+        String returnUrl = "https://vietchef-api.myddns.me/api/v1/payment/success";
+        String cancelUrl = "https://vietchef-api.myddns.me/api/v1/payment/cancel";
         return paypalService.createPayment(amount, currency, bookingId, returnUrl, cancelUrl)
                 .map(ResponseEntity::ok)
                 .onErrorResume(e -> Mono.just(ResponseEntity.status(500).body("Error: " + e.getMessage())));
@@ -35,8 +35,8 @@ public class PaymentController {
     @PostMapping("/deposit")
     public Mono<String> depositToWallet(@RequestParam Long walletId,
                                         @RequestParam BigDecimal amount) {
-        String returnUrl = "https://vietchef-api.ddns.net/api/v1/payment/success";
-        String cancelUrl = "https://vietchef-api.ddns.net/api/v1/payment/cancel";
+        String returnUrl = "https://vietchef-api.myddns.me/api/v1/payment/success";
+        String cancelUrl = "https://vietchef-api.myddns.me/api/v1/payment/cancel";
         String currency = "USD";
         return paypalService.depositToWallet(walletId, amount, currency, returnUrl, cancelUrl);
     }
