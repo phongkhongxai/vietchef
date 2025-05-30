@@ -1738,7 +1738,12 @@ public class BookingServiceImpl implements BookingService {
                     detail.setStatus("CANCELED");
                     bookingDetailRepository.save(detail);
                 }
-                // Gửi thông báo
+                List<PaymentCycle> cycles = paymentCycleRepository
+                        .findByBookingId(booking.getId());
+                for (PaymentCycle cycle : cycles) {
+                        cycle.setStatus("CANCELED");
+                }
+                paymentCycleRepository.saveAll(cycles);
                 notificationService.sendPushNotification(NotificationRequest.builder()
                         .userId(booking.getCustomer().getId())
                         .title("Booking Expired")
