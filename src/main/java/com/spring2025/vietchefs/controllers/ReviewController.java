@@ -3,6 +3,7 @@ package com.spring2025.vietchefs.controllers;
 import com.spring2025.vietchefs.models.entity.*;
 import com.spring2025.vietchefs.models.payload.dto.ChefDto;
 import com.spring2025.vietchefs.models.payload.dto.UserDto;
+import com.spring2025.vietchefs.models.payload.requestModel.ChefResponseRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ReviewCreateRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ReviewCriteriaRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.ReviewReactionRequest;
@@ -350,7 +351,7 @@ public class ReviewController {
     )
     @PostMapping("/reviews/{id}/response")
     @PreAuthorize("hasRole('ROLE_CHEF')")
-    public ResponseEntity<ReviewResponse> respondToReview(@PathVariable Long id, @RequestBody Map<String, String> request) {
+    public ResponseEntity<ReviewResponse> respondToReview(@PathVariable Long id, @Valid @RequestBody ChefResponseRequest request) {
         UserDto currentUser = getCurrentUser();
         ReviewResponse review = reviewService.getReviewById(id);
         
@@ -361,13 +362,11 @@ public class ReviewController {
         if (chef.getUser().getId() != currentUser.getId()) {
             return new ResponseEntity<>(HttpStatus.FORBIDDEN);
         }
+
+        String response = request.getResponse();
         
-        String response = request.get("response");
         
-        // Filter chef's response content
-        String filteredResponse = contentFilterService.filterText(response);
-        
-        ReviewResponse updatedReview = reviewService.addChefResponse(id, filteredResponse, currentUser.getId());
+        ReviewResponse updatedReview = reviewService.addChefResponse(id, response, currentUser.getId());
         
         return ResponseEntity.ok(updatedReview);
     }
