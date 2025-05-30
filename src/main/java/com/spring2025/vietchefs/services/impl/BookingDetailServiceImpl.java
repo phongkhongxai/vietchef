@@ -93,7 +93,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         detail.setChefCookingFee(dto.getChefCookingFee());
         detail.setPriceOfDishes(dto.getPriceOfDishes());
         detail.setIsDeleted(false);
-        detail.setTotalCookTime(dto.getTotalCookTime().divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP));
+        detail.setTotalCookTime(dto.getTotalCookTime());
         detail.setIsUpdated(dto.getIsUpdated());
         detail.setChefBringIngredients(dto.getChefBringIngredients());
         detail.setTimeBeginCook(dto.getTimeBeginCook());
@@ -393,7 +393,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         TimeTravelResponse timeTravelResponse = calculateService.calculateArrivalTime(bookingDetail.getStartTime(), totalCookTime, travelFeeResponse.getDurationHours());
         BigDecimal currentCookTime = bookingDetail.getTotalCookTime();
 
-        if (totalCookTime.compareTo(currentCookTime) > 0) {
+        if (totalCookTime.multiply(BigDecimal.valueOf(60)).compareTo(currentCookTime) > 0) {
             boolean isOverlap = isOverlappingWithExistingBookingDetail(
                     chef,
                     bookingDetail.getSessionDate(),
@@ -413,7 +413,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
             totalPrice = totalPrice.subtract(discountAmountDetail);
         }
         reviewResponse.setChefCookingFee(cookingFee);
-        reviewResponse.setTotalCookTime(totalCookTime);
+        reviewResponse.setTotalCookTime(totalCookTime.multiply(BigDecimal.valueOf(60)));
         reviewResponse.setPriceOfDishes(dishPrice);
         reviewResponse.setArrivalFee(travelFee);
         reviewResponse.setPlatformFee(platformFee);
@@ -507,6 +507,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         }
 
         bookingDetail.getDishes().addAll(newDishes);
+        bookingDetail.setTotalCookTime(bookingDetailUpdateRequest.getTotalCookTime());
         bookingDetail.setMenuId(bookingDetailUpdateRequest.getMenuId());
         bookingDetail.setChefBringIngredients(bookingDetailUpdateRequest.getChefBringIngredients());
         bookingDetail.setArrivalFee(bookingDetailUpdateRequest.getArrivalFee());
