@@ -625,6 +625,7 @@ public class BookingServiceImpl implements BookingService {
                     List<BookingDetail> bookingDetails = bookingDetailRepository.findByBooking(booking);
                     for (BookingDetail detail : bookingDetails) {
                         detail.setStatus("SCHEDULED_COMPLETE");
+                        detail.setIsUpdated(true);
                         bookingDetailRepository.save(detail);
                     }
                     booking.setStatus("CONFIRMED");
