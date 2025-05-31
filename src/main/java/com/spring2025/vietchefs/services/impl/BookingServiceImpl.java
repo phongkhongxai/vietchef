@@ -700,7 +700,6 @@ public class BookingServiceImpl implements BookingService {
                         .description("Refund for rejected Booking #" + booking.getId())
                         .build();
                 customerTransactionRepository.save(refundTransaction);
-                chefService.updateReputation(chef,-1);
 
                 // 7. Cập nhật trạng thái Booking thành REJECTED
                 booking.setStatus("REJECTED");
@@ -724,9 +723,8 @@ public class BookingServiceImpl implements BookingService {
                         .bookingId(booking.getId())
                         .screen("Booking")
                         .build();
-
                 notificationService.sendPushNotification(rejectNotification);
-
+                chefService.updateReputation(chef,-1);
                 return modelMapper.map(booking, BookingResponseDto.class);
             } else {
                 throw new VchefApiException(HttpStatus.BAD_REQUEST, "Booking does not meet the conditions for rejection.");
@@ -1704,6 +1702,7 @@ public class BookingServiceImpl implements BookingService {
                 fullyBookedDates.add(date);
             }
         }
+
         return fullyBookedDates;
     }
 
@@ -1738,7 +1737,12 @@ public class BookingServiceImpl implements BookingService {
                     detail.setStatus("CANCELED");
                     bookingDetailRepository.save(detail);
                 }
-                // Gửi thông báo
+                List<PaymentCycle> cycles = paymentCycleRepository
+                        .findByBookingId(booking.getId());
+                for (PaymentCycle cycle : cycles) {
+                        cycle.setStatus("CANCELED");
+                }
+                paymentCycleRepository.saveAll(cycles);
                 notificationService.sendPushNotification(NotificationRequest.builder()
                         .userId(booking.getCustomer().getId())
                         .title("Booking Expired")

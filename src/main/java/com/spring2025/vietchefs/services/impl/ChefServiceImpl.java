@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -51,6 +52,8 @@ public class ChefServiceImpl implements ChefService {
     @Autowired
     private CalculateService calculateService;
     @Autowired
+    private BookingRepository bookingRepository;
+    @Autowired
     private EmailVerificationService emailVerificationService;
     @Autowired
     private ReviewService reviewService;
@@ -70,6 +73,7 @@ public class ChefServiceImpl implements ChefService {
         if(existingChef.isPresent()){
             throw new VchefApiException(HttpStatus.BAD_REQUEST,"Chef profile already exists for this user.");
         }
+
 
         Chef chef = new Chef();
         chef.setUser(user);
@@ -112,8 +116,6 @@ public class ChefServiceImpl implements ChefService {
 
         notificationService.sendPushNotification(notification);
 
-        notificationService.sendPushNotification(notification);
-
     }
 
     @Override
@@ -136,6 +138,13 @@ public class ChefServiceImpl implements ChefService {
         // Kiểm tra nếu User đã có hồ sơ Chef
         if (chefRepository.findByUser(user).isPresent()) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef profile already exists for this user.");
+        }
+        List<String> pendingStatuses = Arrays.asList("CONFIRMED", "CONFIRMED_PAID", "CONFIRMED_PARTIALLY_PAID");
+
+        boolean hasPendingCustomerBookings = bookingRepository.existsByCustomerIdAndStatusIn(user.getId(), pendingStatuses);
+
+        if (hasPendingCustomerBookings) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "User has uncompleted bookings and cannot be approved as chef.");
         }
         // Đặt trạng thái chờ duyệt (PENDING)
         Chef chef = new Chef();
@@ -164,6 +173,15 @@ public class ChefServiceImpl implements ChefService {
 
         if (!chef.getStatus().equals("PENDING")) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Chef is not in PENDING status.");
+        }
+        // Danh sách các trạng thái chưa hoàn thành
+        List<String> pendingStatuses = Arrays.asList("CONFIRMED", "CONFIRMED_PAID", "CONFIRMED_PARTIALLY_PAID");
+
+        // Kiểm tra xem user có là khách hàng (customer) trong booking chưa hoàn thành không
+        boolean hasPendingCustomerBookings = bookingRepository.existsByCustomerIdAndStatusIn(chef.getUser().getId(), pendingStatuses);
+
+        if (hasPendingCustomerBookings) {
+            throw new VchefApiException(HttpStatus.BAD_REQUEST, "User has uncompleted bookings and cannot be approved as chef.");
         }
         chef.setStatus("ACTIVE");
         Role chefRole = roleRepository.findByRoleName("ROLE_CHEF")
@@ -403,6 +421,7 @@ public class ChefServiceImpl implements ChefService {
         if (chef.getStatus().equalsIgnoreCase("REJECTED")){
             chef.setStatus("PENDING");
         }
+
         if (requestDto.getBio() != null) chef.setBio(requestDto.getBio());
         if (requestDto.getDescription() != null) chef.setDescription(requestDto.getDescription());
         if (requestDto.getAddress() != null) {

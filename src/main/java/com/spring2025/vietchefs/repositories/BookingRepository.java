@@ -32,6 +32,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
     boolean existsByCustomerIdAndChefIdAndBookingTypeIgnoreCaseAndStatusIgnoreCase(
             Long customerId, Long chefId, String bookingType, String status
     );
+    boolean existsByCustomerIdAndStatusIn(Long customerId, List<String> statuses);
+
     @Query("""
     SELECT b FROM Booking b
     LEFT JOIN FETCH b.bookingDetails bd
