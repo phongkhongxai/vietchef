@@ -28,7 +28,7 @@ public class Menu {
     private String name;
     @Column(nullable = false)
     private BigDecimal totalCookTime;
-
+    @Column(columnDefinition = "TEXT")
     private String description;
 
     @OneToMany(mappedBy = "menu", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
