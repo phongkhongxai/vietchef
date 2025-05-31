@@ -413,7 +413,7 @@ public class BookingServiceImpl implements BookingService {
 
             // 🔹 Tính phí món ăn (menu hoặc món lẻ)
             BigDecimal price2 = calculateService.calculateDishPrice(detailDto.getMenuId(), dto.getGuestCount(), detailDto.getExtraDishIds());
-            reviewSingleBookingResponse.setPriceOfDishes(price2);
+            reviewSingleBookingResponse.setPriceOfDishes(price2.multiply(BigDecimal.valueOf(0.8)));
             BigDecimal platformFee = price1.multiply(BigDecimal.valueOf(0.25))  // 25% của cookingFee
                 .add(price2.multiply(BigDecimal.valueOf(0.20))); // 20% của dishPrice
 
@@ -573,7 +573,7 @@ public class BookingServiceImpl implements BookingService {
             detailResponse.setDiscountAmout(discountAmountDetail);
             detailResponse.setTotalPrice(sessionTotalPrice);
             detailResponse.setChefCookingFee(chefCookingFee);
-            detailResponse.setPriceOfDishes(dishPrice);
+            detailResponse.setPriceOfDishes(dishPrice.multiply(BigDecimal.valueOf(0.8)));
             detailResponse.setArrivalFee(travelFee);
             detailResponse.setTimeBeginTravel(ttp.getTimeBeginTravel());
             detailResponse.setTimeBeginCook(ttp.getTimeBeginCook());

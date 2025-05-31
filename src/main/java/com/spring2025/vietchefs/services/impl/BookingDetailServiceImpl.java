@@ -414,7 +414,7 @@ public class BookingDetailServiceImpl implements BookingDetailService {
         }
         reviewResponse.setChefCookingFee(cookingFee);
         reviewResponse.setTotalCookTime(totalCookTime.multiply(BigDecimal.valueOf(60)));
-        reviewResponse.setPriceOfDishes(dishPrice);
+        reviewResponse.setPriceOfDishes(dishPrice.multiply(BigDecimal.valueOf(0.8)));
         reviewResponse.setArrivalFee(travelFee);
         reviewResponse.setPlatformFee(platformFee);
         reviewResponse.setTotalChefFeePrice(totalChefFeePrice);

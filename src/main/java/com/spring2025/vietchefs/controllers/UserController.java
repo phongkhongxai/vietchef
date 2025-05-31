@@ -7,6 +7,7 @@ import com.spring2025.vietchefs.models.payload.requestModel.ChangePasswordReques
 import com.spring2025.vietchefs.models.payload.requestModel.UserRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.UserResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.WalletPlusResponse;
+import com.spring2025.vietchefs.services.AuthService;
 import com.spring2025.vietchefs.services.UserService;
 import com.spring2025.vietchefs.services.WalletService;
 import com.spring2025.vietchefs.utils.AppConstants;
@@ -20,6 +21,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+
 @RestController
 @RequestMapping("/api/v1/users")
 public class UserController {
@@ -27,6 +31,8 @@ public class UserController {
     private UserService userService;
     @Autowired
     private WalletService walletService;
+    @Autowired
+    private AuthService authService;
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
     @GetMapping("/profile")
@@ -50,6 +56,14 @@ public class UserController {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
         WalletPlusResponse bs = walletService.getWalletByUserIdAll(bto.getId(), pageNo,  pageSize,  sortBy,  sortDir);
         return new ResponseEntity<>(bs, HttpStatus.OK);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @PutMapping("/save-device-token/logout")
+    public ResponseEntity<Void> saveTokenDeviceLogout(@AuthenticationPrincipal UserDetails userDetails) {
+        UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        authService.updateTokenExpo(bto.getEmail(), "default");
+        return ResponseEntity.ok().build();
     }
     @SecurityRequirement(name = "Bearer Authentication")
     @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
