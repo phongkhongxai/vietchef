@@ -30,13 +30,13 @@ public class MenuController {
 
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF') or hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('CHEF') or hasRole('ADMIN')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<MenuResponseDto> createMenu(@ModelAttribute MenuRequestDto requestDto,@RequestParam(value = "file", required = false) MultipartFile file) {
         return ResponseEntity.ok(menuService.createMenu(requestDto,file));
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF') or hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('CHEF') or hasRole('ADMIN')")
     @PutMapping(value ="/{menuId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<MenuResponseDto> updateMenu(@PathVariable Long menuId, @ModelAttribute MenuUpdateDto dto,@RequestParam(value = "file", required = false) MultipartFile file) {
         return ResponseEntity.ok(menuService.updateMenu(menuId, dto,file));
@@ -86,7 +86,7 @@ public class MenuController {
         return new ResponseEntity<>(menuResponseDto, HttpStatus.OK);
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF') or hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('CHEF') or hasRole('ADMIN')")
     @DeleteMapping("/{menuId}")
     public ResponseEntity<?> deleteMenu(@PathVariable Long menuId) {
         String msg = menuService.deleteMenu(menuId);

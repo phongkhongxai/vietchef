@@ -31,7 +31,7 @@ public class PaymentController {
                 .onErrorResume(e -> Mono.just(ResponseEntity.status(500).body("Error: " + e.getMessage())));
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CHEF', 'ADMIN')")
     @PostMapping("/deposit")
     public Mono<String> depositToWallet(@RequestParam Long walletId,
                                         @RequestParam BigDecimal amount) {
@@ -41,7 +41,7 @@ public class PaymentController {
         return paypalService.depositToWallet(walletId, amount, currency, returnUrl, cancelUrl);
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CHEF', 'ADMIN')")
     @PostMapping("/withdrawal")
     public Mono<String> withdrawalWallet(@RequestParam Long walletId,
                                         @RequestParam BigDecimal amount) {

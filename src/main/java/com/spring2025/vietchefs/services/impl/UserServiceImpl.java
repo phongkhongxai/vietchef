@@ -60,7 +60,7 @@ public class UserServiceImpl implements UserService {
 
         User user = modelMapper.map(signupDto, User.class);
         user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
-        Role userRole = roleRepository.findByRoleName("ROLE_CHEF")
+        Role userRole = roleRepository.findByRoleName("CHEF")
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User Role not found."));
         user.setRole(userRole);
         user.setAvatarUrl("default");
@@ -124,7 +124,7 @@ public class UserServiceImpl implements UserService {
 
         Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
 
-        Page<User> users = userRepository.findByRoleNameAndIsDeleteFalse("ROLE_CUSTOMER",pageable);
+        Page<User> users = userRepository.findByRoleNameAndIsDeleteFalse("CUSTOMER",pageable);
 
         List<User> userList = users.getContent();
 
@@ -149,7 +149,7 @@ public class UserServiceImpl implements UserService {
 
         Pageable pageable = PageRequest.of(pageNo, pageSize, sort);
 
-        Page<User> users = userRepository.findByRoleNameAndIsDeleteFalse("ROLE_CHEF",pageable);
+        Page<User> users = userRepository.findByRoleNameAndIsDeleteFalse("CHEF",pageable);
 
         List<User> userList = users.getContent();
 

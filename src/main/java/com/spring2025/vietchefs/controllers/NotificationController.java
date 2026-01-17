@@ -29,7 +29,7 @@ public class NotificationController {
     @Autowired
     private UserService userService;
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/send")
     public ResponseEntity<?> sendNotification(@RequestBody NotificationRequest request) {
         notificationService.sendPushNotification(request);
@@ -50,7 +50,7 @@ public class NotificationController {
         return ResponseEntity.ok(notificationService.countUnreadNotifications(bto.getId()));
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('CHEF')")
     @PutMapping("/my/all")
     public ResponseEntity<String> updateNotiReadAll(@AuthenticationPrincipal UserDetails userDetails) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
@@ -58,14 +58,14 @@ public class NotificationController {
         return ResponseEntity.ok("OKE");
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('CHEF')")
     @PutMapping("/my")
     public ResponseEntity<String> updateNotiReadIds(@RequestParam List<Long> ids) {
         notificationService.markAsReadByIds(ids);
         return ResponseEntity.ok("OKE");
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('CHEF')")
     @PutMapping("/my-chat")
     public ResponseEntity<String> updateNotiReadIds(@AuthenticationPrincipal UserDetails userDetails) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());

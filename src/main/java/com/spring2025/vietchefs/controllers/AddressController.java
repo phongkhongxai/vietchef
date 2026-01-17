@@ -25,8 +25,8 @@ public class AddressController {
      * Lấy thông tin Address theo id.
      * Endpoint: GET /api/v1/address/{id}
      */
-    @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+//    @SecurityRequirement(name = "Bearer Authentication")
+//    @PreAuthorize("hasRole('CUSTOMER')")
     @GetMapping("/{id}")
     public ResponseEntity<AddressResponse> getAddressById(@PathVariable Long id) {
         AddressResponse response = addressService.getAddressById(id);
@@ -38,10 +38,17 @@ public class AddressController {
      * Endpoint: GET /api/v1/address/my-addresses
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PreAuthorize("hasRole('CUSTOMER')")
     @GetMapping("/my-addresses")
     public ResponseEntity<List<AddressResponse>> getAddressesFromUser() {
         List<AddressResponse> responses = addressService.getAddressesFromUser();
+        return ResponseEntity.ok(responses);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/my-addresses-v2")
+    public ResponseEntity<List<AddressResponse>> getAddressesFromUserV2() {
+        List<AddressResponse> responses = addressService.getMyAddress();
         return ResponseEntity.ok(responses);
     }
 
@@ -50,7 +57,6 @@ public class AddressController {
      * Endpoint: POST /api/v1/address
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
     @PostMapping
     public ResponseEntity<AddressResponse> createAddress(
             @Valid @RequestBody CreateAddressRequest request) {
@@ -63,7 +69,7 @@ public class AddressController {
      * Endpoint: PUT /api/v1/address
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PreAuthorize("hasRole('CUSTOMER')")
     @PutMapping
     public ResponseEntity<AddressResponse> updateAddress(
             @Valid @RequestBody UpdateAddressRequest request) {
@@ -76,7 +82,7 @@ public class AddressController {
      * Endpoint: DELETE /api/v1/address/{id}
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PreAuthorize("hasRole('CUSTOMER')")
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteAddress(@PathVariable Long id) {
         addressService.deleteAddress(id);

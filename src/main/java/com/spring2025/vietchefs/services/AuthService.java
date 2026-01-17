@@ -6,6 +6,7 @@ import com.google.firebase.auth.FirebaseAuthException;
 import com.spring2025.vietchefs.models.payload.dto.LoginDto;
 import com.spring2025.vietchefs.models.payload.dto.SignupDto;
 import com.spring2025.vietchefs.models.payload.requestModel.NewPasswordRequest;
+import com.spring2025.vietchefs.models.payload.requestModel.RefreshRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.AuthenticationResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -20,7 +21,7 @@ public interface AuthService {
     AuthenticationResponse authenticateWithFacebook(String accessToken) throws Exception;
     AuthenticationResponse authenticateWithOAuth2(String provider, Map<String, Object> userData) throws Exception;
     String signup(SignupDto signupDto);
-    AuthenticationResponse refreshToken(HttpServletRequest request, HttpServletResponse response) throws IOException;
+    AuthenticationResponse refreshToken(RefreshRequest request);
     String verifyEmailCode(String email, String code);
     String setPasswordAfterVerified(String email, String password);
     String resendVerificationCode(String email);

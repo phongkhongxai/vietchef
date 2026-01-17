@@ -2,6 +2,7 @@ package com.spring2025.vietchefs.services.impl;
 
 import com.spring2025.vietchefs.models.entity.Address;
 import com.spring2025.vietchefs.models.entity.User;
+import com.spring2025.vietchefs.models.exception.ResourceNotFoundException;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.requestModel.CreateAddressRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.UpdateAddressRequest;
@@ -14,6 +15,7 @@ import com.spring2025.vietchefs.utils.SecurityUtils;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -39,8 +41,33 @@ public class AddressServiceImpl implements AddressService {
     @Override
     public AddressResponse getAddressById(Long id) {
         Address address = addressRepository.findById(id)
-                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"Address not found with id:" + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Address","id",id));
         return modelMapper.map(address, AddressResponse.class);
+    }
+
+    @Override
+    public List<AddressResponse> getMyAddress() {
+        // 1. Lấy đối tượng Authentication từ context
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        // 2. Trích xuất userId từ claim (ép kiểu về Jwt)
+        Long userId;
+        if (authentication != null && authentication.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt jwt) {
+            userId = jwt.getClaim("userId");
+        } else {
+            userId = null;
+        }
+
+        if (userId == null) {
+            throw new VchefApiException(HttpStatus.FORBIDDEN,"Không tìm thấy UserId trong Token");
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User not found with id: " + userId));
+        List<Address> addresses = addressRepository.findByUserAndIsDeletedFalse(user);
+
+        return addresses.stream()
+                .map(address -> modelMapper.map(address, AddressResponse.class))
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -59,7 +86,19 @@ public class AddressServiceImpl implements AddressService {
 
     @Override
     public AddressResponse createAddress(CreateAddressRequest request) {
-        Long userId = SecurityUtils.getCurrentUserId();
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        // 2. Trích xuất userId từ claim (ép kiểu về Jwt)
+        Long userId;
+        if (authentication != null && authentication.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt jwt) {
+            userId = jwt.getClaim("userId");
+        } else {
+            userId = null;
+        }
+
+        if (userId == null) {
+            throw new VchefApiException(HttpStatus.FORBIDDEN,"Không tìm thấy UserId trong Token");
+        }
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User not found with id: " + userId));
@@ -72,11 +111,18 @@ public class AddressServiceImpl implements AddressService {
         Address address = modelMapper.map(request, Address.class);
 
         address.setUser(user);
-        double[] latLng = distanceService.getLatLngFromAddress(address.getAddress());
+        double[] latLng = getLatLngFromAddress(address.getAddress());
         address.setLatitude(latLng[0]);
         address.setLongitude(latLng[1]);
         Address savedAddress = addressRepository.save(address);
         return modelMapper.map(savedAddress, AddressResponse.class);
+    }
+    public double[] getLatLngFromAddress(String address) {
+        // API hết hạn - Trả về tọa độ ngẫu nhiên
+        double lat = -90.0 + (Math.random() * 180.0);
+        double lng = -180.0 + (Math.random() * 360.0);
+
+        return new double[]{lat, lng};
     }
 
     @Override

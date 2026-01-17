@@ -29,7 +29,7 @@ public class DishController {
     @Autowired
     private DishService dishService;
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF') or hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('CHEF') or hasRole('ADMIN')")
     @Operation(
             summary = "Tạo món ăn mới với ảnh",
             description = "Chấp nhận yêu cầu multipart chứa thông tin món ăn và ảnh"
@@ -117,7 +117,7 @@ public class DishController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF') or hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('CHEF') or hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<?> updateDish(@PathVariable("id") Long id, @Valid @ModelAttribute DishRequest dishRequest) {
         DishDto bt1 = dishService.updateDish(id, dishRequest);
@@ -125,7 +125,7 @@ public class DishController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF') or hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('CHEF') or hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteDish(@PathVariable("id") Long id) {
          String bt1 = dishService.deleteDish(id);

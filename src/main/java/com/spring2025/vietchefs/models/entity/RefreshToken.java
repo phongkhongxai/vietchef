@@ -3,6 +3,7 @@ package com.spring2025.vietchefs.models.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
 import java.util.Set;
 
 @Getter
@@ -14,16 +15,18 @@ import java.util.Set;
 @Table(name = "refresh_tokens")
 public class RefreshToken {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue
     private Long id;
-    @Column(length = 555)
+
+    @Column(unique = true, nullable = false)
     private String token;
 
-    private boolean expired;
+    @ManyToOne
+    private User user;
 
     private boolean revoked;
+    private boolean expired;
 
-    @OneToMany(mappedBy = "refreshToken", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<AccessToken> accessTokens;
+    private Instant expiryDate;
 
 }

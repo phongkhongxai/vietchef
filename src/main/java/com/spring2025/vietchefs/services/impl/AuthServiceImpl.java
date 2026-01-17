@@ -3,9 +3,7 @@ package com.spring2025.vietchefs.services.impl;
 
 
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.FirebaseToken;
-import com.spring2025.vietchefs.models.entity.AccessToken;
 import com.spring2025.vietchefs.models.entity.RefreshToken;
 import com.spring2025.vietchefs.models.entity.Role;
 import com.spring2025.vietchefs.models.entity.User;
@@ -13,8 +11,8 @@ import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.dto.LoginDto;
 import com.spring2025.vietchefs.models.payload.dto.SignupDto;
 import com.spring2025.vietchefs.models.payload.requestModel.NewPasswordRequest;
+import com.spring2025.vietchefs.models.payload.requestModel.RefreshRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.AuthenticationResponse;
-import com.spring2025.vietchefs.repositories.AccessTokenRepository;
 import com.spring2025.vietchefs.repositories.RefreshTokenRepository;
 import com.spring2025.vietchefs.repositories.RoleRepository;
 import com.spring2025.vietchefs.repositories.UserRepository;
@@ -25,6 +23,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -38,8 +37,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,7 +50,6 @@ public class AuthServiceImpl implements AuthService {
     private AuthenticationManager authenticationManager;
     private UserRepository userRepository;
     private RoleRepository roleRepository;
-    private AccessTokenRepository accessTokenRepository;
     private RefreshTokenRepository refreshTokenRepository;
     private EmailVerificationService emailVerificationService;
     private UserDetailsService userDetailsService;
@@ -57,15 +57,16 @@ public class AuthServiceImpl implements AuthService {
     private JwtTokenProvider jwtTokenProvider;
     private ModelMapper modelMapper;
     private WalletService walletService;
+    @Value("${app.jwt-refresh-expiration-seconds}")
+    private long jwtRefreshExpiration;
 
     @Autowired
     public AuthServiceImpl(AuthenticationManager authenticationManager, UserRepository userRepository,
-                           RoleRepository roleRepository, AccessTokenRepository accessTokenRepository, RefreshTokenRepository refreshTokenRepository, UserDetailsService userDetailsService, PasswordEncoder passwordEncoder,
+                           RoleRepository roleRepository, RefreshTokenRepository refreshTokenRepository, UserDetailsService userDetailsService, PasswordEncoder passwordEncoder,
                            JwtTokenProvider jwtTokenProvider, ModelMapper modelMapper, EmailVerificationService emailVerificationService,WalletService walletService) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
-        this.accessTokenRepository = accessTokenRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.userDetailsService = userDetailsService;
         this.passwordEncoder = passwordEncoder;
@@ -77,9 +78,9 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthenticationResponse login(LoginDto loginDto) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginDto.getUsernameOrEmail(), loginDto.getPassword()));
-        SecurityContextHolder.getContext().setAuthentication(authentication);
+//        Authentication authentication = authenticationManager.authenticate(
+//                new UsernamePasswordAuthenticationToken(loginDto.getUsernameOrEmail(), loginDto.getPassword()));
+//        SecurityContextHolder.getContext().setAuthentication(authentication);
         User user = userRepository.findByUsernameOrEmail(loginDto.getUsernameOrEmail(), loginDto.getUsernameOrEmail())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.BAD_REQUEST, "User not found"));
         if (!user.isEmailVerified()) {
@@ -95,20 +96,16 @@ public class AuthServiceImpl implements AuthService {
             userRepository.save(user);
         }
 
-        String accessToken = jwtTokenProvider.generateAccessToken(authentication, user);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(authentication, user);
+        String accessToken = jwtTokenProvider.generateAccessToken(user);
 
         String fullName = user.getFullName();
 
-        revokeRefreshToken(accessToken);
-        RefreshToken savedRefreshToken = saveUserRefreshToken(refreshToken);
-
-        revokeAllUserAccessTokens(user);
-        saveUserAccessToken(user, accessToken, savedRefreshToken);
+        revokeRefreshToken(user.getId());
+        RefreshToken savedRefreshToken = createRefreshToken(user);
 
         return AuthenticationResponse.builder()
                 .accessToken(accessToken)
-                .refreshToken(refreshToken)
+                .refreshToken(savedRefreshToken.getToken())
                 .fullName(fullName)
                 .build();
     }
@@ -142,7 +139,7 @@ public class AuthServiceImpl implements AuthService {
             }
 
             // Lấy role mặc định cho người dùng Google
-            Role userRole = roleRepository.findByRoleName("ROLE_CUSTOMER")
+            Role userRole = roleRepository.findByRoleName("CUSTOMER")
                     .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Default role not found."));
 
             // Tạo user mới từ thông tin Google
@@ -166,18 +163,17 @@ public class AuthServiceImpl implements AuthService {
         }
         // Tạo token cho user
         Authentication authentication = new UsernamePasswordAuthenticationToken(user.getEmail(), null);
-        String accessToken = jwtTokenProvider.generateAccessToken(authentication, user);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(authentication, user);
+        String accessToken = jwtTokenProvider.generateAccessToken(user);
 
-        revokeRefreshToken(accessToken);
-        RefreshToken savedRefreshToken = saveUserRefreshToken(refreshToken);
+        String fullName = user.getFullName();
 
-        revokeAllUserAccessTokens(user);
-        saveUserAccessToken(user, accessToken, savedRefreshToken);
+        revokeRefreshToken(user.getId());
+        RefreshToken savedRefreshToken = createRefreshToken(user);
+
         return AuthenticationResponse.builder()
                 .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .fullName(user.getFullName())
+                .refreshToken(savedRefreshToken.getToken())
+                .fullName(fullName)
                 .build();
     }
 
@@ -197,7 +193,7 @@ public class AuthServiceImpl implements AuthService {
             if (userRepository.existsByEmail(email)) {
                 throw new VchefApiException(HttpStatus.BAD_REQUEST, "Email already exists with another account!");
             }
-            Role userRole = roleRepository.findByRoleName("ROLE_CUSTOMER")
+            Role userRole = roleRepository.findByRoleName("CUSTOMER")
                     .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Default role not found."));
 
             // Tạo user mới từ thông tin Facebook
@@ -219,8 +215,8 @@ public class AuthServiceImpl implements AuthService {
 
         // Tạo token cho user
         Authentication authentication = new UsernamePasswordAuthenticationToken(user.getEmail(), null);
-        String accessTokenGenerated = jwtTokenProvider.generateAccessToken(authentication, user);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(authentication, user);
+        String accessTokenGenerated = jwtTokenProvider.generateAccessToken(user);
+        String refreshToken = createRefreshToken(user).getToken();
 
         return AuthenticationResponse.builder()
                 .accessToken(accessTokenGenerated)
@@ -255,7 +251,7 @@ public class AuthServiceImpl implements AuthService {
                 userRepository.save(user);
             } else {
                 // Tạo user mới nếu không có ai trùng UID hay email
-                Role userRole = roleRepository.findByRoleName("ROLE_CUSTOMER")
+                Role userRole = roleRepository.findByRoleName("CUSTOMER")
                         .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Role not found."));
 
                 user = User.builder()
@@ -278,19 +274,17 @@ public class AuthServiceImpl implements AuthService {
 
         // Generate tokens
         Authentication authentication = new UsernamePasswordAuthenticationToken(user.getEmail(), null);
-        String accessToken = jwtTokenProvider.generateAccessToken(authentication, user);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(authentication, user);
+        String accessToken = jwtTokenProvider.generateAccessToken(user);
 
-        revokeRefreshToken(accessToken);
-        RefreshToken savedRefreshToken = saveUserRefreshToken(refreshToken);
+        String fullName = user.getFullName();
 
-        revokeAllUserAccessTokens(user);
-        saveUserAccessToken(user, accessToken, savedRefreshToken);
+        revokeRefreshToken(user.getId());
+        RefreshToken savedRefreshToken = createRefreshToken(user);
 
         return AuthenticationResponse.builder()
                 .accessToken(accessToken)
-                .refreshToken(refreshToken)
-                .fullName(user.getFullName())
+                .refreshToken(savedRefreshToken.getToken())
+                .fullName(fullName)
                 .build();
     }
 
@@ -304,48 +298,59 @@ public class AuthServiceImpl implements AuthService {
         return username;
     }
 
+    public RefreshToken createRefreshToken(User user) {
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setToken(jwtTokenProvider.generateRefreshToken());
+        refreshToken.setUser(user);
+        refreshToken.setRevoked(false);
+        refreshToken.setExpired(false);
+        refreshToken.setExpiryDate(
+                Instant.now().plus(jwtRefreshExpiration, ChronoUnit.SECONDS)
+        );
+        return refreshTokenRepository.save(refreshToken);
+    }
 
-    public void revokeRefreshToken(String accessToken) {
-        AccessToken token = accessTokenRepository.findByToken(accessToken);
-        if (token != null) {
-            RefreshToken refreshToken = token.getRefreshToken();
-            refreshToken.setRevoked(true);
-            refreshToken.setExpired(true);
-            refreshTokenRepository.save(refreshToken);
+    @Transactional
+    public void revokeRefreshToken(Long userId) {
+        boolean exists = refreshTokenRepository.existsByUserId(userId);
+
+        if (exists) {
+            // 2. Chỉ thực hiện update khi thực sự có dữ liệu
+            refreshTokenRepository.revokeAllByUserId(userId);
         }
     }
 
-    public void revokeAllUserAccessTokens(User user) {
-        var validUserTokens = accessTokenRepository.findAllValidTokensByUser(user.getId());
-        if (validUserTokens.isEmpty()) {
-            return;
-        }
-        validUserTokens.forEach(accessToken -> {
-            accessToken.setRevoked(true);
-            accessToken.setExpired(true);
-        });
-        accessTokenRepository.saveAll(validUserTokens);
-    }
-
-    private void saveUserAccessToken(User user, String jwtToken, RefreshToken refreshToken) {
-        var token = AccessToken.builder()
-                .user(user)
-                .token(jwtToken)
-                .refreshToken(refreshToken)
-                .revoked(false)
-                .expired(false)
-                .build();
-        accessTokenRepository.save(token);
-    }
-
-    private RefreshToken saveUserRefreshToken(String jwtToken) {
-        var token = RefreshToken.builder()
-                .token(jwtToken)
-                .revoked(false)
-                .expired(false)
-                .build();
-        return refreshTokenRepository.save(token);
-    }
+//    public void revokeAllUserAccessTokens(User user) {
+//        var validUserTokens = accessTokenRepository.findAllValidTokensByUser(user.getId());
+//        if (validUserTokens.isEmpty()) {
+//            return;
+//        }
+//        validUserTokens.forEach(accessToken -> {
+//            accessToken.setRevoked(true);
+//            accessToken.setExpired(true);
+//        });
+//        accessTokenRepository.saveAll(validUserTokens);
+//    }
+//
+//    private void saveUserAccessToken(User user, String jwtToken, RefreshToken refreshToken) {
+//        var token = AccessToken.builder()
+//                .user(user)
+//                .token(jwtToken)
+//                .refreshToken(refreshToken)
+//                .revoked(false)
+//                .expired(false)
+//                .build();
+//        accessTokenRepository.save(token);
+//    }
+//
+//    private RefreshToken saveUserRefreshToken(String jwtToken) {
+//        var token = RefreshToken.builder()
+//                .token(jwtToken)
+//                .revoked(false)
+//                .expired(false)
+//                .build();
+//        return refreshTokenRepository.save(token);
+//    }
 
     @Override
     @Transactional
@@ -366,7 +371,7 @@ public class AuthServiceImpl implements AuthService {
         User user = modelMapper.map(signupDto, User.class);
 
         user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
-        Role userRole = roleRepository.findByRoleName("ROLE_CUSTOMER")
+        Role userRole = roleRepository.findByRoleName("CUSTOMER")
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User Role not found."));
         user.setRole(userRole);
         user.setEmailVerified(false);
@@ -379,47 +384,38 @@ public class AuthServiceImpl implements AuthService {
 
 
     @Override
-    public AuthenticationResponse refreshToken(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        final String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
-        final String refreshToken;
-        final String username;
+    public AuthenticationResponse refreshToken(RefreshRequest request) {
+        String refreshTokenValue = request.getRefreshToken();
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return null;
+        if (refreshTokenValue == null || refreshTokenValue.isEmpty()) {
+            throw new VchefApiException(HttpStatus.UNAUTHORIZED, "Refresh token missing in body");
+        }
+        RefreshToken refreshToken = refreshTokenRepository.findByToken(refreshTokenValue)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.UNAUTHORIZED, "Invalid refresh token"));
+
+        if (refreshToken.isRevoked() || refreshToken.isExpired()) {
+            throw new VchefApiException(HttpStatus.UNAUTHORIZED, "Refresh token expired or revoked");
         }
 
-        refreshToken = authHeader.substring(7);
-        RefreshToken token = refreshTokenRepository.findByToken(refreshToken).orElseThrow();
-        username = jwtTokenProvider.getUsernameFromJwt(refreshToken);
+        User user = refreshToken.getUser();
 
-        if (username != null) {
-            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        // 1️⃣ Rotate refresh token (REVOKE OLD)
+        refreshToken.setRevoked(true);
+        refreshToken.setExpired(true);
+        refreshTokenRepository.save(refreshToken);
 
-            // Fetch the User entity
-            User user = this.userRepository.findByUsernameOrEmail(username, username)
-                    .orElseThrow(() -> new VchefApiException(HttpStatus.BAD_REQUEST, "User not found"));
+        // 2️⃣ Create new refresh token
+        RefreshToken newRefreshToken = createRefreshToken(user);
 
-            if (!token.isRevoked() && !token.isExpired()) {
-                // Map user to authentication
-                Authentication userAuthentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+        // 3️⃣ Generate new access token
+        String newAccessToken = jwtTokenProvider.generateAccessToken(user);
 
-                // Generate access token with user details
-                String accessToken = jwtTokenProvider.generateAccessToken(userAuthentication, user);
 
-                // Revoke previous access tokens and save the new one
-                revokeAllUserAccessTokens(user);
-                saveUserAccessToken(user, accessToken, token);
-
-                return AuthenticationResponse.builder()
-                        .accessToken(accessToken)
-                        .refreshToken(refreshToken)
-                        .fullName(user.getFullName())
-                        .build();
-            } else {
-                throw new VchefApiException(HttpStatus.BAD_REQUEST, "Invalid refresh token");
-            }
-        }
-        return null;
+        return AuthenticationResponse.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken.getToken())
+                .fullName(user.getFullName())
+                .build();
     }
 
     @Override

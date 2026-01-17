@@ -26,7 +26,7 @@ public class ReportController {
     @Autowired
     private UserService userService;
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PreAuthorize("hasRole('CUSTOMER')")
     @PostMapping
     @Operation(
             summary = "Tạo report với reason là CHEF_NO_SHOW và phải có bookingDetailId, ko cần reviewId "
@@ -40,7 +40,7 @@ public class ReportController {
         return ResponseEntity.status(HttpStatus.CREATED).body(createdReport);
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PreAuthorize("hasRole('CUSTOMER')")
     @PostMapping("/others")
     @Operation(
             summary = "Tạo report với reason là khác và đi kèm ReviewId, ko cần bookingDetailId "
@@ -91,13 +91,13 @@ public class ReportController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}/status")
     public ResponseEntity<ReportDto> updateReportStatus(@PathVariable Long id, @RequestBody ReportHandleRequest request) {
         return ResponseEntity.ok(reportService.updateReportStatus(id, request));
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteReport(@PathVariable Long id) {
         return ResponseEntity.ok(reportService.deleteReport(id));

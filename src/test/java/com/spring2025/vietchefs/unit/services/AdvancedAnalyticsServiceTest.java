@@ -176,10 +176,10 @@ class AdvancedAnalyticsServiceTest {
         // Given - Only mock the methods actually called by getAdvancedAnalytics()
         // calculateCustomerRetention() calls:
         when(customerTransactionRepository.findTotalRevenue()).thenReturn(BigDecimal.valueOf(50000));
-        when(userRepository.countByRole("ROLE_CUSTOMER")).thenReturn(1000L);
+        when(userRepository.countByRole("CUSTOMER")).thenReturn(1000L);
         
         // calculateChefRetention() calls:
-        when(userRepository.countByRole("ROLE_CHEF")).thenReturn(200L);
+        when(userRepository.countByRole("CHEF")).thenReturn(200L);
         when(chefRepository.countByStatus("ACTIVE")).thenReturn(180L);
         when(chefTransactionRepository.findTotalEarnings()).thenReturn(BigDecimal.valueOf(36000));
         
@@ -218,8 +218,8 @@ class AdvancedAnalyticsServiceTest {
         
         // Verify interactions for methods actually called
         verify(customerTransactionRepository, times(2)).findTotalRevenue(); // Called by calculateCustomerRetention() and generateRevenueForecasting()
-        verify(userRepository).countByRole("ROLE_CUSTOMER");
-        verify(userRepository).countByRole("ROLE_CHEF");
+        verify(userRepository).countByRole("CUSTOMER");
+        verify(userRepository).countByRole("CHEF");
         verify(chefRepository).countByStatus("ACTIVE");
         verify(chefTransactionRepository).findTotalEarnings();
         verify(customerTransactionRepository, times(12)).findRevenueByDateRange(any(), any()); // 12 months for seasonal analysis
@@ -253,7 +253,7 @@ class AdvancedAnalyticsServiceTest {
     @Test
     void calculateCustomerRetention_ShouldCalculateRealRetentionMetrics() {
         // Given
-        when(userRepository.countByRole("ROLE_CUSTOMER")).thenReturn(1000L);
+        when(userRepository.countByRole("CUSTOMER")).thenReturn(1000L);
         when(customerTransactionRepository.findTotalRevenue()).thenReturn(BigDecimal.valueOf(50000));
 
         // When
@@ -272,14 +272,14 @@ class AdvancedAnalyticsServiceTest {
         assertEquals(expectedLifetimeValue, result.getAverageCustomerLifetimeValue());
         
         // Verify interactions
-        verify(userRepository).countByRole("ROLE_CUSTOMER");
+        verify(userRepository).countByRole("CUSTOMER");
         verify(customerTransactionRepository).findTotalRevenue();
     }
 
     @Test
     void calculateChefRetention_ShouldCalculateRealChefRetentionMetrics() {
         // Given
-        when(userRepository.countByRole("ROLE_CHEF")).thenReturn(200L);
+        when(userRepository.countByRole("CHEF")).thenReturn(200L);
         when(chefRepository.countByStatus("ACTIVE")).thenReturn(180L);
         when(chefTransactionRepository.findTotalEarnings()).thenReturn(BigDecimal.valueOf(36000));
 
@@ -299,7 +299,7 @@ class AdvancedAnalyticsServiceTest {
         assertEquals(expectedLifetimeValue, result.getAverageChefLifetimeValue());
         
         // Verify interactions
-        verify(userRepository).countByRole("ROLE_CHEF");
+        verify(userRepository).countByRole("CHEF");
         verify(chefRepository).countByStatus("ACTIVE");
         verify(chefTransactionRepository).findTotalEarnings();
     }

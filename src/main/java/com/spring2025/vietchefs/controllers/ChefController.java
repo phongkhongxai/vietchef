@@ -50,25 +50,25 @@ public class ChefController {
     @Autowired
     private ExportService exportService;
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('ADMIN')")
     @PostMapping("/register/{userId}")
     public ResponseEntity<ChefResponseDto> registerChef(@PathVariable Long userId, @RequestBody ChefRequestDto requestDto) {
         return ResponseEntity.ok(chefService.registerChefRequest(userId, requestDto));
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/approve/{chefId}")
     public ResponseEntity<ChefResponseDto> approveChef(@PathVariable Long chefId) {
         return ResponseEntity.ok(chefService.approveChef(chefId));
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/reject/{chefId}")
     public ResponseEntity<ChefResponseDto> rejectChef(@PathVariable Long chefId,@RequestParam String reason) {
         return ResponseEntity.ok(chefService.rejectChef(chefId, reason));
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/pending")
     public ChefsResponse getAllChefsPending(
             @RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
@@ -78,13 +78,13 @@ public class ChefController {
         return chefService.getAllChefsPending(pageNo, pageSize, sortBy, sortDir);
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{chefId}")
     public ResponseEntity<ChefResponseDto> updateChef(@PathVariable Long chefId, @RequestBody ChefRequestDto chefRequestDto) {
         return ResponseEntity.ok(chefService.updateChef(chefId,chefRequestDto));
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('CHEF')")
     @PutMapping("/my-chef")
     public ResponseEntity<ChefResponseDto> updateChef(@AuthenticationPrincipal UserDetails userDetails, @RequestBody ChefRequestDto chefRequestDto) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
@@ -96,7 +96,7 @@ public class ChefController {
         return new ResponseEntity<>(dto, HttpStatus.OK);
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @PutMapping("/unlock")
     public ResponseEntity<String> unlockChef(@AuthenticationPrincipal UserDetails userDetails){
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
@@ -143,7 +143,7 @@ public class ChefController {
     // ==================== CHEF STATISTICS APIs ====================
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @GetMapping("/statistics/overview")
     public ResponseEntity<ChefOverviewDto> getChefOverview(@AuthenticationPrincipal UserDetails userDetails) {
         UserDto user = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(), userDetails.getUsername());
@@ -154,7 +154,7 @@ public class ChefController {
     // ==================== PHASE 2: CHEF ADVANCED ANALYTICS APIs ====================
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @GetMapping("/analytics/trends")
     public ResponseEntity<TrendAnalyticsDto> getChefTrendAnalytics(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -173,7 +173,7 @@ public class ChefController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @GetMapping("/analytics/performance-comparison")
     public ResponseEntity<Map<String, Object>> getPerformanceComparison(@AuthenticationPrincipal UserDetails userDetails) {
         UserDto user = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(), userDetails.getUsername());
@@ -192,7 +192,7 @@ public class ChefController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @GetMapping("/analytics/earnings-forecast")
     public ResponseEntity<Map<String, Object>> getEarningsForecast(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -240,7 +240,7 @@ public class ChefController {
     // ==================== CHEF EXPORT APIs ====================
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @GetMapping("/export/performance/pdf")
     public ResponseEntity<org.springframework.core.io.Resource> exportPerformanceToPdf(
             @AuthenticationPrincipal UserDetails userDetails,
@@ -263,7 +263,7 @@ public class ChefController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @GetMapping("/export/performance/excel")
     public ResponseEntity<org.springframework.core.io.Resource> exportPerformanceToExcel(
             @AuthenticationPrincipal UserDetails userDetails,

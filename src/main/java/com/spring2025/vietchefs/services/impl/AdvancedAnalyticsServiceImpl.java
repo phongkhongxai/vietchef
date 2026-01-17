@@ -156,7 +156,7 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
     @Override
     public AdvancedAnalyticsDto.CustomerRetentionMetrics calculateCustomerRetention() {
         // Real retention calculation based on database data
-        Long totalCustomers = userRepository.countByRole("ROLE_CUSTOMER");
+        Long totalCustomers = userRepository.countByRole("CUSTOMER");
         Long activeCustomers = totalCustomers; // Simplified
         Long repeatCustomers = Math.round(totalCustomers * 0.6); // 60% assumption
         Long newCustomers = Math.round(totalCustomers * 0.3); // 30% assumption
@@ -188,7 +188,7 @@ public class AdvancedAnalyticsServiceImpl implements AdvancedAnalyticsService {
 
     @Override
     public AdvancedAnalyticsDto.ChefRetentionMetrics calculateChefRetention() {
-        Long totalChefs = userRepository.countByRole("ROLE_CHEF");
+        Long totalChefs = userRepository.countByRole("CHEF");
         Long activeChefs = chefRepository.countByStatus("ACTIVE");
         Long inactiveChefs = totalChefs - activeChefs;
 
