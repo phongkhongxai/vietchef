@@ -22,6 +22,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.ui.ModelMap;
@@ -169,6 +170,27 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserDto getProfileUserByUsernameOrEmail(String username, String email) {
         User existingUser = userRepository.findByUsernameOrEmail(username, email)
+                .orElseThrow(() -> new VchefApiException(HttpStatus.BAD_REQUEST, "User not found"));
+        return modelMapper.map(existingUser, UserDto.class);
+    }
+
+    @Override
+    public UserDto getMyProfile() {
+        // 1. Lấy đối tượng Authentication từ context
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        // 2. Trích xuất userId từ claim (ép kiểu về Jwt)
+        Long userId;
+        if (authentication != null && authentication.getPrincipal() instanceof org.springframework.security.oauth2.jwt.Jwt jwt) {
+            userId = jwt.getClaim("userId");
+        } else {
+            userId = null;
+        }
+
+        if (userId == null) {
+            throw new VchefApiException(HttpStatus.FORBIDDEN,"Không tìm thấy UserId trong Token");
+        }
+        User existingUser = userRepository.findById(userId)
                 .orElseThrow(() -> new VchefApiException(HttpStatus.BAD_REQUEST, "User not found"));
         return modelMapper.map(existingUser, UserDto.class);
     }

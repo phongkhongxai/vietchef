@@ -40,6 +40,13 @@ public class UserController {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
         return new ResponseEntity<>(bto, HttpStatus.OK);
     }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CHEF', 'ADMIN')")
+    @GetMapping("/my-info")
+    public ResponseEntity<UserDto> viewProfileV2() {
+        UserDto bto = userService.getMyProfile();
+        return new ResponseEntity<>(bto, HttpStatus.OK);
+    }
     @GetMapping("/{username}")
     public ResponseEntity<UserResponse> getProfileByUsername(@PathVariable("username") String username) {
         UserResponse bto = userService.getProfileUserByUsername(username);

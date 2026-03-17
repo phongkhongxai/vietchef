@@ -278,7 +278,7 @@ public class MenuServiceImpl implements MenuService {
 
         if (menu.getIsDeleted()) {
             return ApiResponse.<Void>builder()
-                    .success(false)
+                    .code(400)
                     .message("Menu đã bị xóa.")
                     .build();
         }
@@ -291,13 +291,13 @@ public class MenuServiceImpl implements MenuService {
 
         if (!allContained) {
             return ApiResponse.<Void>builder()
-                    .success(false)
+                    .code(400)
                     .message("Menu đã bị thay đổi món ăn so với ban đầu.")
                     .build();
         }
 
         return ApiResponse.<Void>builder()
-                .success(true)
+                .code(400)
                 .message("Menu hợp lệ.")
                 .build();
     }

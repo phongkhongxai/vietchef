@@ -4,23 +4,30 @@ package com.spring2025.vietchefs.services.impl;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseToken;
+import com.spring2025.vietchefs.constant.PredefinedRole;
 import com.spring2025.vietchefs.models.entity.RefreshToken;
 import com.spring2025.vietchefs.models.entity.Role;
 import com.spring2025.vietchefs.models.entity.User;
 import com.spring2025.vietchefs.models.exception.VchefApiException;
 import com.spring2025.vietchefs.models.payload.dto.LoginDto;
 import com.spring2025.vietchefs.models.payload.dto.SignupDto;
+import com.spring2025.vietchefs.models.payload.requestModel.ExchangeTokenRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.NewPasswordRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.RefreshRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.AuthenticationResponse;
 import com.spring2025.vietchefs.repositories.RefreshTokenRepository;
 import com.spring2025.vietchefs.repositories.RoleRepository;
 import com.spring2025.vietchefs.repositories.UserRepository;
+import com.spring2025.vietchefs.repositories.httpclient.OutboundIdentityClient;
+import com.spring2025.vietchefs.repositories.httpclient.OutboundUserClient;
 import com.spring2025.vietchefs.security.JwtTokenProvider;
 import com.spring2025.vietchefs.services.AuthService;
 import com.spring2025.vietchefs.services.WalletService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.NonFinal;
+import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -41,46 +48,40 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
+@Slf4j
+@RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
-    private AuthenticationManager authenticationManager;
-    private UserRepository userRepository;
-    private RoleRepository roleRepository;
-    private RefreshTokenRepository refreshTokenRepository;
-    private EmailVerificationService emailVerificationService;
-    private UserDetailsService userDetailsService;
-    private PasswordEncoder passwordEncoder;
-    private JwtTokenProvider jwtTokenProvider;
-    private ModelMapper modelMapper;
-    private WalletService walletService;
+    private final OutboundIdentityClient outboundIdentityClient;
+    private final OutboundUserClient outboundUserClient;
+    private final AuthenticationManager authenticationManager;
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final EmailVerificationService emailVerificationService;
+    private final UserDetailsService userDetailsService;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtTokenProvider jwtTokenProvider;
+    private final ModelMapper modelMapper;
+    private final WalletService walletService;
     @Value("${app.jwt-refresh-expiration-seconds}")
     private long jwtRefreshExpiration;
+    @Value("${outbound.identity.client-id}")
+    protected String CLIENT_ID;
+    @Value("${outbound.identity.client-secret}")
+    protected String CLIENT_SECRET;
+    @Value("${outbound.identity.redirect-uri}")
+    protected String REDIRECT_URI;
+    protected String GRANT_TYPE = "authorization_code";
 
-    @Autowired
-    public AuthServiceImpl(AuthenticationManager authenticationManager, UserRepository userRepository,
-                           RoleRepository roleRepository, RefreshTokenRepository refreshTokenRepository, UserDetailsService userDetailsService, PasswordEncoder passwordEncoder,
-                           JwtTokenProvider jwtTokenProvider, ModelMapper modelMapper, EmailVerificationService emailVerificationService,WalletService walletService) {
-        this.authenticationManager = authenticationManager;
-        this.userRepository = userRepository;
-        this.roleRepository = roleRepository;
-        this.refreshTokenRepository = refreshTokenRepository;
-        this.userDetailsService = userDetailsService;
-        this.passwordEncoder = passwordEncoder;
-        this.jwtTokenProvider = jwtTokenProvider;
-        this.modelMapper = modelMapper;
-        this.emailVerificationService = emailVerificationService;
-        this.walletService = walletService;
-    }
 
     @Override
     public AuthenticationResponse login(LoginDto loginDto) {
-//        Authentication authentication = authenticationManager.authenticate(
-//                new UsernamePasswordAuthenticationToken(loginDto.getUsernameOrEmail(), loginDto.getPassword()));
-//        SecurityContextHolder.getContext().setAuthentication(authentication);
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(loginDto.getUsernameOrEmail(), loginDto.getPassword()));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
         User user = userRepository.findByUsernameOrEmail(loginDto.getUsernameOrEmail(), loginDto.getUsernameOrEmail())
                 .orElseThrow(() -> new VchefApiException(HttpStatus.BAD_REQUEST, "User not found"));
         if (!user.isEmailVerified()) {
@@ -163,6 +164,69 @@ public class AuthServiceImpl implements AuthService {
         }
         // Tạo token cho user
         Authentication authentication = new UsernamePasswordAuthenticationToken(user.getEmail(), null);
+        String accessToken = jwtTokenProvider.generateAccessToken(user);
+
+        String fullName = user.getFullName();
+
+        revokeRefreshToken(user.getId());
+        RefreshToken savedRefreshToken = createRefreshToken(user);
+
+        return AuthenticationResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(savedRefreshToken.getToken())
+                .fullName(fullName)
+                .build();
+    }
+
+    public AuthenticationResponse outboundAuthenticate(String code, String codeVerifier){
+        var response = outboundIdentityClient.exchangeToken(ExchangeTokenRequest.builder()
+                .code(code)
+                .codeVerifier(codeVerifier)
+                .clientId(CLIENT_ID)
+                .clientSecret(CLIENT_SECRET)
+                .redirectUri(REDIRECT_URI)
+                .grantType(GRANT_TYPE)
+                .build());
+
+        log.info("TOKEN RESPONSE {}", response);
+
+        // Get user info
+        var userInfo = outboundUserClient.getUserInfo("json", response.getAccessToken());
+
+        log.info("User Info {}", userInfo);
+
+        Set<Role> roles = new HashSet<>();
+        roles.add(Role.builder().roleName(PredefinedRole.CUSTOMER_ROLE).build());
+        // Onboard user
+//        var user = userRepository.findByUsername(userInfo.getEmail()).orElseGet(
+//                () -> userRepository.save(User.builder()
+//                        .username(userInfo.getEmail())
+//                        .firstName(userInfo.getGivenName())
+//                        .lastName(userInfo.getFamilyName())
+//                        .roles(roles)
+//                        .build()));
+        Role userRole = roleRepository.findByRoleName("CUSTOMER")
+                .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Default role not found."));
+        var user = userRepository.findByEmail(userInfo.getEmail()).orElseGet(() -> {
+            User newUser = User.builder()
+                    .email(userInfo.getEmail())
+                    .username(generateUniqueUsername(userInfo.getEmail()))
+                    .fullName(userInfo.getName())
+                    .avatarUrl(userInfo.getPicture())
+                    .emailVerified(true)
+                    .role(userRole)
+                    .password(passwordEncoder.encode(UUID.randomUUID().toString()))
+                    .dob(LocalDate.now())
+                    .gender("default")
+                    .build();
+
+            return userRepository.save(newUser);
+        });
+        walletService.createWallet(user.getId(), "CUSTOMER");
+        if (user.isBanned()) {
+            throw new VchefApiException(HttpStatus.FORBIDDEN, "User is banned.");
+        }
+        // Generate token
         String accessToken = jwtTokenProvider.generateAccessToken(user);
 
         String fullName = user.getFullName();
@@ -378,7 +442,8 @@ public class AuthServiceImpl implements AuthService {
         String avatarUrl = "https://api.dicebear.com/7.x/initials/svg?seed=" + signupDto.getUsername();
         user.setAvatarUrl(avatarUrl);
         emailVerificationService.sendVerificationCode(user);
-        userRepository.save(user);
+        user = userRepository.save(user);
+        walletService.createWallet(user.getId(), "CUSTOMER");
         return "Account registered successfully! Please check your email for the verification code.";
     }
 

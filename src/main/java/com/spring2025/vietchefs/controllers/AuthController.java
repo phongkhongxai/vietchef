@@ -8,6 +8,7 @@ import com.spring2025.vietchefs.models.payload.requestModel.LogoutRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.NewPasswordRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.RefreshRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.SetPasswordDto;
+import com.spring2025.vietchefs.models.payload.responseModel.ApiResponse;
 import com.spring2025.vietchefs.models.payload.responseModel.AuthenticationResponse;
 import com.spring2025.vietchefs.services.AuthService;
 import com.spring2025.vietchefs.services.impl.FacebookOAuth2Service;
@@ -47,6 +48,14 @@ public class AuthController {
     public ResponseEntity<AuthenticationResponse> login(@Valid @RequestBody LoginDto loginDto){
         AuthenticationResponse token = authService.login(loginDto);
         return ResponseEntity.ok(token);
+    }
+    @PostMapping("/outbound/authentication")
+    ApiResponse<AuthenticationResponse> outboundAuthenticate(
+            @RequestParam("code") String code,
+            @RequestParam("codeVerifier") String codeVerifier
+    ){
+        var result = authService.outboundAuthenticate(code, codeVerifier);
+        return ApiResponse.<AuthenticationResponse>builder().success(true).data(result).build();
     }
     @PostMapping("/logout")
     public ResponseEntity<?> logout(@RequestBody LogoutRequest request) {

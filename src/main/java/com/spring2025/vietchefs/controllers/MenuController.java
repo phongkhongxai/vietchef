@@ -101,7 +101,7 @@ public class MenuController {
 
         ApiResponse<Void> response = menuService.validateMenuStillValid(menuId, allowedDishIds);
 
-        if (!response.isSuccess()) {
+        if (response.getCode()==400) {
             return ResponseEntity.badRequest().body(response);
         }
         return ResponseEntity.ok(response);

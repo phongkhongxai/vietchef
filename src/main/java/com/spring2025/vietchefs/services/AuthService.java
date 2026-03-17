@@ -18,6 +18,7 @@ public interface AuthService {
     AuthenticationResponse login(LoginDto loginDto);
     void updateTokenExpo(String email,String token);
     AuthenticationResponse authenticateWithGoogle(String idToken) throws Exception;
+    AuthenticationResponse outboundAuthenticate(String code, String codeVerifier);
     AuthenticationResponse authenticateWithFacebook(String accessToken) throws Exception;
     AuthenticationResponse authenticateWithOAuth2(String provider, Map<String, Object> userData) throws Exception;
     String signup(SignupDto signupDto);

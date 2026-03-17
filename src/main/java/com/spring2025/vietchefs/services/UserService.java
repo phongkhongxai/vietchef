@@ -16,6 +16,7 @@ public interface UserService {
     UsersResponse getAllCustomer(int pageNo, int pageSize, String sortBy, String sortDir);
     UsersResponse getAllChef(int pageNo, int pageSize, String sortBy, String sortDir);
     UserDto getProfileUserByUsernameOrEmail(String username, String email);
+    UserDto getMyProfile();
     UserResponse getProfileUserByUsername(String username);
     UserDto updateProfile(Long userId, UserRequest userRequest);
     void changePassword(Long userId, ChangePasswordRequest request);
