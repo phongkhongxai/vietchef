@@ -56,7 +56,6 @@ public class RagConfiguration {
             } else {
                 logger.info("Vector Store File Does Not Exist, loading documents");
                 TextSplitter textSplitter = new CustomDelimiterTextSplitter("@@##");
-
                 // Load tiếng Việt
                 loadAndAddDocumentsWithRetry(vietchefVn, textSplitter, simpleVectorStore, retryTemplate);
 

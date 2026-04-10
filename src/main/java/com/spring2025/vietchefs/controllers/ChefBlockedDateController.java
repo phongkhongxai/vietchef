@@ -29,7 +29,7 @@ public class ChefBlockedDateController {
      * Endpoint: POST /api/v1/chef-blocked-dates
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @PostMapping
     public ResponseEntity<ChefBlockedDateResponse> createBlockedDate(
             @Valid @RequestBody ChefBlockedDateRequest request) {
@@ -42,7 +42,7 @@ public class ChefBlockedDateController {
      * Endpoint: GET /api/v1/chef-blocked-dates/{blockId}
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @GetMapping("/{blockId}")
     public ResponseEntity<ChefBlockedDateResponse> getBlockedDateById(@PathVariable Long blockId) {
         ChefBlockedDateResponse response = blockedDateService.getBlockedDateById(blockId);
@@ -54,7 +54,7 @@ public class ChefBlockedDateController {
      * Endpoint: GET /api/v1/chef-blocked-dates/me
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @GetMapping("/me")
     public ResponseEntity<List<ChefBlockedDateResponse>> getAllBlockedDatesForCurrentChef() {
         List<ChefBlockedDateResponse> responses = blockedDateService.getBlockedDatesForCurrentChef();
@@ -66,7 +66,7 @@ public class ChefBlockedDateController {
      * Endpoint: GET /api/v1/chef-blocked-dates/me/range
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @GetMapping("/me/range")
     public ResponseEntity<List<ChefBlockedDateResponse>> getBlockedDatesBetween(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -80,7 +80,7 @@ public class ChefBlockedDateController {
      * Endpoint: GET /api/v1/chef-blocked-dates/me/date
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @GetMapping("/me/date")
     public ResponseEntity<List<ChefBlockedDateResponse>> getBlockedDatesByDate(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
@@ -93,7 +93,7 @@ public class ChefBlockedDateController {
      * Endpoint: PUT /api/v1/chef-blocked-dates
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @PutMapping
     public ResponseEntity<ChefBlockedDateResponse> updateBlockedDate(
             @Valid @RequestBody ChefBlockedDateUpdateRequest request) {
@@ -106,7 +106,7 @@ public class ChefBlockedDateController {
      * Endpoint: DELETE /api/v1/chef-blocked-dates/{blockId}
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @DeleteMapping("/{blockId}")
     public ResponseEntity<String> deleteBlockedDate(@PathVariable Long blockId) {
         blockedDateService.deleteBlockedDate(blockId);
@@ -118,7 +118,7 @@ public class ChefBlockedDateController {
      * Endpoint: POST /api/v1/chef-blocked-dates/range
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @PostMapping("/range")
     public ResponseEntity<List<ChefBlockedDateResponse>> createBlockedDateRange(
             @Valid @RequestBody ChefBlockedDateRangeRequest request) {

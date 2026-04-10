@@ -31,26 +31,26 @@ public class PackageController {
         return ResponseEntity.ok(packageService.getPackageById(id));
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<PackageResponseDto> createPackage(@RequestBody PackageRequestDto packageRequest) {
         return ResponseEntity.ok(packageService.createPackage(packageRequest));
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<PackageResponseDto> updatePackage(@PathVariable Long id, @RequestBody PackageRequestDto packageRequest) {
         return ResponseEntity.ok(packageService.updatePackage(id, packageRequest));
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deletePackage(@PathVariable Long id) {
         packageService.deletePackage(id);
         return ResponseEntity.ok("Package deleted successfully!");
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @PostMapping("/subscribe")
     public ResponseEntity<String> registerChefToPackages(@RequestBody ChefPackageRequestDto request) {
         packageService.registerChefToPackages(request);
@@ -58,14 +58,14 @@ public class PackageController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @PostMapping("/unsubscribe")
     public ResponseEntity<String> unregisterChefFromPackages(@RequestBody ChefPackageRequestDto request) {
         packageService.unregisterChefFromPackages(request);
         return ResponseEntity.ok("Chef unregistered from packages successfully!");
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @GetMapping("/unregistered/{chefId}")
     public ResponseEntity<List<PackageResponseDto>> getUnregisteredPackages(@PathVariable Long chefId) {
         return ResponseEntity.ok(packageService.getUnregisteredPackages(chefId));

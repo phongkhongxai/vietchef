@@ -97,8 +97,8 @@ public class StatisticsServiceImpl implements StatisticsService {
         
         // Get platform statistics using correct booking statuses
         Long totalUsers = userRepository.countActiveUsers();
-        Long totalChefs = userRepository.countByRole("ROLE_CHEF");
-        Long totalCustomers = userRepository.countByRole("ROLE_CUSTOMER");
+        Long totalChefs = userRepository.countByRole("CHEF");
+        Long totalCustomers = userRepository.countByRole("CUSTOMER");
         
         // Use correct booking statuses based on the codebase
         Long activeBookings = bookingRepository.countByStatus("CONFIRMED") + 
@@ -135,7 +135,7 @@ public class StatisticsServiceImpl implements StatisticsService {
         }
         
         // Calculate chef retention rate based on active vs total chefs
-        Long totalChefsForRetention = userRepository.countByRole("ROLE_CHEF");
+        Long totalChefsForRetention = userRepository.countByRole("CHEF");
         Long activeChefsForRetention = chefRepository.countByStatus("ACTIVE");
         Double chefRetentionRate = (totalChefsForRetention > 0) ? 
             (activeChefsForRetention.doubleValue() / totalChefsForRetention.doubleValue()) * 100 : 0.0;
@@ -171,8 +171,8 @@ public class StatisticsServiceImpl implements StatisticsService {
     public UserStatisticsDto getUserStatistics() {
         return UserStatisticsDto.builder()
                 .totalUsers(userRepository.countActiveUsers())
-                .totalCustomers(userRepository.countByRole("ROLE_CUSTOMER"))
-                .totalChefs(userRepository.countByRole("ROLE_CHEF"))
+                .totalCustomers(userRepository.countByRole("CUSTOMER"))
+                .totalChefs(userRepository.countByRole("CHEF"))
                 .activeChefs(chefRepository.countByStatus("ACTIVE"))
                 .pendingChefs(chefRepository.countByStatus("PENDING"))
                 .bannedUsers(userRepository.countByIsBannedTrue())

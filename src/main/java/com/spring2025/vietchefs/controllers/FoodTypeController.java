@@ -21,7 +21,7 @@ public class FoodTypeController {
     @Autowired
     private FoodTypeService foodTypeService;
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ResponseEntity<?> createFoodType(@Valid @RequestBody FoodTypeDto foodTypeDto) {
         FoodTypeDto pt = foodTypeService.createFoodType(foodTypeDto);
@@ -39,7 +39,7 @@ public class FoodTypeController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<?> updateType(@PathVariable("id") Long id, @Valid @RequestBody FoodTypeDto foodTypeDto) {
         FoodTypeDto bt1 = foodTypeService.updateType(id, foodTypeDto);
@@ -47,7 +47,7 @@ public class FoodTypeController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteType(@PathVariable("id") Long id) {
         String bt1 = foodTypeService.deleteType(id);

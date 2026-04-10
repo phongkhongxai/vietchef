@@ -22,7 +22,7 @@ public class ChatbotController {
         this.chatbotService = chatbotService;
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('CHEF')")
     @PostMapping("/ask")
     public ResponseEntity<ChatboxResponse> chatWithAI(@RequestParam(value = "message", defaultValue = "Vietchef là gì?") String message) {
         return ResponseEntity.ok(chatbotService.processMessage(message));

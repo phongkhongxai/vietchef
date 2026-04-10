@@ -60,7 +60,7 @@ public class AdminController {
     private ExportService exportService;
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/chefs")
     public ResponseEntity<?> createChefUserEX(@Valid @RequestBody SignupDto signupDto) {
         UserDto bt = userService.saveChefUser(signupDto);
@@ -89,7 +89,7 @@ public class AdminController {
 
 
 //    @SecurityRequirement(name = "Bearer Authentication")
-//    @PreAuthorize("hasRole('ROLE_ADMIN')")
+//    @PreAuthorize("hasRole('ADMIN')")
 //    @PostMapping("/bookings/check")
 //    public ResponseEntity<?> paymentCyclesCheck() {
 //        bookingService.markOverdueAndRefundBookings();
@@ -97,7 +97,7 @@ public class AdminController {
 //    }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/users")
     public UsersResponse getAllUsers(@RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
                                      @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
@@ -107,7 +107,7 @@ public class AdminController {
         return userService.getAllUser(pageNo, pageSize, sortBy, sortDir);
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/customers")
     public UsersResponse getAllUsersCustomer(@RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
                                      @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
@@ -118,7 +118,7 @@ public class AdminController {
 
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/chefs")
     public UsersResponse getAllUsersChef(@RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
                                      @RequestParam(value = "pageSize", defaultValue = AppConstants.DEFAULT_PAGE_SIZE, required = false) int pageSize,
@@ -129,14 +129,14 @@ public class AdminController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/users/{id}")
     public ResponseEntity<?> deleteUser(@PathVariable("id") Long id) {
         String msg = userService.deleteUser(id);
         return new ResponseEntity<>(msg, HttpStatus.NO_CONTENT);
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/users/{id}/ban")
     public ResponseEntity<?> banUser(@PathVariable Long id, @RequestParam boolean banned) {
         userService.setUserBanStatus(id, banned);
@@ -145,7 +145,7 @@ public class AdminController {
     // ==================== STATISTICS APIs ====================
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/statistics/overview")
     public ResponseEntity<AdminOverviewDto> getAdminOverview() {
         AdminOverviewDto overview = statisticsService.getAdminOverview();
@@ -153,7 +153,7 @@ public class AdminController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/statistics/users")
     public ResponseEntity<UserStatisticsDto> getUserStatistics() {
         UserStatisticsDto userStats = statisticsService.getUserStatistics();
@@ -161,7 +161,7 @@ public class AdminController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/statistics/bookings")
     public ResponseEntity<BookingStatisticsDto> getBookingStatistics() {
         BookingStatisticsDto bookingStats = statisticsService.getBookingStatistics();
@@ -171,7 +171,7 @@ public class AdminController {
     // ==================== PHASE 2: ADVANCED ANALYTICS APIs ====================
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/analytics/trends")
     public ResponseEntity<TrendAnalyticsDto> getTrendAnalytics(
             @RequestParam(value = "startDate", required = false) String startDate,
@@ -185,7 +185,7 @@ public class AdminController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/analytics/chef-rankings")
     public ResponseEntity<ChefRankingDto> getChefRankings(
             @RequestParam(value = "limit", defaultValue = "10") int limit) {
@@ -195,7 +195,7 @@ public class AdminController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/analytics/advanced")
     public ResponseEntity<AdvancedAnalyticsDto> getAdvancedAnalytics() {
         AdvancedAnalyticsDto analytics = advancedAnalyticsService.getAdvancedAnalytics();
@@ -203,7 +203,7 @@ public class AdminController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/analytics/forecasting")
     public ResponseEntity<AdvancedAnalyticsDto.RevenueForecasting> getRevenueForecasting(
             @RequestParam(value = "monthsAhead", defaultValue = "3") int monthsAhead) {
@@ -214,7 +214,7 @@ public class AdminController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/analytics/retention/customers")
     public ResponseEntity<AdvancedAnalyticsDto.CustomerRetentionMetrics> getCustomerRetention() {
         AdvancedAnalyticsDto.CustomerRetentionMetrics retention = 
@@ -223,7 +223,7 @@ public class AdminController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/analytics/retention/chefs")
     public ResponseEntity<AdvancedAnalyticsDto.ChefRetentionMetrics> getChefRetention() {
         AdvancedAnalyticsDto.ChefRetentionMetrics retention = 
@@ -232,7 +232,7 @@ public class AdminController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/analytics/seasonal")
     public ResponseEntity<AdvancedAnalyticsDto.SeasonalAnalysis> getSeasonalAnalysis() {
         AdvancedAnalyticsDto.SeasonalAnalysis seasonal = 
@@ -243,7 +243,7 @@ public class AdminController {
     // ==================== EXPORT APIs ====================
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/export/statistics/pdf")
     public ResponseEntity<org.springframework.core.io.Resource> exportStatisticsToPdf(
             @RequestParam(value = "startDate", required = false) String startDate,
@@ -261,7 +261,7 @@ public class AdminController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/export/statistics/excel")
     public ResponseEntity<org.springframework.core.io.Resource> exportStatisticsToExcel(
             @RequestParam(value = "startDate", required = false) String startDate,
@@ -279,7 +279,7 @@ public class AdminController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/export/bookings/pdf")
     public ResponseEntity<org.springframework.core.io.Resource> exportBookingAnalyticsToPdf(
             @RequestParam(value = "startDate", required = false) String startDate,
@@ -297,7 +297,7 @@ public class AdminController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/export/forecasting/pdf")
     public ResponseEntity<org.springframework.core.io.Resource> exportRevenueForecastingToPdf(
             @RequestParam(value = "monthsAhead", defaultValue = "3") int monthsAhead) {
@@ -311,7 +311,7 @@ public class AdminController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/export/platform-report")
     public ResponseEntity<org.springframework.core.io.Resource> generatePlatformReport(
             @RequestParam(value = "startDate", required = false) String startDate,
@@ -335,7 +335,7 @@ public class AdminController {
 
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/upload/image/test")
     public ResponseEntity<?> uploadImageTest(@RequestParam MultipartFile file) throws IOException {
         return ResponseEntity.ok(azureBlobStorageService.uploadFile(file));

@@ -26,7 +26,7 @@ public class ChefScheduleController {
      * Endpoint: POST /api/v1/chef-schedules
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @PostMapping
     public ResponseEntity<ChefScheduleResponse> createSchedule(
             @Valid @RequestBody ChefScheduleRequest request) {
@@ -39,7 +39,7 @@ public class ChefScheduleController {
      * Endpoint: POST /api/v1/chef-schedules/multiple
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @PostMapping("/multiple")
     public ResponseEntity<List<ChefScheduleResponse>> createMultipleSchedules(
             @Valid @RequestBody ChefMultipleScheduleRequest request) {
@@ -52,7 +52,7 @@ public class ChefScheduleController {
      * Endpoint: GET /api/v1/chef-schedules/{scheduleId}
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @GetMapping("/{scheduleId}")
     public ResponseEntity<ChefScheduleResponse> getScheduleById(@PathVariable Long scheduleId) {
         ChefScheduleResponse response = chefScheduleService.getScheduleById(scheduleId);
@@ -64,7 +64,7 @@ public class ChefScheduleController {
      * Endpoint: GET /api/v1/chef-schedules/me
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @GetMapping("/me")
     public ResponseEntity<List<ChefScheduleResponse>> getSchedulesForCurrentChef() {
         List<ChefScheduleResponse> responses = chefScheduleService.getSchedulesForCurrentChef();
@@ -76,7 +76,7 @@ public class ChefScheduleController {
      * Endpoint: PUT /api/v1/chef-schedules
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @PutMapping
     public ResponseEntity<ChefScheduleResponse> updateSchedule(
             @Valid @RequestBody ChefScheduleUpdateRequest request) {
@@ -89,7 +89,7 @@ public class ChefScheduleController {
      * Endpoint: DELETE /api/v1/chef-schedules/{scheduleId}
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @DeleteMapping("/{scheduleId}")
     public ResponseEntity<String> deleteSchedule(@PathVariable Long scheduleId) {
         chefScheduleService.deleteSchedule(scheduleId);
@@ -101,7 +101,7 @@ public class ChefScheduleController {
      * Endpoint: DELETE /api/v1/chef-schedules/day/{dayOfWeek}
      */
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     @DeleteMapping("/day/{dayOfWeek}")
     public ResponseEntity<String> deleteSchedulesByDayOfWeek(@PathVariable Integer dayOfWeek) {
         chefScheduleService.deleteSchedulesByDayOfWeek(dayOfWeek);

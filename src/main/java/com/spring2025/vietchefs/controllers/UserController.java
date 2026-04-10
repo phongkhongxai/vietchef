@@ -34,10 +34,17 @@ public class UserController {
     @Autowired
     private AuthService authService;
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CHEF', 'ADMIN')")
     @GetMapping("/profile")
     public ResponseEntity<UserDto> viewProfile(@AuthenticationPrincipal UserDetails userDetails) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
+        return new ResponseEntity<>(bto, HttpStatus.OK);
+    }
+    @SecurityRequirement(name = "Bearer Authentication")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CHEF', 'ADMIN')")
+    @GetMapping("/my-info")
+    public ResponseEntity<UserDto> viewProfileV2() {
+        UserDto bto = userService.getMyProfile();
         return new ResponseEntity<>(bto, HttpStatus.OK);
     }
     @GetMapping("/{username}")
@@ -46,7 +53,7 @@ public class UserController {
         return new ResponseEntity<>(bto, HttpStatus.OK);
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CHEF', 'ADMIN')")
     @GetMapping("/profile/my-wallet/all")
     public ResponseEntity<WalletPlusResponse> viewWalletProfileAll(@AuthenticationPrincipal UserDetails userDetails,
                                                                 @RequestParam(value = "pageNo", defaultValue = AppConstants.DEFAULT_PAGE_NUMBER, required = false) int pageNo,
@@ -58,7 +65,7 @@ public class UserController {
         return new ResponseEntity<>(bs, HttpStatus.OK);
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CHEF', 'ADMIN')")
     @PutMapping("/save-device-token/logout")
     public ResponseEntity<Void> saveTokenDeviceLogout(@AuthenticationPrincipal UserDetails userDetails) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
@@ -66,7 +73,7 @@ public class UserController {
         return ResponseEntity.ok().build();
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CHEF', 'ADMIN')")
     @GetMapping("/profile/my-wallet")
     public ResponseEntity<WalletDto> viewWalletProfile(@AuthenticationPrincipal UserDetails userDetails) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
@@ -74,7 +81,7 @@ public class UserController {
         return new ResponseEntity<>(bs, HttpStatus.OK);
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CHEF', 'ADMIN')")
     @PutMapping("/profile/my-wallet")
     public ResponseEntity<WalletDto> updateEmailWallet(@AuthenticationPrincipal UserDetails userDetails, @RequestParam String email) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
@@ -82,7 +89,7 @@ public class UserController {
         return new ResponseEntity<>(bs, HttpStatus.OK);
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CHEF', 'ADMIN')")
     @PostMapping("/profile/my-wallet/set-password")
     public ResponseEntity<?> setWalletPassword(@AuthenticationPrincipal UserDetails userDetails, @RequestParam String password) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
@@ -91,7 +98,7 @@ public class UserController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CHEF', 'ADMIN')")
     @GetMapping("/profile/my-wallet/has-password")
     public ResponseEntity<?> checkWalletHasPassword(@AuthenticationPrincipal UserDetails userDetails) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
@@ -99,7 +106,7 @@ public class UserController {
         return ResponseEntity.ok(hasPassword);
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CHEF', 'ADMIN')")
     @PostMapping("/profile/my-wallet/access")
     public ResponseEntity<?> accessWallet(@AuthenticationPrincipal UserDetails userDetails, @RequestParam String password) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
@@ -107,7 +114,7 @@ public class UserController {
         return ResponseEntity.ok(success);
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CHEF', 'ADMIN')")
     @PostMapping("/profile/my-wallet/forgot-wallet-password")
     public ResponseEntity<String> forgotWalletPassword(@AuthenticationPrincipal UserDetails userDetails) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
@@ -115,14 +122,14 @@ public class UserController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CHEF', 'ADMIN')")
     @PutMapping("/profile")
     public ResponseEntity<UserDto> updateMyProfile(@AuthenticationPrincipal UserDetails userDetails, @ModelAttribute @Valid UserRequest userDTO) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());
         return ResponseEntity.ok(userService.updateProfile(bto.getId(), userDTO));
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_CHEF', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'CHEF', 'ADMIN')")
     @PutMapping("/change-password")
     public ResponseEntity<String> changePassword(@AuthenticationPrincipal UserDetails userDetails, @RequestBody ChangePasswordRequest request) {
         UserDto bto = userService.getProfileUserByUsernameOrEmail(userDetails.getUsername(),userDetails.getUsername());

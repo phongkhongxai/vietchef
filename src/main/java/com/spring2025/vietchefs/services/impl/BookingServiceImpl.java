@@ -1008,7 +1008,7 @@ public class BookingServiceImpl implements BookingService {
         if (!firstSession.isAfter(now.plusDays(2))) {
             booking.setStatus("PENDING_FIRST_CYCLE");
             booking.setDepositPaid(depositAmount);
-            bookingRepository.save(booking);
+            booking = bookingRepository.save(booking);
             NotificationRequest notification = NotificationRequest.builder()
                     .userId(userId)
                     .title("Complete First Cycle Payment")
@@ -1040,7 +1040,7 @@ public class BookingServiceImpl implements BookingService {
 
         booking.setStatus("DEPOSITED");
         booking.setDepositPaid(depositAmount);
-        bookingRepository.save(booking);
+        booking=bookingRepository.save(booking);
 
         CustomerTransaction transaction = new CustomerTransaction();
         transaction.setWallet(wallet);

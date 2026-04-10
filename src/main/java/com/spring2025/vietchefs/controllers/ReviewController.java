@@ -110,7 +110,7 @@ public class ReviewController {
             description = "Creates a new review criteria. Only admin can use this API."
     )
     @PostMapping("/review-criteria")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ReviewCriteriaResponse> createCriteria(@RequestBody ReviewCriteriaRequest request) {
         return new ResponseEntity<>(reviewCriteriaService.createCriteria(request), HttpStatus.CREATED);
     }
@@ -122,7 +122,7 @@ public class ReviewController {
             description = "Updates an existing review criteria. Only admin can use this API."
     )
     @PutMapping("/review-criteria/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ReviewCriteriaResponse> updateCriteria(@PathVariable Long id, @RequestBody ReviewCriteriaRequest request) {
         return ResponseEntity.ok(reviewCriteriaService.updateCriteria(id, request));
     }
@@ -300,7 +300,7 @@ public class ReviewController {
             description = "Creates a new review for a booking"
     )
     @PostMapping("/reviews")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<ReviewResponse> createReview(@Valid @RequestBody ReviewCreateRequest request) {
         UserDto currentUser = getCurrentUser();
         ReviewResponse savedReview = reviewService.createReview(request, currentUser.getId());
@@ -314,7 +314,7 @@ public class ReviewController {
             description = "Updates an existing review"
     )
     @PutMapping("/reviews/{id}")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<ReviewResponse> updateReview(@PathVariable Long id, @Valid @RequestBody ReviewUpdateRequest request) {
         UserDto currentUser = getCurrentUser();
         ReviewResponse updatedReview = reviewService.updateReview(id, request, currentUser.getId());
@@ -328,14 +328,14 @@ public class ReviewController {
             description = "Deletes a review. Users can only delete their own reviews, while admins can delete any review."
     )
     @DeleteMapping("/reviews/{id}")
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
     public ResponseEntity<Void> deleteReview(@PathVariable Long id) {
         UserDto currentUser = getCurrentUser();
         ReviewResponse review = reviewService.getReviewById(id);
         
         // Allow deletion if user is the author or an admin
         if (review.getUserId().equals(currentUser.getId()) || 
-                "ROLE_ADMIN".equals(roleService.getRoleNameById(currentUser.getRoleId()))) {
+                "ADMIN".equals(roleService.getRoleNameById(currentUser.getRoleId()))) {
             reviewService.deleteReview(id);
             return new ResponseEntity<>(HttpStatus.NO_CONTENT);
         } else {
@@ -350,7 +350,7 @@ public class ReviewController {
             description = "Allows a chef to respond to a review on their service"
     )
     @PostMapping("/reviews/{id}/response")
-    @PreAuthorize("hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CHEF')")
     public ResponseEntity<ReviewResponse> respondToReview(@PathVariable Long id, @Valid @RequestBody ChefResponseRequest request) {
         UserDto currentUser = getCurrentUser();
         ReviewResponse review = reviewService.getReviewById(id);
@@ -404,7 +404,7 @@ public class ReviewController {
     public ResponseEntity<Void> deleteReply(@PathVariable Long replyId) {
         UserDto currentUser = getCurrentUser();
         
-        boolean isAdmin = "ROLE_ADMIN".equals(roleService.getRoleNameById(currentUser.getRoleId()));
+        boolean isAdmin = "ADMIN".equals(roleService.getRoleNameById(currentUser.getRoleId()));
         
         // Check if user owns the reply
         boolean isOwner = reviewReplyService.getRepliesByUser(currentUser.getId()).stream()
@@ -462,7 +462,7 @@ public class ReviewController {
             description = "Returns a list of reviews made by a specific user. Only admin can use this API."
     )
     @GetMapping("/reviews/user/{userId}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> getReviewsByUserId(@PathVariable Long userId) {
         // No need to verify user exists as reviewService will throw exception if user is not found
         

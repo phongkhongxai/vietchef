@@ -50,7 +50,7 @@ public class AvailabilityFinderController {
         return ResponseEntity.ok(availableSlots);
     }
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    @PreAuthorize("hasRole('CUSTOMER')")
     @PostMapping("/chef/{chefId}/multiple-dates")
     public ResponseEntity<List<AvailableTimeSlotResponse>> findAvailableTimeSlotsInMultipleDates(
             @PathVariable Long chefId,

@@ -49,7 +49,7 @@ public class WalletServiceImpl implements WalletService {
     @Override
     public void createWallet(Long userId, String walletType) {
         if (walletRepository.existsByUserId(userId)) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Wallet already exists for this user!");
+            return; // đã có wallet rồi → không tạo nữa
         }
         if (walletType == null || (!walletType.equalsIgnoreCase("customer") && !walletType.equalsIgnoreCase("chef"))) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Wallet type must be either 'customer' or 'chef'");

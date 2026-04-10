@@ -64,7 +64,7 @@ public class ChefServiceImpl implements ChefService {
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND,"User not found"));
 
         // Kiểm tra role của User, chỉ cho phép nếu role là "chef"
-        if (!"ROLE_CHEF".equalsIgnoreCase(user.getRole().getRoleName())) {
+        if (!"CHEF".equalsIgnoreCase(user.getRole().getRoleName())) {
             throw new VchefApiException(HttpStatus.UNAUTHORIZED,"User does not have chef role.");
         }
 
@@ -184,8 +184,8 @@ public class ChefServiceImpl implements ChefService {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "User has uncompleted bookings and cannot be approved as chef.");
         }
         chef.setStatus("ACTIVE");
-        Role chefRole = roleRepository.findByRoleName("ROLE_CHEF")
-                                  .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Role ROLE_CHEF not found"));
+        Role chefRole = roleRepository.findByRoleName("CHEF")
+                                  .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "Role CHEF not found"));
         User user = chef.getUser();
         user.setRole(chefRole);
         userRepository.save(user);

@@ -88,8 +88,8 @@ class StatisticsServiceTest {
                 .thenReturn(BigDecimal.valueOf(1350)); // 60 days ago commission
         
         when(userRepository.countActiveUsers()).thenReturn(1000L);
-        when(userRepository.countByRole("ROLE_CHEF")).thenReturn(150L);
-        when(userRepository.countByRole("ROLE_CUSTOMER")).thenReturn(850L);
+        when(userRepository.countByRole("CHEF")).thenReturn(150L);
+        when(userRepository.countByRole("CUSTOMER")).thenReturn(850L);
         when(userRepository.countNewUsersFromDate(any(LocalDateTime.class))).thenReturn(25L);
         
         when(bookingRepository.countByStatus("CONFIRMED")).thenReturn(50L);
@@ -243,8 +243,8 @@ class StatisticsServiceTest {
     void getUserStatistics_ShouldReturnCorrectUserStats() {
         // Given
         when(userRepository.countActiveUsers()).thenReturn(1000L);
-        when(userRepository.countByRole("ROLE_CUSTOMER")).thenReturn(800L);
-        when(userRepository.countByRole("ROLE_CHEF")).thenReturn(200L);
+        when(userRepository.countByRole("CUSTOMER")).thenReturn(800L);
+        when(userRepository.countByRole("CHEF")).thenReturn(200L);
         when(chefRepository.countByStatus("ACTIVE")).thenReturn(150L);
         when(chefRepository.countByStatus("PENDING")).thenReturn(50L);
         when(userRepository.countByIsBannedTrue()).thenReturn(25L);

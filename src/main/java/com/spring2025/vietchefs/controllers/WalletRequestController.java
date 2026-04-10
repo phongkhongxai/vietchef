@@ -20,7 +20,7 @@ public class WalletRequestController {
     @Autowired
     private WalletRequestService walletRequestService;
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_CUSTOMER') or hasRole('ROLE_CHEF')")
+    @PreAuthorize("hasRole('CUSTOMER') or hasRole('CHEF')")
     @PostMapping
     public ResponseEntity<WalletRequestDto> createRequest(@RequestBody @Valid WalletRequestDto dto) {
         WalletRequestDto createdRequest = walletRequestService.createWithdrawalRequest(dto);
@@ -33,7 +33,7 @@ public class WalletRequestController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}/approve")
     public ResponseEntity<WalletRequestDto> approveRequest(@PathVariable Long id) {
         WalletRequestDto approvedRequest = walletRequestService.approveRequest(id);
@@ -41,7 +41,7 @@ public class WalletRequestController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}/reject")
     public ResponseEntity<WalletRequestDto> rejectRequest(@PathVariable Long id, @RequestParam String reason) {
         WalletRequestDto rejectedRequest = walletRequestService.rejectRequest(id, reason);
@@ -49,7 +49,7 @@ public class WalletRequestController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<String> deleteRequest(@PathVariable Long id) {
         String message = walletRequestService.deleteWalletRequestById(id);

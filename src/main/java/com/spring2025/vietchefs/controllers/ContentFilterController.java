@@ -29,7 +29,7 @@ public class ContentFilterController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(
             summary = "Get all profanity words",
             description = "Admin access only"
@@ -40,7 +40,7 @@ public class ContentFilterController {
     }
     
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(
             summary = "Get detailed list of profanity words",
             description = "Admin access only"
@@ -51,7 +51,7 @@ public class ContentFilterController {
     }
     
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(
             summary = "Get profanity words by language",
             description = "Admin access only"
@@ -62,7 +62,7 @@ public class ContentFilterController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(
             summary = "Add new word to profanity list",
             description = "Admin access only"
@@ -78,7 +78,7 @@ public class ContentFilterController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(
             summary = "Update word in profanity list",
             description = "Admin access only"
@@ -97,7 +97,7 @@ public class ContentFilterController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(
             summary = "Remove word from profanity list",
             description = "Admin access only"
@@ -113,7 +113,7 @@ public class ContentFilterController {
     }
     
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(
             summary = "Remove word from profanity list by ID",
             description = "Admin access only"
@@ -129,7 +129,7 @@ public class ContentFilterController {
     }
 
     @SecurityRequirement(name = "Bearer Authentication")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Operation(
             summary = "Check if text contains profanity",
             description = "Admin access only"
