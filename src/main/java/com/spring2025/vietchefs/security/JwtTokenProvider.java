@@ -128,6 +128,26 @@ public class JwtTokenProvider {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Invalid token");
         }
     }
+    public Instant getExpiration(String token) {
+        if (token == null || token.isBlank()) {
+            return Instant.now().minusSeconds(1); // coi như đã hết hạn
+        }
+
+        try {
+            SignedJWT signedJWT = SignedJWT.parse(token);
+            JWTClaimsSet claimsSet = signedJWT.getJWTClaimsSet();
+
+            Date expiryDate = claimsSet.getExpirationTime();
+
+            return (expiryDate != null)
+                    ? expiryDate.toInstant()
+                    : Instant.now().minusSeconds(1); // fallback: coi như hết hạn
+
+        } catch (Exception e) {
+            log.warn("Failed to extract expiration time from token", e);
+            return Instant.now().minusSeconds(1); // coi như hết hạn nếu parse lỗi
+        }
+    }
 
     // 2. Lấy JTI (ID của token) - Dùng cho Logout Blacklist
     public String extractId(String token) {

@@ -3,6 +3,7 @@ package com.spring2025.vietchefs.configs;
 
 
 import com.spring2025.vietchefs.security.JwtAuthenticationEntryPoint;
+import com.spring2025.vietchefs.security.RateLimitFilter;
 import io.swagger.v3.oas.models.servers.Server;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,7 @@ public class SecurityConfig {
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final CustomJwtDecoder customJwtDecoder;
     private final CustomLogoutHandler logoutHandler;
+    private final RateLimitFilter rateLimitFilter;
 
     @Bean
     public static PasswordEncoder passwordEncoder() {
@@ -61,6 +63,7 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
+                .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )

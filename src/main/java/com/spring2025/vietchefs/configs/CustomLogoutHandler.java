@@ -42,7 +42,6 @@ public class CustomLogoutHandler implements LogoutHandler {
                 log.warn("Access token already expired or invalid, skipping blacklist");
             }
         }
-
         // 2. Xử lý Refresh Token (Vô hiệu hóa trong DB)
         if (refreshToken != null) {
             try {

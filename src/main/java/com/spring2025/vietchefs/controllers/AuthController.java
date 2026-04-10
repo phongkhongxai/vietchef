@@ -67,11 +67,11 @@ public class AuthController {
         String response = authService.signup(signupDto);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
-    @PostMapping("/set-password")
-    public ResponseEntity<String> setPasword(@Valid @RequestBody SetPasswordDto setPasswordDto){
-        String response = authService.setPasswordAfterVerified(setPasswordDto.getEmail(),setPasswordDto.getPassword());
-        return new ResponseEntity<>(response, HttpStatus.OK);
-    }
+//    @PostMapping("/set-password")
+//    public ResponseEntity<String> setPasword(@Valid @RequestBody SetPasswordDto setPasswordDto){
+//        String response = authService.setPasswordAfterVerified(setPasswordDto.getEmail(),setPasswordDto.getPassword());
+//        return new ResponseEntity<>(response, HttpStatus.OK);
+//    }
 
     @PostMapping("/refresh-token")
     public ResponseEntity<AuthenticationResponse> refreshToken(@RequestBody RefreshRequest request

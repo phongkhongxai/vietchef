@@ -419,22 +419,32 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public String signup(SignupDto signupDto) {
-
         // add check if username already exists
         if (userRepository.existsByUsername(signupDto.getUsername())) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Username is already exist!");
         }
-
-        // add check if email already exists
-        if (userRepository.existsByEmail(signupDto.getEmail())) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Email is already exist!");
-        }
         if (userRepository.existsByPhone(signupDto.getPhone())) {
             throw new VchefApiException(HttpStatus.BAD_REQUEST, "Phone number is already exist!");
         }
-        User user = modelMapper.map(signupDto, User.class);
+        Optional<User> existingUserOpt = userRepository.findByEmail(signupDto.getEmail());
 
-        user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+        if (existingUserOpt.isPresent()) {
+            User existingUser = existingUserOpt.get();
+            if (existingUser.isEmailVerified()) {
+                throw new VchefApiException(HttpStatus.BAD_REQUEST, "Email is already exist!");
+            } else {
+                existingUser.setFullName(signupDto.getFullName());
+                existingUser.setPassword(passwordEncoder.encode(signupDto.getPassword()));
+                existingUser.setAvatarUrl("https://api.dicebear.com/7.x/initials/svg?seed=" + existingUser.getUsername());
+                userRepository.save(existingUser);
+                emailVerificationService.sendVerificationCode(existingUser);
+                return "Verification code has been resent to your email. Please check your inbox.";
+            }
+        }
+        User user = modelMapper.map(signupDto, User.class);
+//        user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+
+        user.setPassword(passwordEncoder.encode(signupDto.getPassword()));
         Role userRole = roleRepository.findByRoleName("CUSTOMER")
                 .orElseThrow(() -> new VchefApiException(HttpStatus.NOT_FOUND, "User Role not found."));
         user.setRole(userRole);
@@ -461,20 +471,12 @@ public class AuthServiceImpl implements AuthService {
         if (refreshToken.isRevoked() || refreshToken.isExpired()) {
             throw new VchefApiException(HttpStatus.UNAUTHORIZED, "Refresh token expired or revoked");
         }
-
         User user = refreshToken.getUser();
-
-        // 1️⃣ Rotate refresh token (REVOKE OLD)
         refreshToken.setRevoked(true);
         refreshToken.setExpired(true);
         refreshTokenRepository.save(refreshToken);
-
-        // 2️⃣ Create new refresh token
         RefreshToken newRefreshToken = createRefreshToken(user);
-
-        // 3️⃣ Generate new access token
         String newAccessToken = jwtTokenProvider.generateAccessToken(user);
-
 
         return AuthenticationResponse.builder()
                 .accessToken(newAccessToken)
@@ -500,24 +502,25 @@ public class AuthServiceImpl implements AuthService {
         user.setVerificationCode(null); // Clear the code after verification
         user.setVerificationCodeExpiry(null);
         userRepository.save(user);
+        walletService.createWallet(user.getId(), "CUSTOMER");
         return "Email verified successfully!";
     }
 
-    @Override
-    public String setPasswordAfterVerified(String email, String password) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new VchefApiException(HttpStatus.BAD_REQUEST, "User not found with this email."));
-
-        if (!user.isEmailVerified()) {
-            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Email has not been verified yet.");
-        }
-        user.setPassword(passwordEncoder.encode(password));
-        userRepository.save(user);
-
-        walletService.createWallet(user.getId(), "CUSTOMER");
-
-        return "Password set successfully!";
-    }
+//    @Override
+//    public String setPasswordAfterVerified(String email, String password) {
+//        User user = userRepository.findByEmail(email)
+//                .orElseThrow(() -> new VchefApiException(HttpStatus.BAD_REQUEST, "User not found with this email."));
+//
+//        if (!user.isEmailVerified()) {
+//            throw new VchefApiException(HttpStatus.BAD_REQUEST, "Email has not been verified yet.");
+//        }
+//        user.setPassword(passwordEncoder.encode(password));
+//        userRepository.save(user);
+//
+//        walletService.createWallet(user.getId(), "CUSTOMER");
+//
+//        return "Password set successfully!";
+//    }
 
     @Override
     public String resendVerificationCode(String email) {

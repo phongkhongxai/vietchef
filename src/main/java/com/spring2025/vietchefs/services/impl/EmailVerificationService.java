@@ -35,7 +35,7 @@ public class EmailVerificationService {
 
              helper.setTo(user.getEmail());
              helper.setSubject("✅ Xác thực email - VietChefs");
-             helper.setFrom("apehome8386@gmail.com");
+             helper.setFrom("thieuphongfo4@gmail.com");
 
              String content = "<!DOCTYPE html>" +
                      "<html>" +
@@ -81,7 +81,7 @@ public class EmailVerificationService {
 
             helper.setTo(user.getEmail());
             helper.setSubject("🔐 Mật khẩu ví điện tử - VietChefs");
-            helper.setFrom("apehome8386@gmail.com");
+            helper.setFrom("thieuphongfo4@gmail.com");
 
             String content = "<!DOCTYPE html>" +
                     "<html>" +
@@ -125,7 +125,7 @@ public class EmailVerificationService {
         String message = "Your verification code is: " + verificationCode;
 
         SimpleMailMessage email = new SimpleMailMessage();
-        email.setFrom("apehome8386@gmail.com");
+        email.setFrom("thieuphongfo4@gmail.com");
         email.setTo(recipientEmail);
         email.setSubject(subject);
         email.setText(message);
@@ -149,7 +149,7 @@ public class EmailVerificationService {
         String message = "To reset your password, use the following token: " + resetToken;
 
         SimpleMailMessage email = new SimpleMailMessage();
-        email.setFrom("apehome8386@gmail.com");
+        email.setFrom("thieuphongfo4@gmail.com");
         email.setTo(recipientEmail);
         email.setSubject(subject);
         email.setText(message);
@@ -159,7 +159,7 @@ public class EmailVerificationService {
 
     private void sendEmail(String recipientEmail, String subject, String message) {
         SimpleMailMessage email = new SimpleMailMessage();
-        email.setFrom("apehome8386@gmail.com");
+        email.setFrom("thieuphongfo4@gmail.com");
         email.setTo(recipientEmail);
         email.setSubject(subject);
         email.setText(message);
@@ -173,7 +173,7 @@ public class EmailVerificationService {
 
             helper.setTo(user.getEmail());
             helper.setSubject("❌ Thông báo từ chối đăng ký đầu bếp - VietChefs");
-            helper.setFrom("apehome8386@gmail.com");
+            helper.setFrom("thieuphongfo4@gmail.com");
 
             String content = "<!DOCTYPE html>" +
                     "<html>" +
@@ -217,7 +217,7 @@ public class EmailVerificationService {
 
             helper.setTo(user.getEmail());
             helper.setSubject("✅ Đăng ký đầu bếp được chấp nhận - VietChefs");
-            helper.setFrom("apehome8386@gmail.com");
+            helper.setFrom("thieuphongfo4@gmail.com");
 
             String content = "<!DOCTYPE html>" +
                     "<html>" +

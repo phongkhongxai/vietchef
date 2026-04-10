@@ -1,10 +1,7 @@
 package com.spring2025.vietchefs.models.payload.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,6 +18,9 @@ public class SignupDto {
     private String username;
     @Email(regexp = ".+@.+\\..+", message = "Email is invalid!")
     private String email;
+    @NotBlank(message = "PASSWORD_REQUIRED")
+    @Size(min = 6, message = "INVALID_PASSWORD")
+    private String password;
     @NotEmpty(message = "Full name should not be empty!")
     private String fullName;
     @NotNull(message = "Date of birth should not be empty!")

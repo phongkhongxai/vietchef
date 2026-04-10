@@ -2,16 +2,12 @@ package com.spring2025.vietchefs.services;
 
 
 
-import com.google.firebase.auth.FirebaseAuthException;
 import com.spring2025.vietchefs.models.payload.dto.LoginDto;
 import com.spring2025.vietchefs.models.payload.dto.SignupDto;
 import com.spring2025.vietchefs.models.payload.requestModel.NewPasswordRequest;
 import com.spring2025.vietchefs.models.payload.requestModel.RefreshRequest;
 import com.spring2025.vietchefs.models.payload.responseModel.AuthenticationResponse;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 
-import java.io.IOException;
 import java.util.Map;
 
 public interface AuthService {
@@ -24,7 +20,7 @@ public interface AuthService {
     String signup(SignupDto signupDto);
     AuthenticationResponse refreshToken(RefreshRequest request);
     String verifyEmailCode(String email, String code);
-    String setPasswordAfterVerified(String email, String password);
+//    String setPasswordAfterVerified(String email, String password);
     String resendVerificationCode(String email);
     String forgotPassword(String email);
     String resetPassword(NewPasswordRequest newPasswordRequest);
